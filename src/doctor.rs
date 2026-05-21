@@ -158,6 +158,13 @@ impl Doctor {
                 }
                 BmpMessageType::PeerDownNotification => {
                     peer.peer_down_count += 1;
+                    // RFC 7854, Section 3.5: Peer Down Notification payload
+                    // begins with a 1-byte Reason code immediately after the
+                    // Per-Peer Header. IANA BMP Parameters registry defines
+                    // the values: 0=reserved, 1=Local system closed,
+                    // 2=Local system closed (admin), 3=Remote system closed,
+                    // 4=Remote notification, 5=Peer de-configured, 6=Local
+                    // system terminated, 7=Local system exhausted resources.
                     let reason = frame
                         .payload
                         .get(BMP_PER_PEER_HEADER_SIZE)

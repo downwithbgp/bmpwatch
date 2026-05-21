@@ -4,19 +4,30 @@ use std::path::Path;
 
 use crate::error::DoctorError;
 
+// BMP Common Header as defined in RFC 7854, Section 3.1.
+// Layout: Version (1) + Message Length (4) + Message Type (1) = 6 bytes.
 pub const BMP_COMMON_HEADER_SIZE: usize = 6;
+
+// BMP Per-Peer Header as defined in RFC 7854, Section 3.2.
+// Layout: Peer Type (1) + Peer Flags (1) + Peer Distinguisher (8)
+//       + Peer Address (16) + Peer AS (4) + Peer BGP ID (4)
+//       + Timestamp (8) = 42 bytes.
 pub const BMP_PER_PEER_HEADER_SIZE: usize = 42;
+
+// RFC 7854, Section 9: the only defined BMP version is 3.
 pub const BMP_EXPECTED_VERSION: u8 = 3;
 
+// BMP Message Types as registered in IANA BMP Parameters and defined in
+// RFC 7854 Sections 3.3–3.8 and Section 8 (Route Mirroring).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BmpMessageType {
-    RouteMonitoring = 0,
-    StatisticsReport = 1,
-    PeerDownNotification = 2,
-    PeerUpNotification = 3,
-    InitiationMessage = 4,
-    TerminationMessage = 5,
-    RouteMirroringMessage = 6,
+    RouteMonitoring = 0,       // RFC 7854, Section 3.3
+    StatisticsReport = 1,      // RFC 7854, Section 3.4
+    PeerDownNotification = 2,  // RFC 7854, Section 3.5
+    PeerUpNotification = 3,    // RFC 7854, Section 3.6
+    InitiationMessage = 4,     // RFC 7854, Section 3.7
+    TerminationMessage = 5,    // RFC 7854, Section 3.8
+    RouteMirroringMessage = 6, // RFC 7854, Section 8
 }
 
 impl BmpMessageType {
@@ -45,6 +56,9 @@ impl BmpMessageType {
         }
     }
 
+    // RFC 7854, Section 4.2: the Per-Peer Header is present in Route Monitoring
+    // (0), Statistics Report (1), Peer Down (2), Peer Up (3), and Route
+    // Mirroring (6) messages. Initiation (4) and Termination (5) do not have one.
     pub fn has_per_peer_header(self) -> bool {
         matches!(
             self,
@@ -57,15 +71,32 @@ impl BmpMessageType {
     }
 }
 
+// Per-Peer Header fields as defined in RFC 7854, Section 3.2.
+// Total size: 42 bytes (BMP_PER_PEER_HEADER_SIZE).
 #[derive(Debug, Clone)]
 pub struct PerPeerHeader {
+    // Byte 0: Peer Type (RFC 7854, Section 3.2). 0 = Global Instance,
+    // 1 = RD Instance, 2 = Local Instance.
     pub peer_type: u8,
+    // Byte 1: Peer Flags (RFC 7854, Section 3.2).
+    // Bit 7 (0x80): V flag — if set, Peer Address is IPv6, otherwise IPv4.
+    // Bit 6 (0x40): L flag — post-policy Adj-RIB-Out (RFC 8671).
+    // Bit 5 (0x20): A flag — AS_PATH attribute includes 2 preceding ASNs (legacy).
     pub peer_flags: u8,
+    // Bytes 2–9: Peer Distinguisher (RFC 7854, Section 3.2). Zero-filled
+    // for Global Instance peers.
     pub peer_distinguisher: [u8; 8],
+    // Bytes 10–25: Peer Address (RFC 7854, Section 3.2).
+    // IPv4 addresses use IPv4-mapped IPv6 format (::ffff:x.x.x.x)
+    // at bytes 12–15 of this field.
     pub peer_address: [u8; 16],
+    // Bytes 26–29: Peer AS (RFC 7854, Section 3.2). 4-byte ASN in network byte order.
     pub peer_asn: u32,
+    // Bytes 30–33: Peer BGP ID (RFC 7854, Section 3.2). Router ID of the peer.
     #[allow(dead_code)]
     pub peer_bgp_id: [u8; 4],
+    // Bytes 34–41: Timestamp (RFC 7854, Section 3.2).
+    // Split into seconds (bytes 34–37) and microseconds (bytes 38–41).
     pub timestamp_seconds: u32,
     pub timestamp_microseconds: u32,
 }
@@ -123,6 +154,9 @@ impl PerPeerHeader {
         }
     }
 
+    /// RFC 7854, Section 3.2: the V flag (bit 7, 0x80) in Peer Flags indicates
+    /// whether the Peer Address field carries an IPv6 address (V=1) or an
+    /// IPv4-mapped IPv6 address (V=0).
     fn is_ipv6(&self) -> bool {
         (self.peer_flags & 0x80) != 0
     }
