@@ -62,14 +62,14 @@ Then capture with `nc` or `socat`:
 nc -l 5000 > capture.rawbmp
 ```
 
-## 3. CAIDA/OpenBMP Kafka verification
+## 3. CAIDA/OpenBMP Kafka verification — BLOCKED
 
-- [ ] Run `nc -vz bmp.bgpstream.caida.org 9092` and record output
-- [ ] Run `kcat -b bmp.bgpstream.caida.org:9092 -L` and record topic list
-- [ ] Subscribe to one topic and capture 100 messages
-- [ ] Verify messages are valid BMP frames (inspect first 5 with `xxd`)
-- [ ] Run `bmpdoctor inspect` on captured output
-- [ ] Confirm peer addresses and ASNs match expected CAIDA feed data
+- [x] Run `nc -vz bmp.bgpstream.caida.org 9092` — **Network unreachable**
+- [x] Run `kcat -b bmp.bgpstream.caida.org:9092 -L` — **Broker transport failure**
+- [x] DNS resolves to `192.172.226.44`
+- [ ] All further items blocked until a reachable broker is confirmed
+
+See `docs/caida-kafka-verification.md` for the full test log.
 
 ## 4. BGPReader routeviews-stream comparison
 

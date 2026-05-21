@@ -12,7 +12,7 @@ Sources ordered by implementation status and verification level.
 |------|------------------------------------|--------------|-------------------------|
 | 1    | Synthetic fixtures                 | (in-memory)  | Implemented, 17 tests   |
 | 2    | Local FRR/GoBGP raw BMP            | `.rawbmp`    | Planned, not tested     |
-| 3    | CAIDA/OpenBMP Kafka                | `.obmp`      | Unverified, see below   |
+| 3    | CAIDA/OpenBMP Kafka                | `.obmp`      | Unreachable (blocked)   |
 | 4    | BGPReader routeviews-stream        | N/A          | Comparison only         |
 
 ### Tier 1: Synthetic fixtures
@@ -28,11 +28,21 @@ provide real BGP data for integration testing. The `.rawbmp` extension
 distinguishes raw concatenated BMP frames from OpenBMP length-delimited
 captures.
 
-### Tier 3: CAIDA/OpenBMP Kafka `.obmp`
+### Tier 3: CAIDA/OpenBMP Kafka `.obmp` — BLOCKED
 
-See [OpenBMP Kafka capture guide](openbmp-kafka-capture.md). `.obmp` means
-length-delimited OpenBMP Kafka payloads captured to local disk. This source
-has not been verified from this network yet.
+The CAIDA OpenBMP Kafka broker at `bmp.bgpstream.caida.org:9092` was tested
+manually in May 2026 and found unreachable. DNS resolves to `192.172.226.44`
+but TCP connection fails with "Network is unreachable." Kafka metadata
+retrieval via `kcat -L` fails with "Broker transport failure."
+
+This source is documented in older/example material (Artemis Private BMP
+feeds, BGPStream V2 docs) but is not reachable from the developer's
+network. Implementation of Kafka capture or `.obmp` file support is
+**blocked** until a reachable OpenBMP broker is confirmed.
+
+See [CAIDA Kafka verification](caida-kafka-verification.md) for the full test
+log. See [OpenBMP Kafka capture guide](openbmp-kafka-capture.md) for reference
+procedures (for use if a reachable broker is found later).
 
 ### Tier 4: BGPReader routeviews-stream / RouteViews (comparison only)
 
@@ -52,8 +62,13 @@ real-time data, and BMPDoctor implications.
 
 ## CAIDA / BGPStream OpenBMP Kafka
 
-**Verification pending.** The information below is based on public
-documentation. Connectivity has not been confirmed from this network.
+**Status: Unreachable.** Manual testing in May 2026 confirmed that
+`bmp.bgpstream.caida.org:9092` is not reachable from the developer's
+network. See [CAIDA Kafka verification](caida-kafka-verification.md) for
+the full test log.
+
+The information below is preserved for reference but this broker is not
+the preferred real-data path for BMPDoctor.
 
 - **Host:** `bmp.bgpstream.caida.org`
 - **Port:** `9092`
@@ -72,23 +87,25 @@ streamed by OpenBMP, typically length-delimited by the Kafka message framing.
 
 ### Access notes
 
-- The broker at `bmp.bgpstream.caida.org:9092` is documented as publicly
-  reachable. This has not been verified from this network.
+- The broker is documented in older/example material as publicly reachable.
+  This was not confirmed in manual testing.
 - Topics are produced in real-time; no historical offset retention guarantee.
 - Authentication is reportedly not required for read-only consumers.
-- Use `kcat` (librdkafka) or `kafka-console-consumer` for testing.
 
-### Manual verification required
+### Verification result
 
-Before any integration work, the following must be run manually and the
-output recorded:
+Manual testing in May 2026:
 
 ```sh
-nc -vz bmp.bgpstream.caida.org 9092
-kcat -b bmp.bgpstream.caida.org:9092 -L
+$ nc -vz bmp.bgpstream.caida.org 9092
+Network is unreachable
+
+$ kcat -b bmp.bgpstream.caida.org:9092 -L
+Broker transport failure
 ```
 
-See `docs/openbmp-kafka-capture.md` for full connectivity test procedures.
+Kafka-based capture and `.obmp` file support are blocked until a reachable
+broker is confirmed.
 
 ### References
 

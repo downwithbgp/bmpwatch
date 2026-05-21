@@ -1,8 +1,11 @@
 # OpenBMP Kafka Capture
 
-**Verification pending.** The CAIDA broker at `bmp.bgpstream.caida.org:9092`
-has not been tested from this network. All commands below are reference
-procedures that must be run manually before any implementation work begins.
+**Status: Blocked.** `bmp.bgpstream.caida.org:9092` is not reachable from
+the developer's network as of May 2026. See
+[CAIDA Kafka verification](caida-kafka-verification.md) for the test log.
+
+The procedures below are preserved for reference. They should be re-run if a
+reachable OpenBMP broker is confirmed in the future.
 
 How to verify reachability and test capture from CAIDA's public OpenBMP Kafka
 broker before integrating into BMPDoctor.

@@ -4,8 +4,12 @@ Planned work items for post-MVP development. These are not implemented.
 
 ## 1. examples/record_openbmp_kafka.rs
 
-**Status:** Not started  
+**Status:** Blocked  
 **Scope:** Standalone example binary, not integrated into `bmpdoctor` core CLI
+
+**Blocked because:** CAIDA's `bmp.bgpstream.caida.org:9092` is unreachable
+from the developer's network (see `docs/caida-kafka-verification.md`).
+Implementation requires a reachable OpenBMP Kafka broker for testing.
 
 A Kafka consumer that connects to an OpenBMP broker and writes captured BMP
 data to local files.
@@ -60,8 +64,12 @@ fn main() {
 
 ## 2. --format openbmp-len
 
-**Status:** Not started  
+**Status:** Blocked  
 **Scope:** New input format option for the `bmpdoctor` CLI
+
+**Blocked because:** OpenBMP length-delimited files (`.obmp`) are typically
+produced by OpenBMP Kafka consumers. With no reachable Kafka broker, there
+is no source of real `.obmp` files for testing and validation.
 
 Support for OpenBMP length-delimited files (`.obmp` extension convention).
 

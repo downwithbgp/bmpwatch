@@ -89,15 +89,29 @@ streaming inputs are out of scope for the MVP.
 
 ## Roadmap (not yet implemented)
 
+### Active priority
+
+- Public BMP fixture corpus
+- Local FRR/GoBGP `.rawbmp` integration testing
+- Compressed input (`.bz2`, `.gz`)
+- `.bmpr` capture format support
+- TCP listener mode
+
+### Blocked (CAIDA Kafka unreachable)
+
+CAIDA's `bmp.bgpstream.caida.org:9092` is not reachable from the developer's
+network (see [verification log](docs/caida-kafka-verification.md)). These
+items are blocked until a reachable OpenBMP Kafka broker is confirmed.
+
 - `--format openbmp-len` — OpenBMP length-delimited files (`.obmp`)
 - `examples/record_openbmp_kafka.rs` — Kafka consumer writing to local `.obmp`
-- `.bmpr` capture format support
-- Compressed input (`.bz2`, `.gz`)
-- TCP listener mode
-- Prometheus metrics export
 - Kafka input (integrated into core CLI)
+
+### Future
+
+- RouteViews `bgpreader` PSV comparison tooling
+- Prometheus metrics export
 - Parquet export
-- Public BMP fixture corpus
 
 ## License
 
