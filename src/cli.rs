@@ -88,7 +88,11 @@ pub fn run() {
                 eprintln!("Error processing file: {e}");
                 process::exit(1);
             }
-            report::render_lint(&doctor.state.findings, doctor.was_truncated());
+            report::render_lint(
+                &doctor.state.findings,
+                doctor.was_truncated(),
+                doctor.state.findings_dropped,
+            );
             process::exit(max_exit_code(&doctor.state.findings));
         }
         Command::Dump {
@@ -110,8 +114,8 @@ pub fn run() {
             doctor.dump_jsonl();
             if doctor.was_truncated() {
                 eprintln!(
-                    "NOTE: findings truncated at {} (use --max-findings to raise)",
-                    max_findings
+                    "NOTE: findings truncated at {} ({} dropped). Use --max-findings to raise.",
+                    max_findings, doctor.state.findings_dropped,
                 );
             }
         }

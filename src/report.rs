@@ -101,8 +101,9 @@ pub fn render_inspect(state: &DoctorState, truncated: bool) {
 
     if truncated {
         println!(
-            "  NOTE: findings were truncated ({} shown of total). Use --max-findings to raise the cap.",
-            state.findings.len()
+            "  NOTE: findings truncated at {} ({} dropped). Use --max-findings to raise the cap.",
+            state.findings.len(),
+            state.findings_dropped,
         );
     }
 
@@ -132,7 +133,7 @@ pub fn render_inspect(state: &DoctorState, truncated: bool) {
     }
 }
 
-pub fn render_lint(findings: &[Finding], truncated: bool) {
+pub fn render_lint(findings: &[Finding], truncated: bool, dropped: u64) {
     for f in findings {
         let peer_str = f
             .peer
@@ -147,8 +148,9 @@ pub fn render_lint(findings: &[Finding], truncated: bool) {
     }
     if truncated {
         eprintln!(
-            "NOTE: findings truncated ({} shown). Use --max-findings to raise the cap.",
-            findings.len()
+            "NOTE: findings truncated at {} ({} dropped). Use --max-findings to raise the cap.",
+            findings.len(),
+            dropped,
         );
     }
 }
@@ -169,6 +171,7 @@ struct InspectSummary<'a> {
     warn_count: usize,
     error_count: usize,
     findings_truncated: bool,
+    findings_dropped_count: u64,
 }
 
 pub fn render_inspect_json(state: &DoctorState, truncated: bool) {
@@ -221,6 +224,7 @@ pub fn render_inspect_json(state: &DoctorState, truncated: bool) {
         warn_count,
         error_count,
         findings_truncated: truncated,
+        findings_dropped_count: state.findings_dropped,
     };
 
     let json = serde_json::to_string_pretty(&summary)

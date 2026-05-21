@@ -84,5 +84,6 @@ pub struct DoctorState {
     pub by_type: BTreeMap<u8, u64>,
     pub peers: BTreeMap<PeerKey, PeerState>,
     pub findings: Vec<Finding>,
+    pub findings_dropped: u64,
     pub bgp_elem_count: u64,
 }

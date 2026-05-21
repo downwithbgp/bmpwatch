@@ -50,6 +50,7 @@ impl Doctor {
     fn push_finding(&mut self, finding: Finding) {
         if self.state.findings.len() >= self.max_findings {
             self.findings_truncated = true;
+            self.state.findings_dropped += 1;
             return;
         }
         self.state.findings.push(finding);
@@ -623,5 +624,23 @@ mod tests {
 
         assert_eq!(doctor.state.findings.len(), 2);
         assert!(doctor.was_truncated());
+        assert_eq!(doctor.state.findings_dropped, 1);
+    }
+
+    #[test]
+    fn test_max_findings_cap_zero() {
+        let bad = fixtures::make_invalid_version_frame();
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&bad).unwrap();
+        let path = tmp.into_temp_path();
+
+        // Cap at 0: all findings dropped.
+        let mut doctor = Doctor::with_max_findings(&path, 0).unwrap();
+        doctor.process(false).unwrap();
+
+        assert_eq!(doctor.state.findings.len(), 0);
+        assert!(doctor.was_truncated());
+        assert_eq!(doctor.state.findings_dropped, 1);
     }
 }
