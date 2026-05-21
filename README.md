@@ -81,14 +81,21 @@ Currently only raw BMP frame files are supported. OpenBMP wrapper files, `.bmpr`
 capture format, compressed files (`.bz2`/`.gz`), Kafka, TCP listeners, and
 streaming inputs are out of scope for the MVP.
 
+## Sources & capture
+
+- [Data sources reference](docs/sources.md) — CAIDA/OpenBMP Kafka broker details
+- [OpenBMP Kafka capture guide](docs/openbmp-kafka-capture.md) — connectivity testing with `nc`/`kcat`
+- [Future issues](docs/future-issues.md) — planned features and their scope
+
 ## Roadmap (not yet implemented)
 
-- OpenBMP wrapper files
+- `--format openbmp-len` — OpenBMP length-delimited files (`.obmp`)
+- `examples/record_openbmp_kafka.rs` — Kafka consumer writing to local `.bin`
 - `.bmpr` capture format support
 - Compressed input (`.bz2`, `.gz`)
 - TCP listener mode
 - Prometheus metrics export
-- Kafka input
+- Kafka input (integrated into core CLI)
 - Parquet export
 - Public BMP fixture corpus
 
