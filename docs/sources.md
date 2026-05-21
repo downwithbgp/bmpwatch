@@ -34,11 +34,19 @@ See [OpenBMP Kafka capture guide](openbmp-kafka-capture.md). `.obmp` means
 length-delimited OpenBMP Kafka payloads captured to local disk. This source
 has not been verified from this network yet.
 
-### Tier 4: BGPReader routeviews-stream (comparison only)
+### Tier 4: BGPReader routeviews-stream / RouteViews (comparison only)
+
+RouteViews publishes MRT RIB dumps (every 2 hours) and MRT update dumps
+(every 15 minutes). These are useful for BGPKIT Parser testing but are
+**not raw BMP input**. Real-time BMP data from RouteViews collectors is
+accessed via BGPStream, not direct collector connections.
 
 `bgpreader -p routeviews-stream` produces decoded BGP event streams. Useful
 for comparing BMPDoctor output against known-good BGP data, but NOT a raw
 BMP input source. No integration planned.
+
+See [RouteViews and BMPDoctor](routeviews.md) for details on archive data,
+real-time data, and BMPDoctor implications.
 
 ---
 
