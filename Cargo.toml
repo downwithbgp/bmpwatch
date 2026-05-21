@@ -1,0 +1,23 @@
+[package]
+name = "bmpdoctor"
+version = "0.1.0"
+edition = "2021"
+description = "File-first diagnostic tool for BGP Monitoring Protocol data"
+license = "MIT"
+repository = "https://github.com/downwithbgp/bmpdoctor"
+
+[[bin]]
+name = "bmpdoctor"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bgpkit-parser = "0.16"
+bytes = "1"
+hex = "0.4"
+
+[dev-dependencies]
+tempfile = "3"

@@ -1,0 +1,97 @@
+# BMPDoctor
+
+BMPDoctor is a file-first diagnostic tool for BGP Monitoring Protocol data. It uses
+[BGPKIT Parser](https://github.com/bgpkit/bgpkit-parser) for protocol parsing and
+focuses on stream/session health: frame validity, peer lifecycle, timestamp sanity,
+malformed messages, per-peer summaries, and reproducible diagnostics.
+
+## Purpose
+
+BMPDoctor scans binary BMP frame files and produces:
+
+- **inspect** — human-readable summary of file contents, message counts, peer state
+- **lint** — machine-oriented finding output with severity levels and exit codes
+- **dump --jsonl** — one JSON object per message for debugging and automation
+
+## Installation
+
+```sh
+cargo install --path .
+```
+
+## Usage
+
+### inspect
+
+```sh
+bmpdoctor inspect path/to/bmp-data.bin
+```
+
+Outputs file metadata, message type counts, per-peer statistics, active peer count,
+top peers by route-monitoring messages, and a findings summary.
+
+### lint
+
+```sh
+bmpdoctor lint path/to/bmp-data.bin
+```
+
+Emits one finding per line with severity, rule name, offset, and peer context. Exit codes:
+
+| Exit | Meaning                  |
+|------|--------------------------|
+| 0    | Clean or info only       |
+| 1    | Warnings present         |
+| 2    | Errors or malformed frames |
+
+### dump
+
+```sh
+bmpdoctor dump path/to/bmp-data.bin --jsonl
+```
+
+Emits one JSON object per observed BMP message including offset, type, peer identity,
+timestamp, parse status, and associated findings.
+
+## Detected issues
+
+BMPDoctor checks for:
+
+| Rule                               | Severity | Description                                         |
+|------------------------------------|----------|-----------------------------------------------------|
+| `invalid_bmp_version`              | ERR      | BMP version is not 3                                |
+| `truncated_frame`                  | ERR      | Frame header declares length beyond available data  |
+| `unknown_bmp_type`                 | WARN     | BMP message type outside 0–6                        |
+| `parse_error`                      | ERR      | BGPKIT Parser cannot parse the message              |
+| `route_monitoring_before_peer_up`  | WARN     | RM message before any Peer Up for that peer         |
+| `duplicate_peer_up`                | WARN     | Peer Up for a peer that is already active           |
+| `peer_down_without_peer_up`        | WARN     | Peer Down for a peer that was not active            |
+| `timestamp_regression`             | WARN     | Timestamp went backwards for a given peer           |
+
+## Limitations
+
+BMPDoctor evaluates observed ordering within the input file. If a file starts
+mid-session, warnings like `route_monitoring_before_peer_up` may indicate an
+incomplete capture rather than a broken BMP feed.
+
+Frame-level validation checks the BMP common header (version, length, type) but
+does not perform deep BGP attribute validation beyond what BGPKIT Parser provides.
+
+Currently only raw BMP frame files are supported. OpenBMP wrapper files, `.bmpr`
+capture format, compressed files (`.bz2`/`.gz`), Kafka, TCP listeners, and
+streaming inputs are out of scope for the MVP.
+
+## Roadmap (not yet implemented)
+
+- OpenBMP wrapper files
+- `.bmpr` capture format support
+- Compressed input (`.bz2`, `.gz`)
+- TCP listener mode
+- Prometheus metrics export
+- Kafka input
+- Parquet export
+- Public BMP fixture corpus
+
+## License
+
+MIT

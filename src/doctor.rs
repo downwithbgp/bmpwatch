@@ -1,0 +1,493 @@
+use std::path::Path;
+
+use bytes::Bytes;
+
+use crate::error::DoctorError;
+use crate::event::{emit_jsonl, JsonlEvent};
+use crate::input;
+use crate::lint;
+use crate::raw_bmp::{
+    BmpMessageType, PerPeerHeader, RawBmpFrame, RawBmpIterator, BMP_EXPECTED_VERSION,
+    BMP_PER_PEER_HEADER_SIZE,
+};
+use crate::state::{DoctorState, Finding, PeerKey, Severity};
+
+pub struct Doctor {
+    pub state: DoctorState,
+    pub events: Vec<JsonlEvent>,
+}
+
+impl Doctor {
+    pub fn new(file_path: &Path) -> Result<Self, DoctorError> {
+        let (file_size, format) = input::file_size_and_format(file_path)?;
+        let state = DoctorState {
+            file_path: file_path.to_string_lossy().to_string(),
+            file_size,
+            format,
+            ..Default::default()
+        };
+        Ok(Doctor {
+            state,
+            events: Vec::new(),
+        })
+    }
+
+    pub fn process(&mut self, collect_events: bool) -> Result<(), DoctorError> {
+        let iter = RawBmpIterator::open(&self.state.file_path)?;
+
+        for frame_result in iter {
+            match frame_result {
+                Ok(frame) => {
+                    self.process_frame(frame, collect_events);
+                }
+                Err(DoctorError::Frame(msg)) => {
+                    self.state.malformed_messages += 1;
+                    let finding = Finding {
+                        severity: Severity::Error,
+                        rule: lint::RULE_TRUNCATED_FRAME.to_string(),
+                        offset: None,
+                        peer: None,
+                        message: msg.clone(),
+                    };
+                    self.state.findings.push(finding.clone());
+                    if collect_events {
+                        let event = JsonlEvent::from_frame(
+                            self.state.total_messages,
+                            None,
+                            0,
+                            None,
+                            None,
+                            0,
+                            "malformed",
+                            0,
+                            &[finding],
+                        );
+                        self.events.push(event);
+                    }
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(())
+    }
+
+    fn process_frame(&mut self, frame: RawBmpFrame, collect_events: bool) {
+        self.state.total_messages += 1;
+        *self.state.by_type.entry(frame.msg_type_raw).or_insert(0) += 1;
+
+        let mut frame_findings: Vec<Finding> = Vec::new();
+
+        if frame.version != BMP_EXPECTED_VERSION {
+            frame_findings.push(lint::finding_invalid_version(frame.offset, frame.version));
+        }
+
+        let msg_type = frame.msg_type;
+        if msg_type.is_none() {
+            frame_findings.push(lint::finding_unknown_type(frame.offset, frame.msg_type_raw));
+        }
+
+        let peer_key = frame.per_peer_header.as_ref().map(peer_key_from_pph);
+
+        let mut bgp_elems_count: u64 = 0;
+        let mut parse_ok = true;
+
+        if frame_findings.is_empty() && msg_type.is_some() {
+            match try_bgpkit_parse(&frame.full_data) {
+                Ok(count) => {
+                    bgp_elems_count = count;
+                    self.state.bgp_elem_count += count;
+                }
+                Err(err_msg) => {
+                    parse_ok = false;
+                    frame_findings.push(lint::finding_parse_error(
+                        frame.offset,
+                        peer_key.clone(),
+                        err_msg,
+                    ));
+                }
+            }
+        }
+
+        // Update peer state and generate peer-related findings
+        if let (Some(ref pk), Some(ref pph), Some(mt)) =
+            (&peer_key, &frame.per_peer_header, msg_type)
+        {
+            let peer = self.state.peers.entry(pk.clone()).or_default();
+            let curr_ts = (pph.timestamp_seconds, pph.timestamp_microseconds);
+
+            // Check timestamp regression
+            if let Some(last_ts) = peer.last_timestamp {
+                if is_timestamp_before(curr_ts, last_ts) {
+                    peer.timestamp_regression_count += 1;
+                    frame_findings.push(lint::finding_timestamp_regression(
+                        frame.offset,
+                        pk.clone(),
+                        last_ts.0,
+                        last_ts.1,
+                        curr_ts.0,
+                        curr_ts.1,
+                    ));
+                }
+            }
+
+            peer.last_timestamp = Some(curr_ts);
+            if peer.first_timestamp.is_none() {
+                peer.first_timestamp = Some(curr_ts);
+            }
+
+            match mt {
+                BmpMessageType::RouteMonitoring | BmpMessageType::RouteMirroringMessage => {
+                    peer.route_monitoring_count += 1;
+                    if !peer.peer_up_seen {
+                        peer.update_before_peer_up_count += 1;
+                        frame_findings.push(lint::finding_route_monitoring_before_peer_up(
+                            frame.offset,
+                            pk.clone(),
+                        ));
+                    }
+                }
+                BmpMessageType::PeerUpNotification => {
+                    peer.peer_up_count += 1;
+                    if peer.active {
+                        frame_findings
+                            .push(lint::finding_duplicate_peer_up(frame.offset, pk.clone()));
+                    } else {
+                        peer.peer_up_seen = true;
+                        peer.active = true;
+                    }
+                }
+                BmpMessageType::PeerDownNotification => {
+                    peer.peer_down_count += 1;
+                    let reason = frame
+                        .payload
+                        .get(BMP_PER_PEER_HEADER_SIZE)
+                        .copied()
+                        .unwrap_or(0);
+                    peer.last_peer_down_reason = Some(reason);
+                    if !peer.active {
+                        frame_findings.push(lint::finding_peer_down_without_peer_up(
+                            frame.offset,
+                            pk.clone(),
+                            reason,
+                        ));
+                    } else {
+                        peer.active = false;
+                    }
+                }
+                _ => {
+                    peer.other_message_count += 1;
+                }
+            }
+        }
+
+        for f in &frame_findings {
+            self.state.findings.push(f.clone());
+        }
+
+        if collect_events {
+            let parse_status = if parse_ok { "ok" } else { "error" };
+            let ts = frame
+                .per_peer_header
+                .as_ref()
+                .map(|pph| (pph.timestamp_seconds, pph.timestamp_microseconds));
+            let event = JsonlEvent::from_frame(
+                frame.offset,
+                msg_type,
+                frame.msg_type_raw,
+                peer_key.as_ref(),
+                ts,
+                frame.msg_len,
+                parse_status,
+                bgp_elems_count,
+                &frame_findings,
+            );
+            self.events.push(event);
+        }
+    }
+
+    pub fn dump_jsonl(&self) {
+        emit_jsonl(&self.events);
+    }
+}
+
+fn peer_key_from_pph(pph: &PerPeerHeader) -> PeerKey {
+    let ip = pph.peer_ip();
+    PeerKey {
+        peer_asn: Some(pph.peer_asn),
+        peer_ip: Some(ip),
+        peer_distinguisher: if pph.peer_type != 0 {
+            Some(hex::encode(pph.peer_distinguisher))
+        } else {
+            None
+        },
+    }
+}
+
+fn try_bgpkit_parse(frame_data: &[u8]) -> Result<u64, String> {
+    let mut bytes = Bytes::copy_from_slice(frame_data);
+    match bgpkit_parser::parser::bmp::parse_bmp_msg(&mut bytes) {
+        Ok(msg) => {
+            let count = match msg.message_body {
+                bgpkit_parser::parser::bmp::messages::BmpMessageBody::RouteMonitoring(rm) => {
+                    count_bgp_elems_in_update(rm.bgp_message)
+                }
+                _ => 0,
+            };
+            Ok(count)
+        }
+        Err(e) => Err(format!("{e}")),
+    }
+}
+
+fn count_bgp_elems_in_update(bgp_msg: bgpkit_parser::models::BgpMessage) -> u64 {
+    match bgp_msg {
+        bgpkit_parser::models::BgpMessage::Update(update) => {
+            let announced = update.announced_prefixes.len() as u64;
+            let withdrawn = update.withdrawn_prefixes.len() as u64;
+            announced + withdrawn
+        }
+        _ => 0,
+    }
+}
+
+fn is_timestamp_before(a: (u32, u32), b: (u32, u32)) -> bool {
+    a.0 < b.0 || (a.0 == b.0 && a.1 < b.1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::raw_bmp::fixtures;
+    use std::io::Write;
+
+    #[test]
+    fn test_doctor_process_valid_session() {
+        let peer_up = fixtures::make_peer_up_frame(65000, [10, 0, 0, 1], 100, 0);
+        let rm = fixtures::make_route_monitoring_frame(65000, [10, 0, 0, 1], 200, 0);
+        let peer_down = fixtures::make_peer_down_frame(65000, [10, 0, 0, 1], 300, 0, 3);
+        let data = fixtures::write_fixture(&[peer_up, rm, peer_down]);
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut doctor = Doctor::new(&path).unwrap();
+        doctor.process(false).unwrap();
+
+        assert_eq!(doctor.state.total_messages, 3);
+        assert_eq!(*doctor.state.by_type.get(&0).unwrap_or(&0), 1);
+        assert_eq!(*doctor.state.by_type.get(&3).unwrap_or(&0), 1);
+        assert_eq!(*doctor.state.by_type.get(&2).unwrap_or(&0), 1);
+        assert_eq!(doctor.state.malformed_messages, 0);
+        assert_eq!(doctor.state.peers.len(), 1);
+
+        let peer = doctor.state.peers.values().next().unwrap();
+        assert_eq!(peer.peer_up_count, 1);
+        assert_eq!(peer.route_monitoring_count, 1);
+        assert_eq!(peer.peer_down_count, 1);
+        assert!(!peer.active);
+
+        // Ignore parse errors from bgpkit-parser on synthetic BGP data.
+        // Core diagnostics: no peer lifecycle warnings.
+        let peer_lint_rules: Vec<_> = doctor
+            .state
+            .findings
+            .iter()
+            .filter(|f| {
+                f.rule == "route_monitoring_before_peer_up"
+                    || f.rule == "duplicate_peer_up"
+                    || f.rule == "peer_down_without_peer_up"
+                    || f.rule == "timestamp_regression"
+            })
+            .collect();
+        assert!(
+            peer_lint_rules.is_empty(),
+            "Unexpected peer lifecycle findings: {:?}",
+            peer_lint_rules
+        );
+    }
+
+    #[test]
+    fn test_doctor_route_monitoring_before_peer_up() {
+        let rm = fixtures::make_route_monitoring_frame(65000, [10, 0, 0, 1], 100, 0);
+        let peer_up = fixtures::make_peer_up_frame(65000, [10, 0, 0, 1], 200, 0);
+        let data = fixtures::write_fixture(&[rm, peer_up]);
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut doctor = Doctor::new(&path).unwrap();
+        doctor.process(false).unwrap();
+
+        assert_eq!(doctor.state.total_messages, 2);
+        assert!(!doctor.state.findings.is_empty());
+        let has_rm_before_up = doctor
+            .state
+            .findings
+            .iter()
+            .any(|f| f.rule == "route_monitoring_before_peer_up");
+        assert!(has_rm_before_up);
+    }
+
+    #[test]
+    fn test_doctor_duplicate_peer_up() {
+        let peer_up1 = fixtures::make_peer_up_frame(65000, [10, 0, 0, 1], 100, 0);
+        let peer_up2 = fixtures::make_peer_up_frame(65000, [10, 0, 0, 1], 200, 0);
+        let data = fixtures::write_fixture(&[peer_up1, peer_up2]);
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut doctor = Doctor::new(&path).unwrap();
+        doctor.process(false).unwrap();
+
+        assert_eq!(doctor.state.total_messages, 2);
+        let has_dup = doctor
+            .state
+            .findings
+            .iter()
+            .any(|f| f.rule == "duplicate_peer_up");
+        assert!(has_dup);
+    }
+
+    #[test]
+    fn test_doctor_peer_down_without_up() {
+        let peer_down = fixtures::make_peer_down_frame(65000, [10, 0, 0, 1], 100, 0, 3);
+        let data = peer_down;
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut doctor = Doctor::new(&path).unwrap();
+        doctor.process(false).unwrap();
+
+        assert_eq!(doctor.state.total_messages, 1);
+        let has_down_without_up = doctor
+            .state
+            .findings
+            .iter()
+            .any(|f| f.rule == "peer_down_without_peer_up");
+        assert!(has_down_without_up);
+    }
+
+    #[test]
+    fn test_doctor_timestamp_regression() {
+        let peer_up = fixtures::make_peer_up_frame(65000, [10, 0, 0, 1], 300, 0);
+        let rm = fixtures::make_route_monitoring_frame(65000, [10, 0, 0, 1], 200, 0);
+        let data = fixtures::write_fixture(&[peer_up, rm]);
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut doctor = Doctor::new(&path).unwrap();
+        doctor.process(false).unwrap();
+
+        assert_eq!(doctor.state.total_messages, 2);
+        let has_regression = doctor
+            .state
+            .findings
+            .iter()
+            .any(|f| f.rule == "timestamp_regression");
+        assert!(has_regression);
+    }
+
+    #[test]
+    fn test_doctor_invalid_version() {
+        let bad = fixtures::make_invalid_version_frame();
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&bad).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut doctor = Doctor::new(&path).unwrap();
+        doctor.process(false).unwrap();
+
+        let has_invalid_ver = doctor
+            .state
+            .findings
+            .iter()
+            .any(|f| f.rule == "invalid_bmp_version");
+        assert!(has_invalid_ver);
+    }
+
+    #[test]
+    fn test_doctor_malformed_frame() {
+        let bad = fixtures::make_truncated_frame();
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&bad).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut doctor = Doctor::new(&path).unwrap();
+        doctor.process(false).unwrap();
+
+        assert_eq!(doctor.state.malformed_messages, 1);
+        let has_truncated = doctor
+            .state
+            .findings
+            .iter()
+            .any(|f| f.rule == "truncated_frame");
+        assert!(has_truncated);
+    }
+
+    #[test]
+    fn test_doctor_dump_jsonl() {
+        let peer_up = fixtures::make_peer_up_frame(65000, [10, 0, 0, 1], 100, 0);
+        let rm = fixtures::make_route_monitoring_frame(65000, [10, 0, 0, 1], 200, 0);
+        let data = fixtures::write_fixture(&[peer_up, rm]);
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut doctor = Doctor::new(&path).unwrap();
+        doctor.process(true).unwrap();
+
+        assert_eq!(doctor.events.len(), 2);
+        assert_eq!(doctor.events[0].bmp_type_id, 3); // peer up
+        assert_eq!(doctor.events[1].bmp_type_id, 0); // route monitoring
+    }
+
+    #[test]
+    fn test_doctor_multiple_peers() {
+        let pu1 = fixtures::make_peer_up_frame(65000, [10, 0, 0, 1], 100, 0);
+        let pu2 = fixtures::make_peer_up_frame(65001, [10, 0, 0, 2], 200, 0);
+        let rm1 = fixtures::make_route_monitoring_frame(65000, [10, 0, 0, 1], 300, 0);
+        let rm2 = fixtures::make_route_monitoring_frame(65001, [10, 0, 0, 2], 400, 0);
+        let data = fixtures::write_fixture(&[pu1, pu2, rm1, rm2]);
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut doctor = Doctor::new(&path).unwrap();
+        doctor.process(false).unwrap();
+
+        assert_eq!(doctor.state.total_messages, 4);
+        assert_eq!(doctor.state.peers.len(), 2);
+
+        let active_count = doctor.state.peers.values().filter(|p| p.active).count();
+        assert_eq!(active_count, 2);
+    }
+
+    #[test]
+    fn test_doctor_initiation_message() {
+        let init = fixtures::make_initiation_frame("test-router");
+        let data = init;
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut doctor = Doctor::new(&path).unwrap();
+        doctor.process(false).unwrap();
+
+        assert_eq!(doctor.state.total_messages, 1);
+        assert_eq!(*doctor.state.by_type.get(&4).unwrap_or(&0), 1);
+        assert_eq!(doctor.state.peers.len(), 0);
+    }
+}
