@@ -24,7 +24,7 @@ cargo install --path .
 ### inspect
 
 ```sh
-bmpdoctor inspect path/to/bmp-data.bin
+bmpdoctor inspect path/to/bmp-data.rawbmp
 ```
 
 Outputs file metadata, message type counts, per-peer statistics, active peer count,
@@ -33,7 +33,7 @@ top peers by route-monitoring messages, and a findings summary.
 ### lint
 
 ```sh
-bmpdoctor lint path/to/bmp-data.bin
+bmpdoctor lint path/to/bmp-data.rawbmp
 ```
 
 Emits one finding per line with severity, rule name, offset, and peer context. Exit codes:
@@ -47,7 +47,7 @@ Emits one finding per line with severity, rule name, offset, and peer context. E
 ### dump
 
 ```sh
-bmpdoctor dump path/to/bmp-data.bin --jsonl
+bmpdoctor dump path/to/bmp-data.rawbmp --jsonl
 ```
 
 Emits one JSON object per observed BMP message including offset, type, peer identity,
@@ -90,7 +90,7 @@ streaming inputs are out of scope for the MVP.
 ## Roadmap (not yet implemented)
 
 - `--format openbmp-len` — OpenBMP length-delimited files (`.obmp`)
-- `examples/record_openbmp_kafka.rs` — Kafka consumer writing to local `.bin`
+- `examples/record_openbmp_kafka.rs` — Kafka consumer writing to local `.obmp`
 - `.bmpr` capture format support
 - Compressed input (`.bz2`, `.gz`)
 - TCP listener mode

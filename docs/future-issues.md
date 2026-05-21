@@ -15,7 +15,9 @@ data to local files.
 - Connect to a Kafka broker (configurable host/port)
 - Subscribe to topics matching `^openbmp\.router--.+\.peer-as--.+\.bmp_raw`
 - Consume messages as raw BMP frames (no OpenBMP wrapper at the Kafka layer)
-- Write frames to a local `.bin` file, preserving byte-for-byte fidelity
+- Write frames to a local `.obmp` file (OpenBMP length-delimited format with
+  `BMPDOPENBMP1` magic + `u32` BE length prefix per frame), preserving
+  byte-for-byte fidelity
 - Optional: rotate output files by size or time
 - Optional: track consumer offsets for resumability
 

@@ -4,9 +4,48 @@ This document catalogs known sources of raw BMP data that BMPDoctor targets.
 These are not built into the core CLI; they are experimental references for
 capture, relay, or integration work.
 
+## Source ladder
+
+Sources ordered by implementation status and verification level.
+
+| Tier | Source                             | Extension    | Status                  |
+|------|------------------------------------|--------------|-------------------------|
+| 1    | Synthetic fixtures                 | (in-memory)  | Implemented, 17 tests   |
+| 2    | Local FRR/GoBGP raw BMP            | `.rawbmp`    | Planned, not tested     |
+| 3    | CAIDA/OpenBMP Kafka                | `.obmp`      | Unverified, see below   |
+| 4    | BGPReader routeviews-stream        | N/A          | Comparison only         |
+
+### Tier 1: Synthetic fixtures
+
+Generated in test code (`raw_bmp.rs` fixtures module). Used for frame
+validation, peer state tracking, and lint rule coverage. No network
+dependency.
+
+### Tier 2: Local FRR/GoBGP `.rawbmp`
+
+BMP speakers like FRR and GoBGP can write raw BMP frame files to disk. These
+provide real BGP data for integration testing. The `.rawbmp` extension
+distinguishes raw concatenated BMP frames from OpenBMP length-delimited
+captures.
+
+### Tier 3: CAIDA/OpenBMP Kafka `.obmp`
+
+See [OpenBMP Kafka capture guide](openbmp-kafka-capture.md). `.obmp` means
+length-delimited OpenBMP Kafka payloads captured to local disk. This source
+has not been verified from this network yet.
+
+### Tier 4: BGPReader routeviews-stream (comparison only)
+
+`bgpreader -p routeviews-stream` produces decoded BGP event streams. Useful
+for comparing BMPDoctor output against known-good BGP data, but NOT a raw
+BMP input source. No integration planned.
+
+---
+
 ## CAIDA / BGPStream OpenBMP Kafka
 
-CAIDA operates a public BMP feed as part of Artemis Private BMP feeds.
+**Verification pending.** The information below is based on public
+documentation. Connectivity has not been confirmed from this network.
 
 - **Host:** `bmp.bgpstream.caida.org`
 - **Port:** `9092`
@@ -25,10 +64,23 @@ streamed by OpenBMP, typically length-delimited by the Kafka message framing.
 
 ### Access notes
 
-- The broker at `bmp.bgpstream.caida.org:9092` is publicly reachable.
+- The broker at `bmp.bgpstream.caida.org:9092` is documented as publicly
+  reachable. This has not been verified from this network.
 - Topics are produced in real-time; no historical offset retention guarantee.
-- Authentication is not required for read-only consumers.
+- Authentication is reportedly not required for read-only consumers.
 - Use `kcat` (librdkafka) or `kafka-console-consumer` for testing.
+
+### Manual verification required
+
+Before any integration work, the following must be run manually and the
+output recorded:
+
+```sh
+nc -vz bmp.bgpstream.caida.org 9092
+kcat -b bmp.bgpstream.caida.org:9092 -L
+```
+
+See `docs/openbmp-kafka-capture.md` for full connectivity test procedures.
 
 ### References
 
@@ -49,11 +101,12 @@ Payload:    raw BMP frame    (Length bytes)
 Each record is a single BMP frame prefixed by the magic header and length.
 BMPDoctor does not yet support this format; see `docs/future-issues.md`.
 
-## Raw BMP frame files
+## Raw BMP frame files (.rawbmp)
 
 Concatenated BMP frames with no wrapper:
 ```
 [Common Header (6)] [Payload] [Common Header (6)] [Payload] ...
 ```
 
-This is the primary format BMPDoctor targets in the MVP.
+This is the primary format BMPDoctor targets in the MVP. Files use the
+`.rawbmp` extension by convention when captured from a local BMP speaker.

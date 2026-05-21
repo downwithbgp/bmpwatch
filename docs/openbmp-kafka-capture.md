@@ -1,5 +1,9 @@
 # OpenBMP Kafka Capture
 
+**Verification pending.** The CAIDA broker at `bmp.bgpstream.caida.org:9092`
+has not been tested from this network. All commands below are reference
+procedures that must be run manually before any implementation work begins.
+
 How to verify reachability and test capture from CAIDA's public OpenBMP Kafka
 broker before integrating into BMPDoctor.
 
@@ -18,13 +22,11 @@ sudo apt-get install kafkacat
 ## 1. Broker reachability test
 
 ```sh
-nc -zv bmp.bgpstream.caida.org 9092
+nc -vz bmp.bgpstream.caida.org 9092
 ```
 
-Expected output:
-```
-Connection to bmp.bgpstream.caida.org port 9092 [tcp/XmlIpcRegSvc] succeeded!
-```
+If the broker is reachable, `nc` will print a success message. If not, the
+connection will time out or be refused. Record the actual output.
 
 ## 2. List available topics
 
@@ -32,7 +34,8 @@ Connection to bmp.bgpstream.caida.org port 9092 [tcp/XmlIpcRegSvc] succeeded!
 kcat -b bmp.bgpstream.caida.org:9092 -L
 ```
 
-Look for topics matching `openbmp.router--*.peer-as--*.bmp_raw`.
+Look for topics matching `openbmp.router--*.peer-as--*.bmp_raw`. Record the
+actual topic list.
 
 ## 3. Consume a single topic (one peer session)
 
@@ -72,26 +75,29 @@ kafka-console-consumer \
   --max-messages 100
 ```
 
-## 5. Capture to a local file
+## 5. Capture to a local .obmp file
 
 ```sh
 kcat -b bmp.bgpstream.caida.org:9092 \
   -t openbmp.router--abc123.peer-as--65000.bmp_raw \
   -C -o beginning -c 1000 \
-  > captured_peer.bin
+  > captured_peer.obmp
 ```
 
-Then inspect with BMPDoctor:
+Then inspect with BMPDoctor (once `--format openbmp-len` is implemented):
 
 ```sh
-bmpdoctor inspect captured_peer.bin
-bmpdoctor dump captured_peer.bin --jsonl | head -5
+# Future: bmpdoctor inspect captured_peer.obmp --format openbmp-len
+# Future: bmpdoctor dump captured_peer.obmp --format openbmp-len --jsonl | head -5
 ```
 
 ## Notes
 
 - Messages arrive as raw BMP frames (common header + payload). No OpenBMP
   length-delimited wrapper is applied to individual Kafka messages.
+- When captured to a `.obmp` file, the `examples/record_openbmp_kafka.rs`
+  tool (future) will add the `BMPDOPENBMP1` + `u32` BE length wrapper to
+  each frame on write.
 - The broker may throttle or close connections that consume too fast.
 - For production capture, `examples/record_openbmp_kafka.rs` (future) will
   handle reconnection, offset tracking, and rotation.
