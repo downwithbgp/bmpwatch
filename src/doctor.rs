@@ -15,10 +15,19 @@ use crate::state::{DoctorState, Finding, PeerKey, Severity};
 pub struct Doctor {
     pub state: DoctorState,
     pub events: Vec<JsonlEvent>,
+    max_findings: usize,
+    findings_truncated: bool,
 }
 
+const DEFAULT_MAX_FINDINGS: usize = 1000;
+
 impl Doctor {
+    #[allow(dead_code)]
     pub fn new(file_path: &Path) -> Result<Self, DoctorError> {
+        Self::with_max_findings(file_path, DEFAULT_MAX_FINDINGS)
+    }
+
+    pub fn with_max_findings(file_path: &Path, max_findings: usize) -> Result<Self, DoctorError> {
         let (file_size, format) = input::file_size_and_format(file_path)?;
         let state = DoctorState {
             file_path: file_path.to_string_lossy().to_string(),
@@ -29,7 +38,21 @@ impl Doctor {
         Ok(Doctor {
             state,
             events: Vec::new(),
+            max_findings,
+            findings_truncated: false,
         })
+    }
+
+    pub fn was_truncated(&self) -> bool {
+        self.findings_truncated
+    }
+
+    fn push_finding(&mut self, finding: Finding) {
+        if self.state.findings.len() >= self.max_findings {
+            self.findings_truncated = true;
+            return;
+        }
+        self.state.findings.push(finding);
     }
 
     pub fn process(&mut self, collect_events: bool) -> Result<(), DoctorError> {
@@ -49,7 +72,7 @@ impl Doctor {
                         peer: None,
                         message: msg.clone(),
                     };
-                    self.state.findings.push(finding.clone());
+                    self.push_finding(finding.clone());
                     if collect_events {
                         let event = JsonlEvent::from_frame(
                             self.state.total_messages,
@@ -188,7 +211,7 @@ impl Doctor {
         }
 
         for f in &frame_findings {
-            self.state.findings.push(f.clone());
+            self.push_finding(f.clone());
         }
 
         if collect_events {
@@ -496,5 +519,109 @@ mod tests {
         assert_eq!(doctor.state.total_messages, 1);
         assert_eq!(*doctor.state.by_type.get(&4).unwrap_or(&0), 1);
         assert_eq!(doctor.state.peers.len(), 0);
+    }
+
+    #[test]
+    fn test_multi_frame_two_valid() {
+        let pu = fixtures::make_peer_up_frame(65000, [10, 0, 0, 1], 100, 0);
+        let rm = fixtures::make_route_monitoring_frame(65000, [10, 0, 0, 1], 200, 0);
+        let data = fixtures::write_fixture(&[pu, rm]);
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut doctor = Doctor::new(&path).unwrap();
+        doctor.process(false).unwrap();
+
+        assert_eq!(doctor.state.total_messages, 2);
+        assert_eq!(doctor.state.peers.len(), 1);
+        assert_eq!(doctor.state.malformed_messages, 0);
+    }
+
+    #[test]
+    fn test_multi_frame_valid_then_truncated() {
+        let pu = fixtures::make_peer_up_frame(65000, [10, 0, 0, 1], 100, 0);
+        let bad = fixtures::make_truncated_frame();
+        let data = [pu, bad].concat();
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut doctor = Doctor::new(&path).unwrap();
+        doctor.process(false).unwrap();
+
+        assert_eq!(doctor.state.total_messages, 1);
+        assert_eq!(doctor.state.malformed_messages, 1);
+        assert_eq!(doctor.state.peers.len(), 1);
+    }
+
+    #[test]
+    fn test_multi_frame_malformed_then_extra_bytes() {
+        let bad = fixtures::make_invalid_length_frame();
+        let extra = vec![0x00, 0x01, 0x02, 0x03]; // trailing garbage
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&bad).unwrap();
+        tmp.write_all(&extra).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut doctor = Doctor::new(&path).unwrap();
+        doctor.process(false).unwrap();
+
+        assert_eq!(doctor.state.malformed_messages, 1);
+        assert!(doctor
+            .state
+            .findings
+            .iter()
+            .any(|f| f.rule == "truncated_frame"));
+    }
+
+    #[test]
+    fn test_route_monitoring_before_any_peer_up() {
+        let rm = fixtures::make_route_monitoring_frame(65000, [10, 0, 0, 1], 100, 0);
+        let rm2 = fixtures::make_route_monitoring_frame(65000, [10, 0, 0, 1], 200, 0);
+        let pu = fixtures::make_peer_up_frame(65000, [10, 0, 0, 1], 300, 0);
+        let data = fixtures::write_fixture(&[rm, rm2, pu]);
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut doctor = Doctor::new(&path).unwrap();
+        doctor.process(false).unwrap();
+
+        assert_eq!(doctor.state.total_messages, 3);
+        let rm_before_up_count = doctor
+            .state
+            .findings
+            .iter()
+            .filter(|f| f.rule == "route_monitoring_before_peer_up")
+            .count();
+        assert_eq!(rm_before_up_count, 2);
+
+        let peer = doctor.state.peers.values().next().unwrap();
+        assert_eq!(peer.update_before_peer_up_count, 2);
+        assert!(peer.active);
+    }
+
+    #[test]
+    fn test_max_findings_cap() {
+        let bad1 = fixtures::make_invalid_version_frame();
+        let bad2 = fixtures::make_invalid_version_frame();
+        let bad3 = fixtures::make_invalid_version_frame();
+        let data = fixtures::write_fixture(&[bad1, bad2, bad3]);
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        // Each invalid-version frame generates 1 finding. Cap at 2.
+        let mut doctor = Doctor::with_max_findings(&path, 2).unwrap();
+        doctor.process(false).unwrap();
+
+        assert_eq!(doctor.state.findings.len(), 2);
+        assert!(doctor.was_truncated());
     }
 }

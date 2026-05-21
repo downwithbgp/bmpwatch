@@ -1,5 +1,6 @@
 use crate::raw_bmp::BmpMessageType;
 use crate::state::{DoctorState, Finding, Severity};
+use serde::Serialize;
 
 fn format_size(bytes: u64) -> String {
     const UNITS: &[&str] = &["B", "KB", "MB", "GB"];
@@ -16,7 +17,7 @@ fn format_size(bytes: u64) -> String {
     }
 }
 
-pub fn render_inspect(state: &DoctorState) {
+pub fn render_inspect(state: &DoctorState, truncated: bool) {
     println!("=== BMPDoctor Inspect ===");
     println!();
     println!("File:        {}", state.file_path);
@@ -98,6 +99,13 @@ pub fn render_inspect(state: &DoctorState) {
     println!("  WARN:  {warn_count}");
     println!("  ERROR: {err_count}");
 
+    if truncated {
+        println!(
+            "  NOTE: findings were truncated ({} shown of total). Use --max-findings to raise the cap.",
+            state.findings.len()
+        );
+    }
+
     if !state.findings.is_empty() {
         println!();
         println!("Findings detail (first 20):");
@@ -124,7 +132,7 @@ pub fn render_inspect(state: &DoctorState) {
     }
 }
 
-pub fn render_lint(findings: &[Finding]) {
+pub fn render_lint(findings: &[Finding], truncated: bool) {
     for f in findings {
         let peer_str = f
             .peer
@@ -137,4 +145,85 @@ pub fn render_lint(findings: &[Finding]) {
             f.severity, f.rule, offset_str, peer_str, f.message
         );
     }
+    if truncated {
+        eprintln!(
+            "NOTE: findings truncated ({} shown). Use --max-findings to raise the cap.",
+            findings.len()
+        );
+    }
+}
+
+#[derive(Serialize)]
+struct InspectSummary<'a> {
+    file: &'a str,
+    format: &'a str,
+    size_bytes: u64,
+    total_messages: u64,
+    malformed_messages: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bgp_elem_count: Option<u64>,
+    by_type: std::collections::BTreeMap<String, u64>,
+    peers_observed: usize,
+    active_peers: usize,
+    info_count: usize,
+    warn_count: usize,
+    error_count: usize,
+    findings_truncated: bool,
+}
+
+pub fn render_inspect_json(state: &DoctorState, truncated: bool) {
+    let by_type: std::collections::BTreeMap<String, u64> = state
+        .by_type
+        .iter()
+        .map(|(id, count)| {
+            let name = BmpMessageType::from_u8(*id)
+                .map(|t| t.as_str().to_string())
+                .unwrap_or_else(|| format!("Unknown({id})"));
+            (name, *count)
+        })
+        .collect();
+
+    let active_peers = state.peers.values().filter(|p| p.active).count();
+
+    let info_count = state
+        .findings
+        .iter()
+        .filter(|f| f.severity == Severity::Info)
+        .count();
+    let warn_count = state
+        .findings
+        .iter()
+        .filter(|f| f.severity == Severity::Warn)
+        .count();
+    let error_count = state
+        .findings
+        .iter()
+        .filter(|f| f.severity == Severity::Error)
+        .count();
+
+    let bgp_elems = if state.bgp_elem_count > 0 {
+        Some(state.bgp_elem_count)
+    } else {
+        None
+    };
+
+    let summary = InspectSummary {
+        file: &state.file_path,
+        format: &state.format,
+        size_bytes: state.file_size,
+        total_messages: state.total_messages,
+        malformed_messages: state.malformed_messages,
+        bgp_elem_count: bgp_elems,
+        by_type,
+        peers_observed: state.peers.len(),
+        active_peers,
+        info_count,
+        warn_count,
+        error_count,
+        findings_truncated: truncated,
+    };
+
+    let json = serde_json::to_string_pretty(&summary)
+        .unwrap_or_else(|_| r#"{"error":"serialization failed"}"#.to_string());
+    println!("{json}");
 }
