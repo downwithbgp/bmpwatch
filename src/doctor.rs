@@ -791,4 +791,35 @@ mod tests {
         let term = doctor.state.termination_info.as_ref().unwrap();
         assert_eq!(term.termination_reason, Some(2));
     }
+
+    #[test]
+    fn test_peer_up_down_rawbmp_fixture() {
+        // Read-only regression test: clean Peer Up -> Peer Down lifecycle
+        let mut doctor = Doctor::with_max_findings(
+            Path::new("tests/fixtures/peer-up-down.rawbmp"),
+            1000,
+            InputFormat::RawBmp,
+        )
+        .unwrap();
+        doctor.process(false).unwrap();
+
+        assert_eq!(doctor.state.total_messages, 2);
+        assert_eq!(doctor.state.malformed_messages, 0);
+        assert_eq!(doctor.state.peers.len(), 1);
+
+        let peer = doctor.state.peers.values().next().unwrap();
+        assert_eq!(peer.peer_up_count, 1);
+        assert_eq!(peer.peer_down_count, 1);
+        assert!(!peer.active);
+        assert_eq!(peer.peer_up_seen, true);
+        assert_eq!(peer.last_peer_down_reason, Some(2));
+
+        // No lifecycle warnings in a clean session
+        let has_down_without_up = doctor
+            .state
+            .findings
+            .iter()
+            .any(|f| f.rule == "peer_down_without_peer_up");
+        assert!(!has_down_without_up);
+    }
 }

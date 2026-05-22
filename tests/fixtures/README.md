@@ -57,6 +57,30 @@ without the `.bmpd` container framing.
 
 **Validated by:** `doctor::tests::test_init_term_tlv_rawbmp_fixture`
 
+## `peer-up-down.rawbmp`
+
+| Property | Value |
+|----------|-------|
+| Container | None — concatenated raw RFC 7854 BMP frames |
+| Records | 2 |
+| Payload type | Raw BMP |
+| Record 1 | Peer Up Notification, AS65000 |
+| Record 2 | Peer Down Notification, AS65000, reason code 2 |
+| Size | 127 bytes |
+
+**Purpose:** Regression test for clean peer lifecycle (Peer Up → Peer Down)
+with no stream-order warnings. Verifies peer state tracking: active=false
+at end, no `peer_down_without_peer_up` finding.
+
+**Validated by:** `doctor::tests::test_peer_up_down_rawbmp_fixture`
+
+```sh
+cargo run --bin bmpdoctor -- \
+  inspect tests/fixtures/peer-up-down.rawbmp --summary-json
+# Expected: total_messages=2, malformed_messages=0,
+#   peers_observed=1, active_peers=0, no stream-order warnings
+```
+
 ## Manual validation
 
 All fixtures can be inspected offline with `bmpdoctor`. These are
