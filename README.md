@@ -141,6 +141,12 @@ bmpdoctor inspect path/to/bmp-data.rawbmp
 Outputs file metadata, message type counts, per-peer statistics, active peer count,
 top peers by route-monitoring messages, and a findings summary.
 
+`--max-peers <N>` (default 10) controls how many peers appear in the peer
+inventory table and the "Top peers" section. `--max-peers 0` suppresses
+both peer-list sections while keeping aggregate counts (`peers_observed`,
+`active_peers`). In `--summary-json`, the `peers` array is absent when
+`--max-peers` is 0.
+
 With `--summary-json`, outputs machine-readable totals. For `.obmp` files,
 a `container` section distinguishes the capture wrapper from the payload types:
 
@@ -165,6 +171,16 @@ a `container` section distinguishes the capture wrapper from the payload types:
     "stream_order_warnings": 106,
     "other_findings": 0
   },
+  "peers": [
+    {
+      "peer_asn": 3303,
+      "peer_ip": "2001:07f8:0000:0000:0000:0ce7:0000:0002",
+      "active": false,
+      "rm_count": 42,
+      "up_count": 0,
+      "down_count": 0
+    }
+  ],
   "container": {
     "container_records": 100,
     "raw_bmp_payloads": 0,

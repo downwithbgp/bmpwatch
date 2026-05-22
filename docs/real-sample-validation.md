@@ -45,6 +45,16 @@ cargo run --bin bmpdoctor -- \
     "stream_order_warnings": 106,
     "other_findings": 0
   },
+  "peers": [
+    {
+      "peer_asn": 3303,
+      "peer_ip": "2001:07f8:0000:0000:0000:0ce7:0000:0002",
+      "active": false,
+      "rm_count": 42,
+      "up_count": 0,
+      "down_count": 0
+    }
+  ],
   "container": {
     "container_records": 100,
     "openbmp_wrapped_payloads": 100,

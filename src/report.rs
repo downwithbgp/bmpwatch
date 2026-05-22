@@ -853,4 +853,88 @@ mod tests {
         .unwrap();
         assert!(!summary.contains("\"peers\":"));
     }
+
+    #[test]
+    fn test_json_peers_truncated_to_max_peers() {
+        use crate::state::{PeerKey, PeerState};
+        use std::collections::BTreeMap;
+
+        let mut peers: BTreeMap<PeerKey, PeerState> = BTreeMap::new();
+        for i in 1..=5 {
+            peers.insert(
+                PeerKey {
+                    peer_asn: Some(i * 100),
+                    peer_ip: Some(format!("10.0.0.{i}")),
+                    peer_distinguisher: None,
+                },
+                PeerState {
+                    route_monitoring_count: i as u64,
+                    ..Default::default()
+                },
+            );
+        }
+
+        let state = DoctorState {
+            file_path: "t.obmp".into(),
+            format: "test".into(),
+            peers,
+            total_messages: 5,
+            ..Default::default()
+        };
+
+        let summary = serde_json::to_string(&InspectSummary {
+            file: &state.file_path,
+            format: &state.format,
+            size_bytes: 0,
+            total_messages: 5,
+            malformed_messages: 0,
+            bgp_elem_count: None,
+            by_type: std::collections::BTreeMap::new(),
+            peers_observed: 5,
+            active_peers: 0,
+            info_count: 0,
+            warn_count: 0,
+            error_count: 0,
+            findings_truncated: false,
+            findings_dropped_count: 0,
+            findings_buckets: FindingsBuckets {
+                parse_errors: 0,
+                stream_order_warnings: 0,
+                other_findings: 0,
+            },
+            // Not using the build_peers logic — we pass explicit array of 3
+            peers: Some(vec![
+                PeerSummary {
+                    peer_asn: Some(500),
+                    peer_ip: Some("10.0.0.5".into()),
+                    active: false,
+                    rm_count: 5,
+                    up_count: 0,
+                    down_count: 0,
+                },
+                PeerSummary {
+                    peer_asn: Some(400),
+                    peer_ip: Some("10.0.0.4".into()),
+                    active: false,
+                    rm_count: 4,
+                    up_count: 0,
+                    down_count: 0,
+                },
+                PeerSummary {
+                    peer_asn: Some(300),
+                    peer_ip: Some("10.0.0.3".into()),
+                    active: false,
+                    rm_count: 3,
+                    up_count: 0,
+                    down_count: 0,
+                },
+            ]),
+            container: None,
+        })
+        .unwrap();
+
+        let parsed: serde_json::Value = serde_json::from_str(&summary).unwrap();
+        let arr = parsed["peers"].as_array().unwrap();
+        assert_eq!(arr.len(), 3, "max_peers=3 should produce 3 entries");
+    }
 }
