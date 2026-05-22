@@ -324,6 +324,9 @@ failures.
 
 Frame-level validation checks the BMP common header (version, length, type) but
 does not perform deep BGP attribute validation beyond what BGPKIT Parser provides.
+Initiation and Termination message information TLVs (sysDescr, sysName,
+termination reason) are decoded per RFC 7854 / IANA BMP Parameters; unknown TLVs
+are displayed safely by type number.
 
 Currently only raw BMP frame files are supported. OpenBMP wrapper files, `.bmpr`
 capture format, compressed files (`.bz2`/`.gz`), Kafka, TCP listeners, and
