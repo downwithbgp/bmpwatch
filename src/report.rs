@@ -52,27 +52,43 @@ fn compute_buckets(findings: &[Finding]) -> FindingsBuckets {
 pub fn render_inspect(state: &DoctorState, truncated: bool, max_peers: usize) {
     let buckets = compute_buckets(&state.findings);
 
+    let msgs = |n: u64| -> &str {
+        if n == 1 {
+            "message"
+        } else {
+            "messages"
+        }
+    };
+
     let (health_label, health_detail) = if state.malformed_messages > 0 || buckets.parse_errors > 0
     {
         (
             "ISSUES",
             format!(
-                "{} messages, {} malformed",
-                state.total_messages, state.malformed_messages
+                "{} {}, {} malformed",
+                state.total_messages,
+                msgs(state.total_messages),
+                state.malformed_messages,
             ),
         )
     } else if buckets.stream_order_warnings > 0 {
         (
             "OK_WITH_STREAM_WARNINGS",
             format!(
-                "{} messages, 0 malformed, {} stream warnings",
-                state.total_messages, buckets.stream_order_warnings,
+                "{} {}, 0 malformed, {} stream warnings",
+                state.total_messages,
+                msgs(state.total_messages),
+                buckets.stream_order_warnings,
             ),
         )
     } else {
         (
             "OK",
-            format!("{} messages, 0 malformed", state.total_messages),
+            format!(
+                "{} {}, 0 malformed",
+                state.total_messages,
+                msgs(state.total_messages),
+            ),
         )
     };
 
