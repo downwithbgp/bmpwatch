@@ -72,13 +72,19 @@ without the `.bmpd` container framing.
 with no stream-order warnings. Verifies peer state tracking: active=false
 at end, no `peer_down_without_peer_up` finding.
 
+This fixture validates BMP Peer Up/Down lifecycle behavior. It may produce
+a bgpkit-parser warning for the synthetic embedded BGP OPEN message; that
+is not a BMP framing or lifecycle failure.
+
 **Validated by:** `doctor::tests::test_peer_up_down_rawbmp_fixture`
 
 ```sh
 cargo run --bin bmpdoctor -- \
   inspect tests/fixtures/peer-up-down.rawbmp --summary-json
 # Expected: total_messages=2, malformed_messages=0,
-#   peers_observed=1, active_peers=0, no stream-order warnings
+#   peers_observed=1, active_peers=0, stream_order_warnings=0,
+#   session_lifecycle.peer_up_messages=1, peer_down_messages=1
+# (may include 1 bgpkit-parser parse_error from synthetic BGP OPEN)
 ```
 
 ## Manual validation

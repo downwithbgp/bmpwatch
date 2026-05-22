@@ -794,7 +794,9 @@ mod tests {
 
     #[test]
     fn test_peer_up_down_rawbmp_fixture() {
-        // Read-only regression test: clean Peer Up -> Peer Down lifecycle
+        // Read-only regression test: clean Peer Up -> Peer Down lifecycle.
+        // The synthetic BGP OPEN may produce a bgpkit-parser parse_error;
+        // that is expected and is not a BMP framing or lifecycle failure.
         let mut doctor = Doctor::with_max_findings(
             Path::new("tests/fixtures/peer-up-down.rawbmp"),
             1000,
