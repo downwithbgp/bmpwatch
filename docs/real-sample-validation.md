@@ -21,7 +21,7 @@ cargo run --bin record_openbmp_kafka -- \
 
 ```sh
 cargo run --bin bmpdoctor -- \
-  inspect samples/routeviews-broad-100.obmp --format openbmp-len --summary-json
+  inspect samples/routeviews-broad-100.obmp --summary-json
 ```
 
 ```json

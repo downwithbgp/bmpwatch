@@ -46,7 +46,8 @@ bmp.bgpstream.caida.org has address 192.172.226.44
 
 - `examples/record_openbmp_kafka.rs` is **blocked** until a reachable OpenBMP
   Kafka broker is confirmed.
-- `--format openbmp-len` (`.obmp` file support) is **blocked** on Kafka capture;
+- `--format openbmp-len` (`.obmp` file support) was blocked until RouteViews
+  Kafka was verified reachable; now implemented and verified against live data.
   it depends on having real OpenBMP-wrapped payloads for testing.
 - CAIDA/OpenBMP Kafka is **not** the preferred real-data path for BMPDoctor.
   Local FRR/GoBMP `.rawbmp` captures are the recommended integration test source.

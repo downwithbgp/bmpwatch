@@ -108,8 +108,8 @@ cargo run --bin record_openbmp_kafka -- \
 ```
 
 The `.obmp` file uses the `BMPDOPENBMP1\n` magic header followed by
-repeated `u32` BE length + payload frames. Parsing support via
-`bmpdoctor --format openbmp-len` is planned but not yet implemented.
+repeated `u32` BE length + payload frames. Format is auto-detected by
+BMPDoctor; use `inspect`, `lint`, or `dump` directly.
 
 **Prerequisite:** librdkafka must be installed:
 ```sh
@@ -117,11 +117,11 @@ brew install librdkafka          # macOS
 sudo apt-get install librdkafka-dev  # Debian/Ubuntu
 ```
 
-Then inspect with BMPDoctor (once `--format openbmp-len` is implemented):
+Then inspect with BMPDoctor (auto-detected, no `--format` flag needed):
 
 ```sh
-# Future: bmpdoctor inspect samples/nwax-sample.obmp --format openbmp-len
-# Future: bmpdoctor dump samples/nwax-sample.obmp --format openbmp-len --jsonl | head -5
+bmpdoctor inspect samples/nwax-sample.obmp --summary-json
+bmpdoctor dump samples/nwax-sample.obmp --jsonl | head -5
 ```
 
 ## Notes
