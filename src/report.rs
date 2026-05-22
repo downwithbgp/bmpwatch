@@ -257,6 +257,19 @@ pub fn render_inspect(state: &DoctorState, truncated: bool, max_peers: usize) {
         }
     }
 
+    if let Some(ref stats) = state.stats_info {
+        if !stats.entries.is_empty() {
+            println!();
+            println!("Stats Report info:");
+            for e in stats.entries.iter().take(10) {
+                println!("  {}: {}", e.stat_name, e.stat_value);
+            }
+            if stats.entries.len() > 10 {
+                println!("  ... and {} more entries", stats.entries.len() - 10);
+            }
+        }
+    }
+
     let lifecycle = compute_lifecycle(state);
     println!();
     println!("Session lifecycle:");

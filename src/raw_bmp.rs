@@ -173,6 +173,88 @@ pub struct RawBmpFrame {
     pub payload: Vec<u8>,
     pub full_data: Vec<u8>,
     pub tlv_info: Option<TlvInfo>,
+    /// Stats Report entries, if message type is StatisticsReport (1).
+    pub stats_info: Option<StatsInfo>,
+}
+
+/// Stats Report information (RFC 7854, Section 3.4).
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub struct StatsInfo {
+    pub entries: Vec<StatsEntry>,
+}
+
+/// A single statistic entry from a Stats Report message.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct StatsEntry {
+    pub stat_type: u16,
+    pub stat_name: String,
+    pub stat_value: u64,
+}
+
+/// Known Stats Report stat type names (RFC 7854 + IANA BMP Parameters).
+fn stat_type_name(t: u16) -> &'static str {
+    match t {
+        0 => "Prefixes rejected by inbound policy",
+        1 => "Duplicate prefix advertisements received",
+        2 => "Duplicate withdraws received",
+        3 => "Updates invalidated due to CLUSTER_LIST loop",
+        4 => "Updates invalidated due to AS_PATH loop detection",
+        5 => "Updates invalidated due to ORIGINATOR_ID",
+        6 => "Updates invalidated due to AS_CONFED loop detection",
+        7 => "Routes in Adj-RIBs-In",
+        8 => "Routes in Loc-RIB",
+        9 => "Routes in per-AFI/SAFI Adj-RIB-In",
+        10 => "Routes in per-AFI/SAFI Loc-RIB",
+        11 => "Updates subjected to AS_PATH update treatment",
+        12 => "Prefixes subjected to AS_PATH update treatment",
+        13 => "Duplicate updates",
+        _ => "Unknown",
+    }
+}
+
+/// Parse Stats Report payload after the Per-Peer Header.
+/// RFC 7854, Section 3.4: Stats Count (4) + repeated entries of Stat Type (2) + Stat Len (2) + value.
+fn parse_stats(payload: &[u8]) -> Option<StatsInfo> {
+    if payload.len() < 4 {
+        return None;
+    }
+    let stats_count = u32::from_be_bytes([payload[0], payload[1], payload[2], payload[3]]) as usize;
+    let mut entries = Vec::new();
+    let mut pos = 4;
+
+    for _ in 0..stats_count {
+        if pos + 4 > payload.len() {
+            break;
+        }
+        let stat_type = u16::from_be_bytes([payload[pos], payload[pos + 1]]);
+        let stat_len = u16::from_be_bytes([payload[pos + 2], payload[pos + 3]]) as usize;
+        pos += 4;
+
+        if pos + stat_len > payload.len() {
+            break;
+        }
+        let data = &payload[pos..pos + stat_len];
+        pos += stat_len;
+
+        let value = match data.len() {
+            4 => u32::from_be_bytes([data[0], data[1], data[2], data[3]]) as u64,
+            8 => u64::from_be_bytes([
+                data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7],
+            ]),
+            _ => data.len() as u64,
+        };
+        entries.push(StatsEntry {
+            stat_type,
+            stat_name: stat_type_name(stat_type).to_string(),
+            stat_value: value,
+        });
+    }
+
+    if entries.is_empty() {
+        None
+    } else {
+        Some(StatsInfo { entries })
+    }
 }
 
 /// BMP Information TLV entry (RFC 7854, Sections 3.7–3.8).
@@ -330,6 +412,11 @@ pub fn parse_frame_from_bytes(data: &[u8], file_offset: u64) -> Result<RawBmpFra
         _ => None,
     };
 
+    let stats_info = match msg_type {
+        Some(BmpMessageType::StatisticsReport) => parse_stats(&payload[BMP_PER_PEER_HEADER_SIZE..]),
+        _ => None,
+    };
+
     let mut full_data = Vec::with_capacity(total);
     full_data.extend_from_slice(&data[..total]);
 
@@ -343,6 +430,7 @@ pub fn parse_frame_from_bytes(data: &[u8], file_offset: u64) -> Result<RawBmpFra
         payload: payload.to_vec(),
         full_data,
         tlv_info,
+        stats_info,
     })
 }
 
@@ -424,6 +512,13 @@ impl Iterator for RawBmpIterator {
             _ => None,
         };
 
+        let stats_info = match msg_type {
+            Some(BmpMessageType::StatisticsReport) => {
+                parse_stats(&payload[BMP_PER_PEER_HEADER_SIZE..])
+            }
+            _ => None,
+        };
+
         Some(Ok(RawBmpFrame {
             offset: frame_offset,
             version,
@@ -434,6 +529,7 @@ impl Iterator for RawBmpIterator {
             payload,
             full_data,
             tlv_info,
+            stats_info,
         }))
     }
 }
@@ -789,6 +885,71 @@ mod tests {
         buf.extend_from_slice(&msg_len.to_be_bytes());
         buf.push(msg_type);
         buf.extend_from_slice(payload);
+        buf
+    }
+
+    #[test]
+    fn test_parse_stats_report() {
+        // Build Stats Report with per-peer header + 2 stat entries
+        let pph = fixtures::make_per_peer_header(65000, [10, 0, 0, 1], 100, 0);
+        let mut payload = vec![0u8; 4]; // stats_count
+        payload[0..4].copy_from_slice(&2u32.to_be_bytes());
+        // Entry 1: type 7 (Adj-RIBs-In routes), len=4, value=42
+        let e1 = make_stats_entry(7, &42u32.to_be_bytes());
+        payload.extend_from_slice(&e1);
+        // Entry 2: type 8 (Loc-RIB routes), len=4, value=10
+        let e2 = make_stats_entry(8, &10u32.to_be_bytes());
+        payload.extend_from_slice(&e2);
+        let total = [pph.as_slice(), payload.as_slice()].concat();
+        let frame = make_bmp_message(1, &total);
+        let frame = parse_frame_from_bytes(&frame, 0).unwrap();
+        let stats = frame.stats_info.as_ref().unwrap();
+        assert_eq!(stats.entries.len(), 2);
+        assert_eq!(stats.entries[0].stat_type, 7);
+        assert_eq!(stats.entries[0].stat_value, 42);
+        assert!(stats.entries[0].stat_name.contains("Adj-RIBs-In"));
+        assert_eq!(stats.entries[1].stat_type, 8);
+        assert_eq!(stats.entries[1].stat_value, 10);
+    }
+
+    #[test]
+    fn test_parse_stats_unknown_type() {
+        let pph = fixtures::make_per_peer_header(65000, [10, 0, 0, 1], 100, 0);
+        let payload = [
+            1u32.to_be_bytes().as_slice(),
+            make_stats_entry(99, &1u32.to_be_bytes()).as_slice(),
+        ]
+        .concat();
+        let total = [pph.as_slice(), payload.as_slice()].concat();
+        let frame = make_bmp_message(1, &total);
+        let stats = parse_frame_from_bytes(&frame, 0)
+            .unwrap()
+            .stats_info
+            .unwrap();
+        assert_eq!(stats.entries[0].stat_name, "Unknown");
+    }
+
+    #[test]
+    fn test_parse_stats_truncated() {
+        let pph = fixtures::make_per_peer_header(65000, [10, 0, 0, 1], 100, 0);
+        // Declare 99 entries but only provide 1
+        let mut payload = vec![0u8; 4];
+        payload[0..4].copy_from_slice(&99u32.to_be_bytes());
+        payload.extend_from_slice(&make_stats_entry(7, &42u32.to_be_bytes()));
+        let total = [pph.as_slice(), payload.as_slice()].concat();
+        let frame = make_bmp_message(1, &total);
+        let stats = parse_frame_from_bytes(&frame, 0)
+            .unwrap()
+            .stats_info
+            .unwrap();
+        assert_eq!(stats.entries.len(), 1); // stops at truncation
+    }
+
+    fn make_stats_entry(t: u16, value: &[u8]) -> Vec<u8> {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&t.to_be_bytes());
+        buf.extend_from_slice(&(value.len() as u16).to_be_bytes());
+        buf.extend_from_slice(value);
         buf
     }
 }

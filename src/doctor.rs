@@ -123,6 +123,7 @@ impl Doctor {
                             "malformed",
                             0,
                             None,
+                            None,
                             &[finding],
                         );
                         self.events.push(event);
@@ -272,6 +273,13 @@ impl Doctor {
             }
         }
 
+        // Collect Stats Report info from the first such message
+        if let Some(ref stats) = frame.stats_info {
+            if self.state.stats_info.is_none() && !stats.entries.is_empty() {
+                self.state.stats_info = Some(stats.clone());
+            }
+        }
+
         for f in &frame_findings {
             self.push_finding(f.clone());
         }
@@ -292,6 +300,7 @@ impl Doctor {
                 parse_status,
                 bgp_elems_count,
                 frame.tlv_info.as_ref(),
+                frame.stats_info.as_ref(),
                 &frame_findings,
             );
             self.events.push(event);
