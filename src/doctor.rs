@@ -741,4 +741,32 @@ mod tests {
         // ObmpReader fails on missing magic
         assert!(doctor.process(false).is_err());
     }
+
+    #[test]
+    fn test_init_term_tlv_fixture() {
+        // Read-only regression test against committed fixture
+        let mut doctor = Doctor::with_max_findings(
+            Path::new("tests/fixtures/init-term-tlvs.bmpd"),
+            1000,
+            InputFormat::Bmpd,
+        )
+        .unwrap();
+        doctor.process(false).unwrap();
+
+        assert_eq!(doctor.state.total_messages, 2);
+        assert_eq!(doctor.state.malformed_messages, 0);
+        assert_eq!(*doctor.state.by_type.get(&4).unwrap_or(&0), 1); // Initiation
+        assert_eq!(*doctor.state.by_type.get(&5).unwrap_or(&0), 1); // Termination
+
+        // Initiation TLVs
+        let init = doctor.state.initiation_info.as_ref().unwrap();
+        assert_eq!(init.strings.len(), 2);
+        assert_eq!(init.strings[0].value, "FRRouting");
+        assert_eq!(init.strings[1].value, "bmp-speaker");
+
+        // Termination reason
+        let term = doctor.state.termination_info.as_ref().unwrap();
+        assert_eq!(term.termination_reason, Some(2));
+        assert!(crate::raw_bmp::termination_reason_name(2).contains("closed"));
+    }
 }
