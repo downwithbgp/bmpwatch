@@ -89,6 +89,14 @@ streaming inputs are out of scope for the MVP.
 
 ## Roadmap (not yet implemented)
 
+### Active next external-data milestones
+
+RouteViews Kafka (`stream.routeviews.org:9092`) is verified reachable.
+See [RouteViews Kafka verification](docs/routeviews-kafka-verification.md).
+
+- `examples/record_openbmp_kafka.rs` — Kafka consumer writing to local `.obmp`
+- `--format openbmp-len` — OpenBMP length-delimited files (`.obmp`)
+
 ### Active priority
 
 - Public BMP fixture corpus
@@ -97,14 +105,11 @@ streaming inputs are out of scope for the MVP.
 - `.bmpr` capture format support
 - TCP listener mode
 
-### Blocked (CAIDA Kafka unreachable)
+### Blocked
 
-CAIDA's `bmp.bgpstream.caida.org:9092` is not reachable from the developer's
-network (see [verification log](docs/caida-kafka-verification.md)). These
-items are blocked until a reachable OpenBMP Kafka broker is confirmed.
+CAIDA's `bmp.bgpstream.caida.org:9092` is unreachable from the developer's
+network (see [verification log](docs/caida-kafka-verification.md)).
 
-- `--format openbmp-len` — OpenBMP length-delimited files (`.obmp`)
-- `examples/record_openbmp_kafka.rs` — Kafka consumer writing to local `.obmp`
 - Kafka input (integrated into core CLI)
 
 ### Future

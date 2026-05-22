@@ -62,14 +62,24 @@ Then capture with `nc` or `socat`:
 nc -l 5000 > capture.rawbmp
 ```
 
-## 3. CAIDA/OpenBMP Kafka verification — BLOCKED
+## 3. RouteViews Kafka verification
 
-- [x] Run `nc -vz bmp.bgpstream.caida.org 9092` — **Network unreachable**
-- [x] Run `kcat -b bmp.bgpstream.caida.org:9092 -L` — **Broker transport failure**
-- [x] DNS resolves to `192.172.226.44`
-- [ ] All further items blocked until a reachable broker is confirmed
+- [x] Run `nc -vz stream.routeviews.org 9092` — **Connection succeeded**
+- [x] Run `kcat -b stream.routeviews.org:9092 -L` — **Topics listed**
+- [x] Observed topics match `^route-?views\..*\.bmp_raw$`
+- [ ] Subscribe to one topic and capture 100 messages
+- [ ] Verify messages are valid BMP frames (inspect first 5 with `xxd`)
+- [ ] Run `bmpdoctor inspect` on captured output
+- [ ] Confirm peer addresses and ASNs match expected RouteViews feed data
 
-See `docs/caida-kafka-verification.md` for the full test log.
+See `docs/routeviews-kafka-verification.md` for the full test log.
+
+### CAIDA/OpenBMP Kafka — BLOCKED (historical)
+
+- [x] `nc -vz bmp.bgpstream.caida.org 9092` — **Network unreachable**
+- [x] `kcat -b bmp.bgpstream.caida.org:9092 -L` — **Broker transport failure**
+
+See `docs/caida-kafka-verification.md`.
 
 ## 4. BGPReader routeviews-stream comparison
 

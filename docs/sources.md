@@ -12,8 +12,9 @@ Sources ordered by implementation status and verification level.
 |------|------------------------------------|--------------|-------------------------|
 | 1    | Synthetic fixtures                 | (in-memory)  | Implemented, 17 tests   |
 | 2    | Local FRR/GoBGP raw BMP            | `.rawbmp`    | Planned, not tested     |
-| 3    | CAIDA/OpenBMP Kafka                | `.obmp`      | Unreachable (blocked)   |
+| 3    | RouteViews Kafka                   | `.obmp`      | Verified reachable      |
 | 4    | BGPReader routeviews-stream        | N/A          | Comparison only         |
+| —    | CAIDA/OpenBMP Kafka (historical)   | `.obmp`      | Unreachable (blocked)   |
 
 ### Tier 1: Synthetic fixtures
 
@@ -28,21 +29,33 @@ provide real BGP data for integration testing. The `.rawbmp` extension
 distinguishes raw concatenated BMP frames from OpenBMP length-delimited
 captures.
 
-### Tier 3: CAIDA/OpenBMP Kafka `.obmp` — BLOCKED
+### Tier 3: RouteViews Kafka `.obmp` — active next milestone
 
-The CAIDA OpenBMP Kafka broker at `bmp.bgpstream.caida.org:9092` was tested
-manually in May 2026 and found unreachable. DNS resolves to `192.172.226.44`
-but TCP connection fails with "Network is unreachable." Kafka metadata
-retrieval via `kcat -L` fails with "Broker transport failure."
+`stream.routeviews.org:9092` is the verified working OpenBMP Kafka broker
+for BMPDoctor integration. It serves live BMP data from RouteViews
+collectors via topics matching `^route-?views\..*\.bmp_raw$`.
 
-This source is documented in older/example material (Artemis Private BMP
-feeds, BGPStream V2 docs) but is not reachable from the developer's
-network. Implementation of Kafka capture or `.obmp` file support is
-**blocked** until a reachable OpenBMP broker is confirmed.
+Each topic corresponds to a BMP peer session. Observed topics include
+`routeviews.sg.64050.bmp_raw`, `routeviews.flix.395880.bmp_raw`,
+`route-views.linx.8714.bmp_raw`, and others.
 
-See [CAIDA Kafka verification](caida-kafka-verification.md) for the full test
-log. See [OpenBMP Kafka capture guide](openbmp-kafka-capture.md) for reference
-procedures (for use if a reachable broker is found later).
+**Warning:** Topic naming is not perfectly uniform. Both `routeviews.`
+and `route-views.` prefixes exist. Consumers must handle both variants.
+
+This is now the preferred external real-data source for BMPDoctor.
+See [RouteViews Kafka verification](routeviews-kafka-verification.md)
+for the full test log and
+[OpenBMP Kafka capture guide](openbmp-kafka-capture.md) for consumer
+procedures.
+
+### Historical: CAIDA/OpenBMP Kafka — unreachable
+
+`bmp.bgpstream.caida.org:9092` was tested in May 2026 and found
+unreachable. Documented in older/example material (Artemis Private BMP
+feeds, BGPStream V2 docs) but not usable from this network. Preserved
+as a reference only.
+
+See [CAIDA Kafka verification](caida-kafka-verification.md).
 
 ### Tier 4: BGPReader routeviews-stream / RouteViews (comparison only)
 

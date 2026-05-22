@@ -1,14 +1,27 @@
 # OpenBMP Kafka Capture
 
-**Status: Blocked.** `bmp.bgpstream.caida.org:9092` is not reachable from
-the developer's network as of May 2026. See
-[CAIDA Kafka verification](caida-kafka-verification.md) for the test log.
+How to verify reachability and test capture from an OpenBMP Kafka broker
+before integrating into BMPDoctor.
 
-The procedures below are preserved for reference. They should be re-run if a
-reachable OpenBMP broker is confirmed in the future.
+## Preferred broker: RouteViews
 
-How to verify reachability and test capture from CAIDA's public OpenBMP Kafka
-broker before integrating into BMPDoctor.
+`stream.routeviews.org:9092` is the verified working broker for
+BMPDoctor integration. See
+[RouteViews Kafka verification](routeviews-kafka-verification.md)
+for the full test log.
+
+**Topic regex:** `^route-?views\..*\.bmp_raw$`
+
+**Warning:** Topic naming is not perfectly uniform. Both `routeviews.`
+and `route-views.` prefixes have been observed. Consumers must handle
+both variants.
+
+## Historical: CAIDA BGPStream broker
+
+`bmp.bgpstream.caida.org:9092` was tested in May 2026 and found
+unreachable from the developer's network. It is preserved in
+documentation for historical reference only. See
+[CAIDA Kafka verification](caida-kafka-verification.md).
 
 ## Prerequisites
 
@@ -25,28 +38,24 @@ sudo apt-get install kafkacat
 ## 1. Broker reachability test
 
 ```sh
-nc -vz bmp.bgpstream.caida.org 9092
+nc -vz stream.routeviews.org 9092
 ```
-
-If the broker is reachable, `nc` will print a success message. If not, the
-connection will time out or be refused. Record the actual output.
 
 ## 2. List available topics
 
 ```sh
-kcat -b bmp.bgpstream.caida.org:9092 -L
+kcat -b stream.routeviews.org:9092 -L
 ```
 
-Look for topics matching `openbmp.router--*.peer-as--*.bmp_raw`. Record the
-actual topic list.
+Look for topics matching `^route-?views\..*\.bmp_raw$`.
 
 ## 3. Consume a single topic (one peer session)
 
 Pick a topic from the listing and subscribe:
 
 ```sh
-kcat -b bmp.bgpstream.caida.org:9092 \
-  -t openbmp.router--abc123.peer-as--65000.bmp_raw \
+kcat -b stream.routeviews.org:9092 \
+  -t routeviews.sg.64050.bmp_raw \
   -C -o beginning -c 10
 ```
 
@@ -59,8 +68,8 @@ Each message printed will be binary BMP frame data. Pipe through `xxd` or
 `hexdump -C` for inspection:
 
 ```sh
-kcat -b bmp.bgpstream.caida.org:9092 \
-  -t openbmp.router--abc123.peer-as--65000.bmp_raw \
+kcat -b stream.routeviews.org:9092 \
+  -t routeviews.sg.64050.bmp_raw \
   -C -o beginning -c 1 | xxd | head -20
 ```
 
@@ -72,8 +81,8 @@ spawn one consumer per topic, or use `kafka-console-consumer` with
 
 ```sh
 kafka-console-consumer \
-  --bootstrap-server bmp.bgpstream.caida.org:9092 \
-  --whitelist 'openbmp\.router--.+\.peer-as--.+\.bmp_raw' \
+  --bootstrap-server stream.routeviews.org:9092 \
+  --whitelist 'routeviews\..*\.bmp_raw' \
   --from-beginning \
   --max-messages 100
 ```
@@ -81,8 +90,8 @@ kafka-console-consumer \
 ## 5. Capture to a local .obmp file
 
 ```sh
-kcat -b bmp.bgpstream.caida.org:9092 \
-  -t openbmp.router--abc123.peer-as--65000.bmp_raw \
+kcat -b stream.routeviews.org:9092 \
+  -t routeviews.sg.64050.bmp_raw \
   -C -o beginning -c 1000 \
   > captured_peer.obmp
 ```
