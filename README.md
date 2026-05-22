@@ -382,7 +382,8 @@ Historical tags (`v0.1.*`) are checkpoints, not polished releases.
 - More synthetic fixtures for edge-case coverage
 - Better peer/session lifecycle summaries
 - Additional real RouteViews sample validation notes
-- Local FRR/GoBGP `.rawbmp` integration testing
+- Local FRR `.rawbmp` integration testing
+  (see [FRR local BMP lab](docs/frr-local-bmp-lab.md))
 
 ### B. Useful later
 
