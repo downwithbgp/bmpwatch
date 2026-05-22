@@ -49,6 +49,36 @@ fn compute_buckets(findings: &[Finding]) -> FindingsBuckets {
     }
 }
 
+#[derive(Serialize)]
+struct SessionLifecycle {
+    peers_observed: usize,
+    active_peers: usize,
+    route_monitoring_messages: u64,
+    peer_up_messages: u64,
+    peer_down_messages: u64,
+    rm_before_peer_up_warnings: u64,
+}
+
+fn compute_lifecycle(state: &DoctorState) -> SessionLifecycle {
+    let rm_msgs = state.by_type.get(&0).copied().unwrap_or(0);
+    let pu_msgs = state.by_type.get(&3).copied().unwrap_or(0);
+    let pd_msgs = state.by_type.get(&2).copied().unwrap_or(0);
+    let rm_warnings = state
+        .findings
+        .iter()
+        .filter(|f| f.rule == "route_monitoring_before_peer_up")
+        .count() as u64;
+
+    SessionLifecycle {
+        peers_observed: state.peers.len(),
+        active_peers: state.peers.values().filter(|p| p.active).count(),
+        route_monitoring_messages: rm_msgs,
+        peer_up_messages: pu_msgs,
+        peer_down_messages: pd_msgs,
+        rm_before_peer_up_warnings: rm_warnings,
+    }
+}
+
 pub fn render_inspect(state: &DoctorState, truncated: bool, max_peers: usize) {
     let buckets = compute_buckets(&state.findings);
 
@@ -227,6 +257,48 @@ pub fn render_inspect(state: &DoctorState, truncated: bool, max_peers: usize) {
         }
     }
 
+    let lifecycle = compute_lifecycle(state);
+    println!();
+    println!("Session lifecycle:");
+    println!(
+        "  Peers observed:              {}",
+        lifecycle.peers_observed
+    );
+    println!("  Active at end:               {}", lifecycle.active_peers);
+    println!(
+        "  Route-monitoring messages:   {}",
+        lifecycle.route_monitoring_messages
+    );
+    println!(
+        "  Peer Up messages:            {}",
+        lifecycle.peer_up_messages
+    );
+    println!(
+        "  Peer Down messages:          {}",
+        lifecycle.peer_down_messages
+    );
+    if lifecycle.rm_before_peer_up_warnings > 0 {
+        println!(
+            "  RM before Peer Up warnings: {}",
+            lifecycle.rm_before_peer_up_warnings
+        );
+    }
+
+    if lifecycle.rm_before_peer_up_warnings > 0
+        && state.malformed_messages == 0
+        && compute_buckets(&state.findings).parse_errors == 0
+    {
+        println!(
+            "  Interpretation: likely mid-stream capture; stream-order warnings are expected."
+        );
+    } else if state.malformed_messages > 0 || compute_buckets(&state.findings).parse_errors > 0 {
+        println!(
+            "  Interpretation: parse issues need investigation ({} malformed, {} parse errors).",
+            state.malformed_messages,
+            compute_buckets(&state.findings).parse_errors,
+        );
+    }
+
     println!();
     println!("Findings summary:");
 
@@ -342,6 +414,7 @@ struct InspectSummary<'a> {
     findings_truncated: bool,
     findings_dropped_count: u64,
     findings_buckets: FindingsBuckets,
+    session_lifecycle: SessionLifecycle,
     #[serde(skip_serializing_if = "Option::is_none")]
     peers: Option<Vec<PeerSummary>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -475,6 +548,7 @@ pub fn render_inspect_json(state: &DoctorState, truncated: bool, max_peers: usiz
         findings_truncated: truncated,
         findings_dropped_count: state.findings_dropped,
         findings_buckets: compute_buckets(&state.findings),
+        session_lifecycle: compute_lifecycle(state),
         peers,
         container,
     };
@@ -532,6 +606,14 @@ mod tests {
                 stream_order_warnings: 0,
                 other_findings: 0,
             },
+            session_lifecycle: SessionLifecycle {
+                peers_observed: 0,
+                active_peers: 0,
+                route_monitoring_messages: 0,
+                peer_up_messages: 0,
+                peer_down_messages: 0,
+                rm_before_peer_up_warnings: 0,
+            },
             peers: None,
             container: None,
         })
@@ -582,6 +664,14 @@ mod tests {
                 parse_errors: 0,
                 stream_order_warnings: 0,
                 other_findings: 0,
+            },
+            session_lifecycle: SessionLifecycle {
+                peers_observed: 0,
+                active_peers: 0,
+                route_monitoring_messages: 0,
+                peer_up_messages: 0,
+                peer_down_messages: 0,
+                rm_before_peer_up_warnings: 0,
             },
             peers: None,
             container: Some(container),
@@ -638,6 +728,14 @@ mod tests {
                 stream_order_warnings: 0,
                 other_findings: 0,
             },
+            session_lifecycle: SessionLifecycle {
+                peers_observed: 0,
+                active_peers: 0,
+                route_monitoring_messages: 0,
+                peer_up_messages: 0,
+                peer_down_messages: 0,
+                rm_before_peer_up_warnings: 0,
+            },
             peers: None,
             container: Some(container),
         })
@@ -678,6 +776,14 @@ mod tests {
                 parse_errors: 0,
                 stream_order_warnings: 0,
                 other_findings: 0,
+            },
+            session_lifecycle: SessionLifecycle {
+                peers_observed: 0,
+                active_peers: 0,
+                route_monitoring_messages: 0,
+                peer_up_messages: 0,
+                peer_down_messages: 0,
+                rm_before_peer_up_warnings: 0,
             },
             peers: None,
             container: Some(container),
@@ -864,6 +970,14 @@ mod tests {
                 stream_order_warnings: 0,
                 other_findings: 0,
             },
+            session_lifecycle: SessionLifecycle {
+                peers_observed: 0,
+                active_peers: 0,
+                route_monitoring_messages: 0,
+                peer_up_messages: 0,
+                peer_down_messages: 0,
+                rm_before_peer_up_warnings: 0,
+            },
             peers: Some(vec![
                 PeerSummary {
                     peer_asn: Some(200),
@@ -916,6 +1030,14 @@ mod tests {
                 parse_errors: 0,
                 stream_order_warnings: 0,
                 other_findings: 0,
+            },
+            session_lifecycle: SessionLifecycle {
+                peers_observed: 0,
+                active_peers: 0,
+                route_monitoring_messages: 0,
+                peer_up_messages: 0,
+                peer_down_messages: 0,
+                rm_before_peer_up_warnings: 0,
             },
             peers: None,
             container: None,
@@ -971,6 +1093,14 @@ mod tests {
                 parse_errors: 0,
                 stream_order_warnings: 0,
                 other_findings: 0,
+            },
+            session_lifecycle: SessionLifecycle {
+                peers_observed: 0,
+                active_peers: 0,
+                route_monitoring_messages: 0,
+                peer_up_messages: 0,
+                peer_down_messages: 0,
+                rm_before_peer_up_warnings: 0,
             },
             // Not using the build_peers logic — we pass explicit array of 3
             peers: Some(vec![
