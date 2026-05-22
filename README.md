@@ -339,6 +339,24 @@ BMPDoctor checks for:
 | `peer_down_without_peer_up`        | WARN     | Peer Down for a peer that was not active            |
 | `timestamp_regression`             | WARN     | Timestamp went backwards for a given peer           |
 
+## Input model
+
+How raw BMP frames, BMPDoctor containers, upstream wrappers, and external
+data sources relate to each other.
+
+| Layer | Format | Characteristic |
+|-------|--------|----------------|
+| Raw BMP frame | `.rawbmp` | Concatenated RFC 7854 BMP messages. First byte `0x03`. Direct TCP byte stream capture. |
+| BMPDoctor container | `.bmpd` | Local capture wrapper: `BMPDOPENBMP1\n` magic + u32 BE length-prefixed records. Not an OpenBMP standard. |
+| Upstream wrapper | `OBMP` | OpenBMP header inside RouteViews Kafka `*.bmp_raw` payloads. Stripped automatically when reading `.bmpd` records. |
+| RouteViews Kafka | N/A | `record_openbmp_kafka` saves payloads into `.bmpd`. Payloads are typically `OBMP`-wrapped. |
+| MRT / BGPReader | N/A | Not BMP. BGPReader output is decoded BGP events, not raw BMP frames. Comparison-only; no direct parsing. |
+| PCAP | N/A | BMP over TCP requires stream reassembly. External-tool workflow documented; native support deferred. |
+
+Each `.bmpd` record contains one raw BMP frame or one `OBMP`-wrapped raw
+BMP frame. BMPDoctor's pipeline unwraps `OBMP` (if present) and parses the
+inner RFC 7854 frame.
+
 ## Terminology
 
 | Term | Meaning |
