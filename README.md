@@ -357,7 +357,9 @@ Frame-level validation checks the BMP common header (version, length, type) but
 does not perform deep BGP attribute validation beyond what BGPKIT Parser provides.
 Initiation and Termination message information TLVs (sysDescr, sysName,
 termination reason) are decoded per RFC 7854 / IANA BMP Parameters; unknown TLVs
-are displayed safely by type number.
+are displayed safely by type number. Basic Stats Report type/value entries are
+decoded for diagnostics; BMPDoctor is not a time-series analytics tool or
+Prometheus exporter.
 
 Currently only raw BMP frame files are supported. OpenBMP wrapper files, `.bmpr`
 capture format, compressed files (`.bz2`/`.gz`), Kafka, TCP listeners, and
