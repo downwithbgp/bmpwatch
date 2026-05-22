@@ -45,6 +45,9 @@ pub enum Command {
         /// Input format: auto, raw-bmp, or openbmp-len
         #[arg(long, default_value = "auto")]
         format: InputFormat,
+        /// Maximum peers to display (0 suppresses peer sections)
+        #[arg(long, default_value_t = 10)]
+        max_peers: usize,
     },
     /// Machine-oriented lint output with exit codes
     Lint {
@@ -82,6 +85,7 @@ pub fn run() {
             max_findings,
             summary_json,
             format,
+            max_peers,
         } => {
             let fmt = resolve_format(&file, format);
             let mut doctor = match Doctor::with_max_findings(&file, max_findings.max(1), fmt) {
@@ -96,9 +100,9 @@ pub fn run() {
                 process::exit(1);
             }
             if summary_json {
-                report::render_inspect_json(&doctor.state, doctor.was_truncated());
+                report::render_inspect_json(&doctor.state, doctor.was_truncated(), max_peers);
             } else {
-                report::render_inspect(&doctor.state, doctor.was_truncated());
+                report::render_inspect(&doctor.state, doctor.was_truncated(), max_peers);
             }
         }
         Command::Lint {

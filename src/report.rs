@@ -49,7 +49,7 @@ fn compute_buckets(findings: &[Finding]) -> FindingsBuckets {
     }
 }
 
-pub fn render_inspect(state: &DoctorState, truncated: bool) {
+pub fn render_inspect(state: &DoctorState, truncated: bool, max_peers: usize) {
     println!("=== BMPDoctor Inspect ===");
     println!();
     println!("File:        {}", state.file_path);
@@ -91,20 +91,52 @@ pub fn render_inspect(state: &DoctorState, truncated: bool) {
         let active_count = state.peers.values().filter(|p| p.active).count();
         println!("Active at end:  {}", active_count);
 
-        println!();
-        println!("Top peers by route-monitoring messages:");
-
         let mut peer_list: Vec<_> = state.peers.iter().collect();
-        peer_list.sort_by_key(|(_, ps)| std::cmp::Reverse(ps.route_monitoring_count));
-        let top_n = peer_list.len().min(10);
-        for (i, (pk, ps)) in peer_list.iter().take(top_n).enumerate() {
-            let status = if ps.active { "active" } else { "inactive" };
+        peer_list.sort_by(|a, b| {
+            b.1.route_monitoring_count
+                .cmp(&a.1.route_monitoring_count)
+                .then_with(|| a.0.cmp(b.0))
+        });
+
+        if max_peers > 0 {
+            println!();
             println!(
-                "  {}. {:30} {:>8} updates  [{status}]",
-                i + 1,
-                pk.display(),
-                ps.route_monitoring_count,
+                " {:<10} {:<40} {:<7} {:<8} {:<5} {:<5}",
+                "ASN", "Peer IP", "Active", "RM msgs", "UPs", "DOWNs"
             );
+            for (pk, ps) in peer_list.iter().take(max_peers) {
+                let asn = pk
+                    .peer_asn
+                    .map(|a| format!("{a}"))
+                    .unwrap_or_else(|| "-".to_string());
+                let ip = pk.peer_ip.as_deref().unwrap_or("-");
+                let active = if ps.active { "yes" } else { "no" };
+                println!(
+                    " {asn:<10} {ip:<40} {active:<7} {:<8} {:<5} {:<5}",
+                    ps.route_monitoring_count, ps.peer_up_count, ps.peer_down_count,
+                );
+            }
+
+            let shown = peer_list.len().min(max_peers);
+            if peer_list.len() > shown {
+                println!(
+                    " ({more} more peers not shown; use --max-peers to raise)",
+                    more = peer_list.len() - shown,
+                );
+            }
+
+            println!();
+            println!("Top peers by route-monitoring messages:");
+
+            for (i, (pk, ps)) in peer_list.iter().take(max_peers).enumerate() {
+                let status = if ps.active { "active" } else { "inactive" };
+                println!(
+                    "  {}. {:30} {:>8} updates  [{status}]",
+                    i + 1,
+                    pk.display(),
+                    ps.route_monitoring_count,
+                );
+            }
         }
     }
 
@@ -213,6 +245,16 @@ pub fn render_lint(findings: &[Finding], truncated: bool, dropped: u64) {
 }
 
 #[derive(Serialize)]
+struct PeerSummary {
+    peer_asn: Option<u32>,
+    peer_ip: Option<String>,
+    active: bool,
+    rm_count: u64,
+    up_count: u64,
+    down_count: u64,
+}
+
+#[derive(Serialize)]
 struct InspectSummary<'a> {
     file: &'a str,
     format: &'a str,
@@ -230,6 +272,8 @@ struct InspectSummary<'a> {
     findings_truncated: bool,
     findings_dropped_count: u64,
     findings_buckets: FindingsBuckets,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    peers: Option<Vec<PeerSummary>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     container: Option<ContainerSummary>,
 }
@@ -265,7 +309,7 @@ fn is_zero(v: &u64) -> bool {
     *v == 0
 }
 
-pub fn render_inspect_json(state: &DoctorState, truncated: bool) {
+pub fn render_inspect_json(state: &DoctorState, truncated: bool, max_peers: usize) {
     let by_type: std::collections::BTreeMap<String, u64> = state
         .by_type
         .iter()
@@ -321,6 +365,30 @@ pub fn render_inspect_json(state: &DoctorState, truncated: bool) {
         None
     };
 
+    let peers: Option<Vec<PeerSummary>> = if max_peers > 0 && !state.peers.is_empty() {
+        let mut list: Vec<_> = state.peers.iter().collect();
+        list.sort_by(|a, b| {
+            b.1.route_monitoring_count
+                .cmp(&a.1.route_monitoring_count)
+                .then_with(|| a.0.cmp(b.0))
+        });
+        let summaries: Vec<_> = list
+            .iter()
+            .take(max_peers)
+            .map(|(pk, ps)| PeerSummary {
+                peer_asn: pk.peer_asn,
+                peer_ip: pk.peer_ip.clone(),
+                active: ps.active,
+                rm_count: ps.route_monitoring_count,
+                up_count: ps.peer_up_count,
+                down_count: ps.peer_down_count,
+            })
+            .collect();
+        Some(summaries)
+    } else {
+        None
+    };
+
     let summary = InspectSummary {
         file: &state.file_path,
         format: &state.format,
@@ -337,6 +405,7 @@ pub fn render_inspect_json(state: &DoctorState, truncated: bool) {
         findings_truncated: truncated,
         findings_dropped_count: state.findings_dropped,
         findings_buckets: compute_buckets(&state.findings),
+        peers,
         container,
     };
 
@@ -393,6 +462,7 @@ mod tests {
                 stream_order_warnings: 0,
                 other_findings: 0,
             },
+            peers: None,
             container: None,
         })
         .unwrap();
@@ -443,6 +513,7 @@ mod tests {
                 stream_order_warnings: 0,
                 other_findings: 0,
             },
+            peers: None,
             container: Some(container),
         })
         .unwrap();
@@ -497,6 +568,7 @@ mod tests {
                 stream_order_warnings: 0,
                 other_findings: 0,
             },
+            peers: None,
             container: Some(container),
         })
         .unwrap();
@@ -537,6 +609,7 @@ mod tests {
                 stream_order_warnings: 0,
                 other_findings: 0,
             },
+            peers: None,
             container: Some(container),
         })
         .unwrap();
@@ -647,5 +720,137 @@ mod tests {
             assert_eq!(buckets.parse_errors, 0);
             assert_eq!(buckets.other_findings, 0);
         }
+    }
+
+    #[test]
+    fn test_json_peers_array_sorted_by_rm() {
+        use crate::obmp_reader::ContainerStats;
+        use crate::state::{PeerKey, PeerState};
+        use std::collections::BTreeMap;
+
+        let mut peers: BTreeMap<PeerKey, PeerState> = BTreeMap::new();
+        let pk1 = PeerKey {
+            peer_asn: Some(100),
+            peer_ip: Some("10.0.0.1".into()),
+            peer_distinguisher: None,
+        };
+        let pk2 = PeerKey {
+            peer_asn: Some(200),
+            peer_ip: Some("10.0.0.2".into()),
+            peer_distinguisher: None,
+        };
+        peers.insert(
+            pk1,
+            PeerState {
+                route_monitoring_count: 5,
+                peer_up_count: 1,
+                peer_down_count: 0,
+                active: true,
+                peer_up_seen: true,
+                ..Default::default()
+            },
+        );
+        peers.insert(
+            pk2,
+            PeerState {
+                route_monitoring_count: 10,
+                peer_up_count: 2,
+                peer_down_count: 1,
+                active: false,
+                peer_up_seen: true,
+                ..Default::default()
+            },
+        );
+
+        let state = DoctorState {
+            file_path: "t.obmp".into(),
+            format: "test".into(),
+            peers,
+            total_messages: 2,
+            container_stats: ContainerStats {
+                container_records: 2,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let summary = serde_json::to_string(&InspectSummary {
+            file: &state.file_path,
+            format: &state.format,
+            size_bytes: 0,
+            total_messages: 2,
+            malformed_messages: 0,
+            bgp_elem_count: None,
+            by_type: std::collections::BTreeMap::new(),
+            peers_observed: 2,
+            active_peers: 1,
+            info_count: 0,
+            warn_count: 0,
+            error_count: 0,
+            findings_truncated: false,
+            findings_dropped_count: 0,
+            findings_buckets: FindingsBuckets {
+                parse_errors: 0,
+                stream_order_warnings: 0,
+                other_findings: 0,
+            },
+            peers: Some(vec![
+                PeerSummary {
+                    peer_asn: Some(200),
+                    peer_ip: Some("10.0.0.2".into()),
+                    active: false,
+                    rm_count: 10,
+                    up_count: 2,
+                    down_count: 1,
+                },
+                PeerSummary {
+                    peer_asn: Some(100),
+                    peer_ip: Some("10.0.0.1".into()),
+                    active: true,
+                    rm_count: 5,
+                    up_count: 1,
+                    down_count: 0,
+                },
+            ]),
+            container: None,
+        })
+        .unwrap();
+
+        // Higher RM count should appear first
+        let idx200 = summary.find("\"peer_asn\":200").unwrap();
+        let idx100 = summary.find("\"peer_asn\":100").unwrap();
+        assert!(
+            idx200 < idx100,
+            "peer AS200 (rm_count=10) should be before AS100 (rm_count=5)"
+        );
+    }
+
+    #[test]
+    fn test_json_peers_absent_with_max_peers_zero() {
+        let summary = serde_json::to_string(&InspectSummary {
+            file: "t.obmp",
+            format: "test",
+            size_bytes: 0,
+            total_messages: 0,
+            malformed_messages: 0,
+            bgp_elem_count: None,
+            by_type: std::collections::BTreeMap::new(),
+            peers_observed: 0,
+            active_peers: 0,
+            info_count: 0,
+            warn_count: 0,
+            error_count: 0,
+            findings_truncated: false,
+            findings_dropped_count: 0,
+            findings_buckets: FindingsBuckets {
+                parse_errors: 0,
+                stream_order_warnings: 0,
+                other_findings: 0,
+            },
+            peers: None,
+            container: None,
+        })
+        .unwrap();
+        assert!(!summary.contains("\"peers\":"));
     }
 }
