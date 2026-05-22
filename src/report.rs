@@ -76,6 +76,22 @@ pub fn render_inspect(state: &DoctorState, truncated: bool) {
         }
     }
 
+    if let Some(ref meta) = state.container_stats.openbmp_metadata {
+        if meta.any() {
+            println!();
+            println!("OpenBMP metadata:");
+            if let Some(ref c) = meta.collector {
+                println!("  Collector:  {c}");
+            }
+            if let Some(ref r) = meta.router {
+                println!("  Router:     {r}");
+            }
+            if let Some(ref ip) = meta.router_ip {
+                println!("  Router IP:  {ip}");
+            }
+        }
+    }
+
     println!();
     println!("Findings summary:");
 
@@ -189,6 +205,18 @@ struct ContainerSummary {
     openbmp_unwrap_errors: u64,
     #[serde(skip_serializing_if = "is_zero")]
     inner_bmp_parse_errors: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    openbmp_metadata: Option<OpenBmpMetadataSummary>,
+}
+
+#[derive(Serialize)]
+struct OpenBmpMetadataSummary {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    collector: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    router: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    router_ip: Option<String>,
 }
 
 fn is_zero(v: &u64) -> bool {
@@ -239,6 +267,13 @@ pub fn render_inspect_json(state: &DoctorState, truncated: bool) {
             unrecognized_payloads: state.container_stats.unrecognized_payloads,
             openbmp_unwrap_errors: state.container_stats.openbmp_unwrap_errors,
             inner_bmp_parse_errors: state.container_stats.inner_bmp_parse_errors,
+            openbmp_metadata: state.container_stats.openbmp_metadata.as_ref().map(|m| {
+                OpenBmpMetadataSummary {
+                    collector: m.collector.clone(),
+                    router: m.router.clone(),
+                    router_ip: m.router_ip.clone(),
+                }
+            }),
         })
     } else {
         None
@@ -337,6 +372,7 @@ mod tests {
             unrecognized_payloads: 0,
             openbmp_unwrap_errors: 0,
             inner_bmp_parse_errors: 0,
+            openbmp_metadata: None,
         };
 
         let summary = serde_json::to_string(&InspectSummary {
@@ -366,5 +402,81 @@ mod tests {
         assert!(!summary.contains("openbmp_unwrap_errors"));
         assert!(!summary.contains("inner_bmp_parse_errors"));
         assert!(!summary.contains("raw_bmp_payloads"));
+    }
+
+    #[test]
+    fn test_summary_json_includes_openbmp_metadata() {
+        let meta = crate::obmp_reader::OpenBmpMetadata {
+            collector: Some("coll-1".into()),
+            router: Some("rtr-1".into()),
+            router_ip: Some("10.0.0.1".into()),
+        };
+        let container = ContainerSummary {
+            container_records: 1,
+            raw_bmp_payloads: 0,
+            openbmp_wrapped_payloads: 1,
+            unrecognized_payloads: 0,
+            openbmp_unwrap_errors: 0,
+            inner_bmp_parse_errors: 0,
+            openbmp_metadata: Some(OpenBmpMetadataSummary {
+                collector: meta.collector.clone(),
+                router: meta.router.clone(),
+                router_ip: meta.router_ip.clone(),
+            }),
+        };
+        let summary = serde_json::to_string(&InspectSummary {
+            file: "t.obmp",
+            format: "OpenBMP length-delimited",
+            size_bytes: 100,
+            total_messages: 1,
+            malformed_messages: 0,
+            bgp_elem_count: None,
+            by_type: std::collections::BTreeMap::new(),
+            peers_observed: 0,
+            active_peers: 0,
+            info_count: 0,
+            warn_count: 0,
+            error_count: 0,
+            findings_truncated: false,
+            findings_dropped_count: 0,
+            container: Some(container),
+        })
+        .unwrap();
+        assert!(summary.contains("openbmp_metadata"));
+        assert!(summary.contains("coll-1"));
+        assert!(summary.contains("rtr-1"));
+        assert!(summary.contains("10.0.0.1"));
+    }
+
+    #[test]
+    fn test_summary_json_omits_metadata_when_absent() {
+        let container = ContainerSummary {
+            container_records: 1,
+            raw_bmp_payloads: 1,
+            openbmp_wrapped_payloads: 0,
+            unrecognized_payloads: 0,
+            openbmp_unwrap_errors: 0,
+            inner_bmp_parse_errors: 0,
+            openbmp_metadata: None,
+        };
+        let summary = serde_json::to_string(&InspectSummary {
+            file: "t.obmp",
+            format: "OpenBMP length-delimited",
+            size_bytes: 100,
+            total_messages: 1,
+            malformed_messages: 0,
+            bgp_elem_count: None,
+            by_type: std::collections::BTreeMap::new(),
+            peers_observed: 0,
+            active_peers: 0,
+            info_count: 0,
+            warn_count: 0,
+            error_count: 0,
+            findings_truncated: false,
+            findings_dropped_count: 0,
+            container: Some(container),
+        })
+        .unwrap();
+        assert!(!summary.contains("openbmp_metadata"));
     }
 }
