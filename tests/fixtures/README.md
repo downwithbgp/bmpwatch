@@ -93,6 +93,26 @@ No Peer Up message included — avoids synthetic BGP OPEN parse warnings.
 
 **Validated by:** `doctor::tests::test_stats_report_rawbmp_fixture`
 
+## Malformed fixtures
+
+These are intentionally invalid samples that validate BMPDoctor's error
+handling. All produce findings or errors; none should panic.
+
+| File | Format | Fault | Expected behavior |
+|------|--------|-------|-------------------|
+| `malformed/truncated-common-header.rawbmp` | raw BMP | 4 bytes (< 6) | `truncated_frame` finding |
+| `malformed/bad-version.rawbmp` | raw BMP | Version 0xFF | `invalid_bmp_version` finding |
+| `malformed/truncated-per-peer-header.rawbmp` | raw BMP | Payload < 42 bytes | Frame parsed, no per-peer header, no peer tracked |
+| `malformed/bad-magic.bmpd` | `.bmpd` | Wrong container magic | `ObmpReader::open` returns error |
+| `malformed/truncated-record-length.bmpd` | `.bmpd` | Partial length prefix | Iterator yields error frame |
+
+```sh
+cargo run --bin bmpdoctor -- \
+  lint tests/fixtures/malformed/bad-version.rawbmp
+cargo run --bin bmpdoctor -- \
+  inspect tests/fixtures/malformed/truncated-common-header.rawbmp --summary-json
+```
+
 ```sh
 cargo run --bin bmpdoctor -- \
   inspect tests/fixtures/stats-report.rawbmp --summary-json

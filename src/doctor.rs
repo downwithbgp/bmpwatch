@@ -858,4 +858,52 @@ mod tests {
         assert_eq!(stats.entries[1].stat_value, 10);
         assert!(stats.entries[1].stat_name.contains("Loc-RIB"));
     }
+
+    #[test]
+    fn test_malformed_truncated_common_header() {
+        let mut doctor = Doctor::with_max_findings(
+            Path::new("tests/fixtures/malformed/truncated-common-header.rawbmp"),
+            1000,
+            InputFormat::RawBmp,
+        )
+        .unwrap();
+        doctor.process(false).unwrap();
+        assert!(doctor.state.malformed_messages > 0);
+        assert!(doctor
+            .state
+            .findings
+            .iter()
+            .any(|f| f.rule == "truncated_frame"));
+    }
+
+    #[test]
+    fn test_malformed_bad_version() {
+        let mut doctor = Doctor::with_max_findings(
+            Path::new("tests/fixtures/malformed/bad-version.rawbmp"),
+            1000,
+            InputFormat::RawBmp,
+        )
+        .unwrap();
+        doctor.process(false).unwrap();
+        assert!(doctor
+            .state
+            .findings
+            .iter()
+            .any(|f| f.rule == "invalid_bmp_version"));
+    }
+
+    #[test]
+    fn test_malformed_truncated_per_peer_header() {
+        let mut doctor = Doctor::with_max_findings(
+            Path::new("tests/fixtures/malformed/truncated-per-peer-header.rawbmp"),
+            1000,
+            InputFormat::RawBmp,
+        )
+        .unwrap();
+        doctor.process(false).unwrap();
+        // The per-peer header parsing is optional — the frame validates,
+        // but the pph is None because the payload is too short
+        assert_eq!(doctor.state.total_messages, 1);
+        assert_eq!(doctor.state.peers.len(), 0);
+    }
 }

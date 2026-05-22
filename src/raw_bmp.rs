@@ -458,6 +458,7 @@ impl Iterator for RawBmpIterator {
             Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
                 if self.offset == 0 {
+                    self.offset = 1; // prevent infinite loop on empty/truncated files
                     return Some(Err(DoctorError::Frame(
                         "File appears empty or truncated".to_string(),
                     )));

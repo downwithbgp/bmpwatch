@@ -770,4 +770,19 @@ mod tests {
         assert_eq!(stats.openbmp_unwrap_errors, 0);
         assert!(stats.inner_bmp_parse_errors > 0);
     }
+
+    #[test]
+    fn test_malformed_bad_magic_bmpd() {
+        let result = ObmpReader::open("tests/fixtures/malformed/bad-magic.bmpd");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_malformed_truncated_record_length_bmpd() {
+        let reader =
+            ObmpReader::open("tests/fixtures/malformed/truncated-record-length.bmpd").unwrap();
+        let frames: Vec<_> = reader.collect();
+        assert_eq!(frames.len(), 1);
+        assert!(frames[0].is_err());
+    }
 }
