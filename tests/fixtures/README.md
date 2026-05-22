@@ -65,7 +65,7 @@ without the `.bmpd` container framing.
 | Records | 2 |
 | Payload type | Raw BMP |
 | Record 1 | Peer Up Notification, AS65000 |
-| Record 2 | Peer Down Notification, AS65000, reason code 2 |
+| Record 2 | Peer Down Notification, AS65000, reason code 2 (Local system closed, no NOTIFICATION) |
 | Size | 127 bytes |
 
 **Purpose:** Regression test for clean peer lifecycle (Peer Up → Peer Down)
@@ -124,7 +124,8 @@ cargo run --bin bmpdoctor -- \
   inspect tests/fixtures/peer-up-down.rawbmp --summary-json
 # Expected: total_messages=2, malformed_messages=0,
 #   peers_observed=1, active_peers=0, stream_order_warnings=0,
-#   session_lifecycle.peer_up_messages=1, peer_down_messages=1
+#   session_lifecycle.peer_up_messages=1, peer_down_messages=1,
+#   Peer Down info: Local system closed, no NOTIFICATION (code 2)
 # (may include 1 bgpkit-parser parse_error from synthetic BGP OPEN)
 ```
 
