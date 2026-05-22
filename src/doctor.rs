@@ -811,7 +811,7 @@ mod tests {
         assert_eq!(peer.peer_up_count, 1);
         assert_eq!(peer.peer_down_count, 1);
         assert!(!peer.active);
-        assert_eq!(peer.peer_up_seen, true);
+        assert!(peer.peer_up_seen);
         assert_eq!(peer.last_peer_down_reason, Some(2));
 
         // No lifecycle warnings in a clean session
