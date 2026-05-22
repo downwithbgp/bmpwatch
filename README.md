@@ -114,7 +114,7 @@ The 2-step workflow to verify end-to-end health against real RouteViews data:
 ```sh
 # Step 1: capture 100 messages
 cargo run --bin record_openbmp_kafka -- \
-  --out samples/smoke.obmp --max-messages 100
+  --out samples/smoke.obmp --max-messages 100 --min-messages 1
 
 # Step 2: inspect, check for malformed
 cargo run --bin bmpdoctor -- \
@@ -128,6 +128,8 @@ Unlike the offline smoke test, this requires network access to
 A useful capture should show `status: ok` and `messages_written > 0` in
 the recorder summary; `status: no_messages` means the file only contains
 the `.obmp` container magic and should not be used as a validation sample.
+The capture step uses `--min-messages 1` to exit non-zero on magic-only
+captures.
 See [Real-sample validation](docs/real-sample-validation.md) for an example
 of expected output with 106 warnings / 0 parse errors.
 

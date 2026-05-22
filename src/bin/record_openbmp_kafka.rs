@@ -77,6 +77,13 @@ struct Cli {
 
     #[arg(long, help = "Filter topics ending in .<ASN>.bmp_raw (e.g. 13335)")]
     asn: Option<String>,
+
+    #[arg(
+        long,
+        default_value = "0",
+        help = "Exit non-zero if fewer than N messages are captured"
+    )]
+    min_messages: u64,
 }
 
 fn fetch_topics(broker: &str, pattern: &str) -> Result<Vec<String>> {
@@ -114,6 +121,18 @@ fn apply_filters(topics: Vec<String>, collector: Option<&str>, asn: Option<&str>
         v.retain(|t| t.ends_with(&suffix));
     }
     v
+}
+
+/// Check whether the minimum message threshold is met.
+/// Returns Ok(()) if it is, or a descriptive error string if not.
+fn check_min_messages(got: u64, required: u64) -> Result<(), String> {
+    if required > 0 && got < required {
+        Err(format!(
+            "Capture failed minimum message requirement: got {got}, required {required}."
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 fn main() -> Result<()> {
@@ -261,6 +280,11 @@ fn run_record(cli: &Cli, topics: Vec<String>) -> Result<()> {
         println!("status: ok");
     }
 
+    if let Err(msg) = check_min_messages(msg_count, cli.min_messages) {
+        eprintln!("{msg}");
+        anyhow::bail!("insufficient messages captured");
+    }
+
     if msg_count == 0 {
         eprintln!(
             "No messages received in {}s. The broker may be quiet with --from-end.\n\
@@ -336,5 +360,19 @@ mod tests {
         let topics = vec!["routeviews.a.bmp_raw".into(), "routeviews.b.bmp_raw".into()];
         let filtered = apply_filters(topics.clone(), None, None);
         assert_eq!(filtered, topics);
+    }
+
+    #[test]
+    fn test_min_messages_ok() {
+        assert!(check_min_messages(10, 5).is_ok());
+        assert!(check_min_messages(5, 5).is_ok());
+        assert!(check_min_messages(100, 0).is_ok());
+        assert!(check_min_messages(0, 0).is_ok());
+    }
+
+    #[test]
+    fn test_min_messages_fails() {
+        assert!(check_min_messages(0, 1).is_err());
+        assert!(check_min_messages(3, 10).is_err());
     }
 }
