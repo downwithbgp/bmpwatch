@@ -1,13 +1,36 @@
 # BMPDoctor
 
-BMPDoctor is a file-first diagnostic tool for BGP Monitoring Protocol data. It uses
-[BGPKIT Parser](https://github.com/bgpkit/bgpkit-parser) for protocol parsing and
-focuses on stream/session health: frame validity, peer lifecycle, timestamp sanity,
-malformed messages, per-peer summaries, and reproducible diagnostics.
+BMPDoctor is a diagnostic and learning tool for BGP Monitoring Protocol
+captures. It validates RFC 7854 BMP framing, unwraps OpenBMP `OBMP` payloads
+from RouteViews Kafka captures, and summarizes peers and findings. It is
+useful for parser development, lab testing, capture sanity checks, and
+pre-ingest validation.
+
+### Scope
+
+BMPDoctor is **not** an observability platform. It is not a replacement for
+OpenBMP, BGPStream, RouteViews, pmacct, or full routing analytics. There is
+no deep BGP UPDATE semantic validation yet, and no native PCAP/TCP
+reassembly yet. The focus is capture inspection, framing validation, and
+BMP literacy.
+
+## Supported inputs
+
+| Input | Format | How |
+|-------|--------|-----|
+| `.rawbmp` | Raw RFC 7854 BMP frames | `--format auto` (default) or `--format raw-bmp` |
+| `.bmpd` | BMPDoctor local capture container | `--format auto` (default) or `--format bmpd` |
+| RouteViews Kafka | Live `*.bmp_raw` topics | `record_openbmp_kafka` saves as `.bmpd` |
+| OpenBMP `OBMP` wrapper | Upstream wrapper inside Kafka payloads | Stripped automatically by `.bmpd` parser |
+| BGPReader / MRT / PCAP | N/A | Comparison or external extraction only |
+
+> `.bmpd` is BMPDoctor's local capture container. It is not an OpenBMP
+> standard. Its records may contain raw BMP frames or upstream OpenBMP
+> `OBMP`-wrapped payloads.
 
 ## Purpose
 
-BMPDoctor scans binary BMP frame files and produces:
+BMPDoctor scans binary BMP input and produces:
 
 - **inspect** — human-readable summary of file contents, message counts, peer state
 - **lint** — machine-oriented finding output with severity levels and exit codes
