@@ -1,14 +1,27 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process;
 
 use clap::{Parser, Subcommand};
 
 use crate::doctor::Doctor;
 use crate::event::max_exit_code;
-use crate::input::InputFormat;
+use crate::input::{detect_format, InputFormat};
 use crate::report;
 
 const DEFAULT_MAX_FINDINGS: usize = 1000;
+
+fn resolve_format(file: &Path, format: InputFormat) -> InputFormat {
+    match format {
+        InputFormat::Auto => match detect_format(file) {
+            Ok(fmt) => fmt,
+            Err(e) => {
+                eprintln!("Error detecting format: {e}, falling back to raw-bmp");
+                InputFormat::RawBmp
+            }
+        },
+        explicit => explicit,
+    }
+}
 
 #[derive(Parser)]
 #[command(name = "bmpdoctor", version, about = "BMP file diagnostic tool")]
@@ -29,8 +42,8 @@ pub enum Command {
         /// Output machine-readable JSON summary instead of text
         #[arg(long)]
         summary_json: bool,
-        /// Input format: raw-bmp (default) or openbmp-len
-        #[arg(long, default_value = "raw-bmp")]
+        /// Input format: auto, raw-bmp, or openbmp-len
+        #[arg(long, default_value = "auto")]
         format: InputFormat,
     },
     /// Machine-oriented lint output with exit codes
@@ -40,8 +53,8 @@ pub enum Command {
         /// Cap findings at N (default 1000)
         #[arg(long, default_value_t = DEFAULT_MAX_FINDINGS)]
         max_findings: usize,
-        /// Input format: raw-bmp (default) or openbmp-len
-        #[arg(long, default_value = "raw-bmp")]
+        /// Input format: auto, raw-bmp, or openbmp-len
+        #[arg(long, default_value = "auto")]
         format: InputFormat,
     },
     /// Debug/development JSONL output
@@ -54,8 +67,8 @@ pub enum Command {
         /// Cap findings at N (default 1000)
         #[arg(long, default_value_t = DEFAULT_MAX_FINDINGS)]
         max_findings: usize,
-        /// Input format: raw-bmp (default) or openbmp-len
-        #[arg(long, default_value = "raw-bmp")]
+        /// Input format: auto, raw-bmp, or openbmp-len
+        #[arg(long, default_value = "auto")]
         format: InputFormat,
     },
 }
@@ -70,7 +83,8 @@ pub fn run() {
             summary_json,
             format,
         } => {
-            let mut doctor = match Doctor::with_max_findings(&file, max_findings.max(1), format) {
+            let fmt = resolve_format(&file, format);
+            let mut doctor = match Doctor::with_max_findings(&file, max_findings.max(1), fmt) {
                 Ok(d) => d,
                 Err(e) => {
                     eprintln!("Error opening file: {e}");
@@ -92,7 +106,8 @@ pub fn run() {
             max_findings,
             format,
         } => {
-            let mut doctor = match Doctor::with_max_findings(&file, max_findings.max(1), format) {
+            let fmt = resolve_format(&file, format);
+            let mut doctor = match Doctor::with_max_findings(&file, max_findings.max(1), fmt) {
                 Ok(d) => d,
                 Err(e) => {
                     eprintln!("Error opening file: {e}");
@@ -116,7 +131,8 @@ pub fn run() {
             max_findings,
             format,
         } => {
-            let mut doctor = match Doctor::with_max_findings(&file, max_findings.max(1), format) {
+            let fmt = resolve_format(&file, format);
+            let mut doctor = match Doctor::with_max_findings(&file, max_findings.max(1), fmt) {
                 Ok(d) => d,
                 Err(e) => {
                     eprintln!("Error opening file: {e}");

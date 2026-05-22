@@ -94,6 +94,7 @@ impl Doctor {
                 FrameSource::RawBmp(RawBmpIterator::open(&self.state.file_path)?)
             }
             InputFormat::OpenBmpLen => FrameSource::Obmp(ObmpReader::open(&self.state.file_path)?),
+            InputFormat::Auto => unreachable!("Auto should be resolved before Doctor construction"),
         };
 
         for frame_result in &mut iter {
@@ -685,5 +686,41 @@ mod tests {
         assert_eq!(doctor.state.findings.len(), 0);
         assert!(doctor.was_truncated());
         assert_eq!(doctor.state.findings_dropped, 1);
+    }
+
+    #[test]
+    fn test_override_raw_bmp_on_obmp_file() {
+        // .obmp file with --format raw-bmp should fail as raw BMP,
+        // not silently auto-correct to openbmp-len
+        let inner = crate::raw_bmp::fixtures::make_peer_up_frame(65000, [10, 0, 0, 1], 100, 0);
+        let wrapped = crate::obmp_reader::fixtures::make_openbmp_wrapped(&inner);
+        let data = crate::obmp_reader::fixtures::make_valid_obmp(&[wrapped]);
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut doctor = Doctor::with_max_findings(&path, 1000, InputFormat::RawBmp).unwrap();
+        doctor.process(false).unwrap();
+
+        // The raw BMP parser sees the .obmp magic as garbage
+        assert!(doctor.state.malformed_messages >= 1);
+        assert_eq!(doctor.state.peers.len(), 0);
+    }
+
+    #[test]
+    fn test_override_openbmp_len_on_raw_bmp_file() {
+        // Raw BMP file with --format openbmp-len should fail as obmp,
+        // not silently auto-correct to raw-bmp
+        let frame = crate::raw_bmp::fixtures::make_peer_up_frame(65000, [10, 0, 0, 1], 100, 0);
+        let data = crate::raw_bmp::fixtures::write_fixture(&[frame]);
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut doctor = Doctor::with_max_findings(&path, 1000, InputFormat::OpenBmpLen).unwrap();
+        // ObmpReader fails on missing magic
+        assert!(doctor.process(false).is_err());
     }
 }
