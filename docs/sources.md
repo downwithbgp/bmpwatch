@@ -131,7 +131,7 @@ broker is confirmed.
 OpenBMP can write BMP data to disk with a length-delimited wrapper:
 
 ```
-Magic:      "BMPDOPENBMP1"  (12 bytes)
+Magic:      "BMPDOPENBMP1\n"  (13 bytes)
 Length:     u32 big-endian   (4 bytes)
 Payload:    raw BMP frame    (Length bytes)
 ```

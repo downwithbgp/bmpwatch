@@ -93,47 +93,14 @@ BMP frame through the existing parser pipeline.
 Verified against real RouteViews capture: 100 messages, 18 peers, 29 BGP
 elements, 0 malformed.
 
-Support for OpenBMP length-delimited files (`.obmp` extension convention).
+### Future work
 
-### Format specification
-
-```
-+----------------+--------+-------------+
-| Magic (12)     | Len (4)| Payload     |
-+----------------+--------+-------------+
-| "BMPDOPENBMP1" | u32 BE | BMP frame   |
-+----------------+--------+-------------+
-```
-
-Each record:
-1. Magic header: `BMPDOPENBMP1` (12 ASCII bytes)
-2. Length: `u32` big-endian (4 bytes), number of payload bytes
-3. Payload: raw BMP frame of `Length` bytes (common header + body)
-
-### Implementation plan
-
-1. Add `OpenBmpLenIterator` in `src/input.rs` or `src/raw_bmp.rs`
-2. Detect format from magic header on file open
-3. For each record:
-   a. Read and validate `BMPDOPENBMP1` magic
-   b. Read `u32` BE length
-   c. Read `length` bytes of payload
-   d. Call `bgpkit_parser::parser::bmp::parse_openbmp_header()` to parse any
-      OpenBMP-specific metadata
-   e. Call `bgpkit_parser::parser::bmp::parse_bmp_msg()` on the payload
-4. Wire into CLI via `--format openbmp-len` flag on `inspect`/`lint`/`dump`
-
-### CLI usage sketch
-
-```sh
-bmpdoctor inspect capture.obmp --format openbmp-len
-bmpdoctor dump capture.obmp --format openbmp-len --jsonl
-```
-
-### References
-
-- `bgpkit_parser::parser::bmp::parse_openbmp_msg` - parses OpenBMP-wrapped messages
-- `bgpkit_parser::parser::openbmp::parse_openbmp_header` - parses the OpenBMP header
+- Richer display of OpenBMP metadata (collector ID, router IP, admin ID)
+  during `inspect` output
+- Live-stream diagnostics (incremental counter tracking between repeated
+  `.obmp` file reads)
+- `--format openbmp-len` auto-detection (skip `--format` flag when magic
+  matches)
 
 ---
 

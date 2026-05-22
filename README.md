@@ -13,6 +13,44 @@ BMPDoctor scans binary BMP frame files and produces:
 - **lint** — machine-oriented finding output with severity levels and exit codes
 - **dump --jsonl** — one JSON object per message for debugging and automation
 
+## Happy path (RouteViews live data)
+
+The recommended workflow from zero to verified results:
+
+1. **Verify Kafka reachability** (one-time):
+   ```sh
+   nc -vz stream.routeviews.org 9092
+   kcat -b stream.routeviews.org:9092 -L
+   ```
+
+2. **Record a `.obmp` capture**:
+   ```sh
+   cargo run --bin record_openbmp_kafka -- \
+     --topic-regex '^routeviews.*\.bmp_raw$' \
+     --out samples/capture.obmp \
+     --max-messages 100
+   ```
+
+3. **Inspect with `--format openbmp-len`**:
+   ```sh
+   cargo run --bin bmpdoctor -- \
+     inspect samples/capture.obmp --format openbmp-len
+   ```
+
+4. **Understand the layers** (see [Terminology](#terminology)):
+   - `.obmp` = BMPDoctor capture container (`BMPDOPENBMP1\n`)
+   - `OBMP` = upstream OpenBMP wrapper inside Kafka payloads
+   - Inner frame = RFC 7854 BMP message
+
+### Known-good smoke test
+
+```sh
+cargo test obmp_reader::test_committed_fixture_two_openbmp_records
+```
+
+Verifies that the committed 2-record `.obmp` fixture (PeerUp + RouteMonitoring,
+both OpenBMP-wrapped) parses correctly without network dependency.
+
 ## Installation
 
 ```sh
@@ -93,7 +131,7 @@ streaming inputs are out of scope for the MVP.
 
 ## Sources & capture
 
-- [Data sources reference](docs/sources.md) — CAIDA/OpenBMP Kafka broker details
+- [Data sources reference](docs/sources.md) — RouteViews Kafka (primary), CAIDA (historical)
 - [OpenBMP Kafka capture guide](docs/openbmp-kafka-capture.md) — connectivity testing with `nc`/`kcat`
 - [Future issues](docs/future-issues.md) — planned features and their scope
 - [Real-sample validation](docs/real-sample-validation.md) — verified capture + parse results
