@@ -135,18 +135,29 @@ Expected pass conditions:
 
 ## Status
 
-**BMP output not observed.** BGP peering works (AS65000 ↔ AS65001,
-confirmed via `show bgp summary`). FRR daemons start cleanly. The
-`bgpd_bmp.so` module loads, BMP configuration is accepted, and
-`show bmp` shows the listener target. However, `bgpd` does not open
-TCP connections to the BMP listener — no bytes are written to
-`samples/frr-smoke.rawbmp`.
+**BGP verified; BMP output blocked on FRR 8.4 image.**
 
-This was tested with `frrouting/frr:latest` (FRR 8.4_git). The BMP
-module may not be fully functional in this version. Newer FRR releases
-(9.x+) are expected to have more complete BMP support but currently
-no tagged images beyond `latest` are available on Docker Hub.
+| Component | Status |
+|-----------|--------|
+| Docker Compose lab | Starts cleanly |
+| zebra / bgpd | Start (with `SYS_ADMIN`) |
+| BGP session | AS65000 ↔ AS65001, confirmed via `show bgp summary` |
+| `bgpd_bmp.so` | Loads with `-M bmp` |
+| BMP config | Parses; `show bmp` shows target/listener |
+| frr1 ↔ bmp-capture:1790 | TCP reachable |
+| BMP TCP connection | **Never initiated by bgpd** |
+| `samples/frr-smoke.rawbmp` | **0 bytes** |
 
-**Lab infrastructure verified:** Docker networking, BGP peering, socat
-capture listener, and BMP config parsing all work correctly. The blocker
-is FRR 8.4 BMP module behavior.
+FRR 8.4_git BMP module appears non-functional for outbound connections.
+Newer 9.x/10.x tags were not available on Docker Hub during testing.
+
+### Next hypotheses
+
+1. Test a newer FRR Docker image if one becomes available.
+2. Build a local FRR image from source/packages if FRR BMP support is
+   confirmed in a newer release and no pre-built image exists.
+3. Continue using RouteViews Kafka `.bmpd` and synthetic fixtures as
+   primary validation sources for BMPDoctor.
+
+The lab infrastructure (networking, BGP, capture listener) is verified
+and can be reused when a functional FRR BMP image is available.
