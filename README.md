@@ -45,7 +45,7 @@ The recommended workflow from zero to verified results:
 ### Known-good smoke test
 
 ```sh
-cargo test obmp_reader::test_committed_fixture_two_openbmp_records
+cargo test obmp_reader::tests::test_committed_fixture_two_openbmp_records
 ```
 
 Verifies that the committed 2-record `.obmp` fixture (PeerUp + RouteMonitoring,

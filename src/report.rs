@@ -274,19 +274,22 @@ mod tests {
     use crate::state::DoctorState;
 
     fn make_state(with_container: bool) -> DoctorState {
-        let mut state = DoctorState::default();
-        state.file_path = "test.rawbmp".into();
-        state.format = "raw BMP frames".into();
-        state.file_size = 100;
-        state.total_messages = 3;
-        if with_container {
-            state.container_stats = ContainerStats {
-                container_records: 3,
-                openbmp_wrapped_payloads: 3,
-                ..Default::default()
-            };
+        DoctorState {
+            file_path: "test.rawbmp".into(),
+            format: "raw BMP frames".into(),
+            file_size: 100,
+            total_messages: 3,
+            container_stats: if with_container {
+                ContainerStats {
+                    container_records: 3,
+                    openbmp_wrapped_payloads: 3,
+                    ..Default::default()
+                }
+            } else {
+                ContainerStats::default()
+            },
+            ..Default::default()
         }
-        state
     }
 
     #[test]
@@ -316,11 +319,14 @@ mod tests {
 
     #[test]
     fn test_summary_json_container_present_for_obmp() {
-        let mut state = make_state(false);
-        state.format = "OpenBMP length-delimited".into();
-        state.container_stats = ContainerStats {
-            container_records: 3,
-            openbmp_wrapped_payloads: 3,
+        let state = DoctorState {
+            format: "OpenBMP length-delimited".into(),
+            total_messages: 3,
+            container_stats: ContainerStats {
+                container_records: 3,
+                openbmp_wrapped_payloads: 3,
+                ..Default::default()
+            },
             ..Default::default()
         };
 

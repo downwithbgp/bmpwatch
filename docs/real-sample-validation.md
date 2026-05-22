@@ -31,6 +31,7 @@ cargo run --bin bmpdoctor -- \
   "size_bytes": 27630,
   "total_messages": 100,
   "malformed_messages": 0,
+  "bgp_elem_count": 29,
   "by_type": { "RouteMonitoring": 100 },
   "peers_observed": 18,
   "active_peers": 0,
@@ -38,7 +39,11 @@ cargo run --bin bmpdoctor -- \
   "warn_count": 106,
   "error_count": 0,
   "findings_truncated": false,
-  "findings_dropped_count": 0
+  "findings_dropped_count": 0,
+  "container": {
+    "container_records": 100,
+    "openbmp_wrapped_payloads": 100
+  }
 }
 ```
 

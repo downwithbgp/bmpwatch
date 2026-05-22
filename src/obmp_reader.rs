@@ -560,7 +560,7 @@ mod tests {
         std::fs::write("tests/fixtures/openbmp-two-records.obmp", &data).unwrap();
 
         let mut reader = ObmpReader::open("tests/fixtures/openbmp-two-records.obmp").unwrap();
-        while let Some(_) = reader.next() {}
+        for _ in reader.by_ref() {}
         let stats = &reader.stats;
         assert_eq!(stats.container_records, 2);
         assert_eq!(stats.openbmp_wrapped_payloads, 2);
@@ -580,7 +580,7 @@ mod tests {
         let path = tmp.into_temp_path();
 
         let mut reader = ObmpReader::open(&path).unwrap();
-        while let Some(_) = reader.next() {}
+        for _ in reader.by_ref() {}
         let stats = &reader.stats;
         assert_eq!(stats.container_records, 2);
         assert_eq!(stats.raw_bmp_payloads, 2);
@@ -599,7 +599,7 @@ mod tests {
 
         let mut reader = ObmpReader::open(&path).unwrap();
         // Drain iterator, keeping reader alive for stats access
-        while let Some(_) = reader.next() {}
+        for _ in reader.by_ref() {}
         let stats = &reader.stats;
         assert_eq!(stats.container_records, 1);
         assert_eq!(stats.unrecognized_payloads, 1);
@@ -622,7 +622,7 @@ mod tests {
         let path = tmp.into_temp_path();
 
         let mut reader = ObmpReader::open(&path).unwrap();
-        while let Some(r) = reader.next() {
+        for r in reader.by_ref() {
             assert!(r.is_err());
         }
         let stats = &reader.stats;
