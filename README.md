@@ -104,14 +104,31 @@ a `container` section distinguishes the capture wrapper from the payload types:
   "container": {
     "container_records": 100,
     "raw_bmp_payloads": 0,
-    "openbmp_wrapped_payloads": 100
+    "openbmp_wrapped_payloads": 100,
+    "openbmp_metadata": {
+      "collector": "bmp-01",
+      "router": "namex.fco",
+      "router_ip": "185.33.111.234"
+    }
   }
 }
 ```
 
 The `container` section is intentionally absent for `raw-bmp` input, which
-has no `.obmp` record layer. Zero-value container fields are omitted from
-the output to keep the JSON compact.
+has no `.obmp` record layer. `openbmp_metadata` appears only when records
+contain an OpenBMP `OBMP` wrapper with populated fields; it is not guaranteed
+for all `.obmp` files. Zero-value container fields and absent metadata keys
+are omitted from the output to keep the JSON compact.
+
+The `inspect` text output shows the same metadata between the peer list and
+findings summary:
+
+```
+OpenBMP metadata:
+  Collector:  bmp-01
+  Router:     namex.fco
+  Router IP:  185.33.111.234
+```
 
 ### lint
 

@@ -42,10 +42,28 @@ cargo run --bin bmpdoctor -- \
   "findings_dropped_count": 0,
   "container": {
     "container_records": 100,
-    "openbmp_wrapped_payloads": 100
+    "openbmp_wrapped_payloads": 100,
+    "openbmp_metadata": {
+      "collector": "bmp-01",
+      "router": "namex.fco",
+      "router_ip": "185.33.111.234"
+    }
   }
 }
 ```
+
+The text `inspect` output shows:
+
+```
+OpenBMP metadata:
+  Collector:  bmp-01
+  Router:     namex.fco
+  Router IP:  185.33.111.234
+```
+
+Metadata is captured from the first successfully unwrapped `OBMP` payload.
+It is present only when records contain an OpenBMP wrapper with populated
+fields; it is not guaranteed for all `.obmp` files.
 
 ## Interpretation
 
