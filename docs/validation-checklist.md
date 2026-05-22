@@ -68,6 +68,7 @@ nc -l 5000 > capture.rawbmp
 - [x] Run `kcat -b stream.routeviews.org:9092 -L` — **Topics listed**
 - [x] Observed topics match `^route-?views\..*\.bmp_raw$`
 - [x] Broad regex capture with recorder — **100 msgs, 27,630 bytes, 4s**
+- [x] `.obmp` container parsing via `--format openbmp-len` — **100 msgs, 18 peers, 0 malformed**
 - [ ] Subscribe to exact topic and capture 100 messages
 - [ ] Verify messages are valid BMP frames (inspect first 5 with `xxd`)
 - [ ] Run `bmpdoctor inspect` on captured `.obmp` (needs `--format openbmp-len`)

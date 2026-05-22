@@ -1,6 +1,6 @@
 # RouteViews Kafka Verification
 
-**Result: Reachable — working OpenBMP Kafka broker confirmed.**
+**Result: Reachable — working broker confirmed, capture and parse verified.**
 
 ## Environment
 
@@ -66,9 +66,15 @@ Metadata for all topics (from broker -1: stream.routeviews.org:9092/bootstrap):
   regex `^routeviews.*\.bmp_raw$`. Successful capture: 100 messages,
   27,630 bytes in 4 seconds. Exact single-topic captures may be quiet;
   broad regex is the recommended smoke test.
-- `--format openbmp-len` (`.obmp`) parser support is the active next
-  milestone. Captured `.obmp` files are non-empty and ready for parser
-  validation.
+- `--format openbmp-len` (`.obmp`) parser is **implemented and verified**.
+  Captured `.obmp` files parse correctly: 100 Route Monitoring messages,
+  18 peers, 29 BGP elements. RouteViews Kafka `*.bmp_raw` payloads are
+  OpenBMP `OBMP`-wrapped, not raw RFC 7854. BMPDoctor's OpenBMP unwrap
+  uses `bgpkit_parser::parse_openbmp_header` to strip the wrapper,
+  then passes the inner RFC 7854 BMP frame to our existing parser.
+- Our `.obmp` is a local capture container (`BMPDOPENBMP1\n` magic +
+  `u32` BE length prefix). `OBMP` is the upstream OpenBMP wrapper
+  inside each RouteViews Kafka payload.
 
 ### Verified recorder smoke test
 

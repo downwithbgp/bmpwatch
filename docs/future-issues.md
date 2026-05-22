@@ -81,21 +81,17 @@ fn main() {
 
 ## 2. --format openbmp-len
 
-**Status:** Active next milestone
-**Scope:** New input format option for the `bmpdoctor` CLI
+**Status:** Implemented and verified
+**Scope:** `--format openbmp-len` flag on `inspect`/`lint`/`dump`
 
-Support for OpenBMP length-delimited files (`.obmp` extension convention).
-Captured `.obmp` files from RouteViews Kafka are non-empty and ready for
-parser validation. Implementation plan:
+Parses `.obmp` container files (`BMPDOPENBMP1\n` magic + `u32` BE length-
+prefixed records). Detects raw BMP (first byte `0x03`) and OpenBMP-wrapped
+payloads (first bytes `OBMP`). OpenBMP unwrap uses bgpkit-parser's
+`parse_openbmp_header` to strip the wrapper, then passes the inner RFC 7854
+BMP frame through the existing parser pipeline.
 
-1. Add `.obmp` reader for `BMPDOPENBMP1\n` magic + repeated `u32` BE
-   length + raw payload
-2. Wire as `--format openbmp-len` flag on `inspect`/`lint`/`dump`
-3. For each payload, parse as RFC 7854 BMP frame using existing raw
-   BMP logic
-4. Tests: empty `.obmp`, one frame, multiple frames, truncated length
-   prefix, declared length longer than remaining file, zero-length
-   frame, malformed contained BMP frame
+Verified against real RouteViews capture: 100 messages, 18 peers, 29 BGP
+elements, 0 malformed.
 
 Support for OpenBMP length-delimited files (`.obmp` extension convention).
 

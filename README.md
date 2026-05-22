@@ -96,7 +96,7 @@ Broad regex capture with the recorder produced 100 messages, 27,630 bytes.
 See [RouteViews Kafka verification](docs/routeviews-kafka-verification.md).
 
 - `record_openbmp_kafka.rs` — **Implemented and verified** (100 msgs, 4s capture)
-- `--format openbmp-len` — **Active next milestone**: OpenBMP `.obmp` parser
+- `--format openbmp-len` — **Implemented and verified** (100 msgs, 18 peers, 0 malformed)
 
 ### Active priority
 
