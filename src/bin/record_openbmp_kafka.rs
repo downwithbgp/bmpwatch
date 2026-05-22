@@ -255,6 +255,11 @@ fn run_record(cli: &Cli, topics: Vec<String>) -> Result<()> {
     println!("bytes_written: {byte_count}");
     println!("output_path: {}", cli.out.display());
     println!("duration_secs: {}", start.elapsed().as_secs());
+    if msg_count == 0 {
+        println!("status: no_messages");
+    } else {
+        println!("status: ok");
+    }
 
     if msg_count == 0 {
         eprintln!(

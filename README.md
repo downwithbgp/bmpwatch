@@ -125,6 +125,9 @@ Pass condition: `malformed_messages == 0`. Warnings from mid-stream capture
 (typically `stream_order_warnings`) are expected observations, not failures.
 Unlike the offline smoke test, this requires network access to
 `stream.routeviews.org:9092` and may produce stream-order warnings.
+A useful capture should show `status: ok` and `messages_written > 0` in
+the recorder summary; `status: no_messages` means the file only contains
+the `.obmp` container magic and should not be used as a validation sample.
 See [Real-sample validation](docs/real-sample-validation.md) for an example
 of expected output with 106 warnings / 0 parse errors.
 
