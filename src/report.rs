@@ -17,6 +17,38 @@ fn format_size(bytes: u64) -> String {
     }
 }
 
+#[derive(Serialize)]
+struct FindingsBuckets {
+    parse_errors: u64,
+    stream_order_warnings: u64,
+    other_findings: u64,
+}
+
+fn compute_buckets(findings: &[Finding]) -> FindingsBuckets {
+    let mut parse_errors = 0u64;
+    let mut stream_order_warnings = 0u64;
+    let mut other = 0u64;
+
+    for f in findings {
+        match f.rule.as_str() {
+            "invalid_bmp_version" | "truncated_frame" | "unknown_bmp_type" | "parse_error" => {
+                parse_errors += 1
+            }
+            "route_monitoring_before_peer_up"
+            | "duplicate_peer_up"
+            | "peer_down_without_peer_up"
+            | "timestamp_regression" => stream_order_warnings += 1,
+            _ => other += 1,
+        }
+    }
+
+    FindingsBuckets {
+        parse_errors,
+        stream_order_warnings,
+        other_findings: other,
+    }
+}
+
 pub fn render_inspect(state: &DoctorState, truncated: bool) {
     println!("=== BMPDoctor Inspect ===");
     println!();
@@ -115,6 +147,15 @@ pub fn render_inspect(state: &DoctorState, truncated: bool) {
     println!("  WARN:  {warn_count}");
     println!("  ERROR: {err_count}");
 
+    let buckets = compute_buckets(&state.findings);
+    if buckets.parse_errors > 0 || buckets.stream_order_warnings > 0 || buckets.other_findings > 0 {
+        println!("  Parse errors:          {}", buckets.parse_errors);
+        println!("  Stream-order warnings: {}", buckets.stream_order_warnings);
+        if buckets.other_findings > 0 {
+            println!("  Other findings:        {}", buckets.other_findings);
+        }
+    }
+
     if truncated {
         println!(
             "  NOTE: findings truncated at {} ({} dropped). Use --max-findings to raise the cap.",
@@ -188,6 +229,7 @@ struct InspectSummary<'a> {
     error_count: usize,
     findings_truncated: bool,
     findings_dropped_count: u64,
+    findings_buckets: FindingsBuckets,
     #[serde(skip_serializing_if = "Option::is_none")]
     container: Option<ContainerSummary>,
 }
@@ -294,6 +336,7 @@ pub fn render_inspect_json(state: &DoctorState, truncated: bool) {
         error_count,
         findings_truncated: truncated,
         findings_dropped_count: state.findings_dropped,
+        findings_buckets: compute_buckets(&state.findings),
         container,
     };
 
@@ -345,6 +388,11 @@ mod tests {
             error_count: 0,
             findings_truncated: false,
             findings_dropped_count: 0,
+            findings_buckets: FindingsBuckets {
+                parse_errors: 0,
+                stream_order_warnings: 0,
+                other_findings: 0,
+            },
             container: None,
         })
         .unwrap();
@@ -390,6 +438,11 @@ mod tests {
             error_count: 0,
             findings_truncated: false,
             findings_dropped_count: 0,
+            findings_buckets: FindingsBuckets {
+                parse_errors: 0,
+                stream_order_warnings: 0,
+                other_findings: 0,
+            },
             container: Some(container),
         })
         .unwrap();
@@ -439,6 +492,11 @@ mod tests {
             error_count: 0,
             findings_truncated: false,
             findings_dropped_count: 0,
+            findings_buckets: FindingsBuckets {
+                parse_errors: 0,
+                stream_order_warnings: 0,
+                other_findings: 0,
+            },
             container: Some(container),
         })
         .unwrap();
@@ -474,9 +532,68 @@ mod tests {
             error_count: 0,
             findings_truncated: false,
             findings_dropped_count: 0,
+            findings_buckets: FindingsBuckets {
+                parse_errors: 0,
+                stream_order_warnings: 0,
+                other_findings: 0,
+            },
             container: Some(container),
         })
         .unwrap();
         assert!(!summary.contains("openbmp_metadata"));
+    }
+
+    #[test]
+    fn test_buckets_mixed_findings() {
+        use crate::state::Severity;
+        let findings = vec![
+            Finding {
+                severity: Severity::Error,
+                rule: "parse_error".into(),
+                offset: None,
+                peer: None,
+                message: "test".into(),
+            },
+            Finding {
+                severity: Severity::Warn,
+                rule: "route_monitoring_before_peer_up".into(),
+                offset: None,
+                peer: None,
+                message: "test".into(),
+            },
+            Finding {
+                severity: Severity::Error,
+                rule: "invalid_bmp_version".into(),
+                offset: None,
+                peer: None,
+                message: "test".into(),
+            },
+            Finding {
+                severity: Severity::Warn,
+                rule: "timestamp_regression".into(),
+                offset: None,
+                peer: None,
+                message: "test".into(),
+            },
+            Finding {
+                severity: Severity::Info,
+                rule: "custom_info".into(),
+                offset: None,
+                peer: None,
+                message: "test".into(),
+            },
+        ];
+        let buckets = compute_buckets(&findings);
+        assert_eq!(buckets.parse_errors, 2); // parse_error + invalid_bmp_version
+        assert_eq!(buckets.stream_order_warnings, 2); // rm_before_up + timestamp_regression
+        assert_eq!(buckets.other_findings, 1); // custom_info
+    }
+
+    #[test]
+    fn test_buckets_all_zero() {
+        let buckets = compute_buckets(&[]);
+        assert_eq!(buckets.parse_errors, 0);
+        assert_eq!(buckets.stream_order_warnings, 0);
+        assert_eq!(buckets.other_findings, 0);
     }
 }

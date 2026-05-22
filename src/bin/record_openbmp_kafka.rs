@@ -11,6 +11,8 @@ use rdkafka::Message;
 
 use bmpdoctor::obmp_writer::ObmpWriter;
 
+const DEFAULT_TOPIC_LIMIT: usize = 20;
+
 #[derive(Parser)]
 #[command(
     name = "record_openbmp_kafka",
@@ -26,7 +28,7 @@ struct Cli {
 
     #[arg(
         long,
-        default_value = "^route-?views\\..*\\.bmp_raw$",
+        default_value = "^routeviews.*\\.bmp_raw$",
         help = "Regex to match topic names (ignored if --topic is set)"
     )]
     topic_regex: String,
@@ -50,41 +52,54 @@ struct Cli {
         help = "Start consuming from end of topic (latest offsets)"
     )]
     from_end: bool,
+
+    #[arg(long, help = "List matching topics and exit (no recording)")]
+    list_topics: bool,
+
+    #[arg(
+        long,
+        default_value_t = DEFAULT_TOPIC_LIMIT,
+        help = "Refuse to subscribe if regex matches more than N topics"
+    )]
+    topic_limit: usize,
+}
+
+fn fetch_topics(broker: &str, pattern: &str) -> Result<Vec<String>> {
+    let consumer: BaseConsumer = ClientConfig::new()
+        .set("bootstrap.servers", broker)
+        .set("group.id", "bmpdoctor-recorder-metadata")
+        .create()
+        .context("Failed to create metadata consumer")?;
+
+    let metadata = consumer
+        .fetch_metadata(None, Duration::from_secs(10))
+        .context("Failed to fetch topic metadata")?;
+
+    let regex =
+        regex::Regex::new(pattern).with_context(|| format!("Invalid topic regex: {pattern}"))?;
+
+    let mut matched: Vec<String> = metadata
+        .topics()
+        .iter()
+        .map(|t| t.name().to_string())
+        .filter(|name| regex.is_match(name))
+        .collect();
+    matched.sort();
+    Ok(matched)
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let running = Arc::new(AtomicBool::new(true));
-    let r = running.clone();
-    ctrlc::set_handler(move || {
-        r.store(false, Ordering::SeqCst);
-    })
-    .context("Failed to set Ctrl-C handler")?;
-
-    let topics = if let Some(ref exact) = cli.topic {
-        vec![exact.clone()]
+    if let Some(ref exact) = cli.topic {
+        // Exact topic mode — skip regex matching
+        if cli.list_topics {
+            println!("{exact}");
+            return Ok(());
+        }
+        run_record(&cli, vec![exact.clone()])
     } else {
-        let consumer: BaseConsumer = ClientConfig::new()
-            .set("bootstrap.servers", &cli.broker)
-            .set("group.id", "bmpdoctor-recorder-metadata")
-            .create()
-            .context("Failed to create metadata consumer")?;
-
-        let metadata = consumer
-            .fetch_metadata(None, Duration::from_secs(10))
-            .context("Failed to fetch topic metadata")?;
-
-        let regex = regex::Regex::new(&cli.topic_regex)
-            .with_context(|| format!("Invalid topic regex: {}", cli.topic_regex))?;
-
-        let mut matched: Vec<String> = metadata
-            .topics()
-            .iter()
-            .map(|t| t.name().to_string())
-            .filter(|name| regex.is_match(name))
-            .collect();
-        matched.sort();
+        let matched = fetch_topics(&cli.broker, &cli.topic_regex)?;
 
         if matched.is_empty() {
             anyhow::bail!(
@@ -93,17 +108,52 @@ fn main() -> Result<()> {
             );
         }
 
-        eprintln!(
-            "Regex '{}' matched {} topics",
-            cli.topic_regex,
-            matched.len()
-        );
-        for t in &matched {
-            eprintln!("  {t}");
+        if cli.list_topics {
+            for t in &matched {
+                println!("{t}");
+            }
+            eprintln!("{} topics matched", matched.len());
+            return Ok(());
         }
 
-        matched
-    };
+        if matched.len() > cli.topic_limit {
+            let show = matched.len().min(3);
+            let sample: Vec<_> = matched.iter().take(show).collect();
+            anyhow::bail!(
+                "Regex matched {} topics but --topic-limit is {}.\n\
+                 First {} topic(s):\n  {}\n\n\
+                 Choose one of:\n  \
+                 --topic <exact-topic>       pick a single topic\n  \
+                 --topic-limit <N>           raise the limit\n  \
+                 --list-topics              see all matching topics",
+                matched.len(),
+                cli.topic_limit,
+                show,
+                sample
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join("\n  "),
+            );
+        }
+
+        eprintln!(
+            "Regex '{}' matched {} topics (limit {})",
+            cli.topic_regex,
+            matched.len(),
+            cli.topic_limit,
+        );
+        run_record(&cli, matched)
+    }
+}
+
+fn run_record(cli: &Cli, topics: Vec<String>) -> Result<()> {
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
+    ctrlc::set_handler(move || {
+        r.store(false, Ordering::SeqCst);
+    })
+    .context("Failed to set Ctrl-C handler")?;
 
     let offset_reset = if cli.from_end { "latest" } else { "earliest" };
 
@@ -156,6 +206,7 @@ fn main() -> Result<()> {
     let byte_count = writer.bytes_written();
     writer.finish().context("Failed to finalize output file")?;
 
+    // Summary to stdout
     println!("broker: {}", cli.broker);
     println!("topic/s: {}", topics.join(", "));
     println!("messages_written: {msg_count}");
@@ -163,9 +214,12 @@ fn main() -> Result<()> {
     println!("output_path: {}", cli.out.display());
     println!("duration_secs: {}", start.elapsed().as_secs());
 
-    if cli.topic.is_none() {
+    // Zero-message diagnostic
+    if msg_count == 0 {
         eprintln!(
-            "NOTE: .obmp file written. Use --topic-regex with the future --format openbmp-len parser."
+            "No messages received in {}s. The broker may be quiet with --from-end.\n\
+             Try --from-end=false, a longer --max-seconds, or an exact --topic.",
+            start.elapsed().as_secs()
         );
     }
 

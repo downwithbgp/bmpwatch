@@ -51,6 +51,30 @@ cargo test obmp_reader::tests::test_committed_fixture_two_openbmp_records
 Verifies that the committed 2-record `.obmp` fixture (PeerUp + RouteMonitoring,
 both OpenBMP-wrapped) parses correctly without network dependency.
 
+### Smoke test (RouteViews live capture)
+
+The 2-step workflow to verify end-to-end health against real RouteViews data:
+
+```sh
+# Step 1: capture 100 messages
+cargo run --bin record_openbmp_kafka -- \
+  --out samples/smoke.obmp --max-messages 100
+
+# Step 2: inspect, check for malformed
+cargo run --bin bmpdoctor -- \
+  inspect samples/smoke.obmp --summary-json
+```
+
+Pass condition: `malformed_messages == 0`. Warnings from mid-stream capture
+(typically `stream_order_warnings`) are expected observations, not failures.
+See [Real-sample validation](docs/real-sample-validation.md) for an example
+of expected output with 106 warnings / 0 parse errors.
+
+The `findings_buckets` field in `--summary-json` separates counts into:
+- `parse_errors` — parser/frame-level issues (version, truncation, unknown type)
+- `stream_order_warnings` — protocol/stream-order observations (RM before PeerUp, timestamp regression)
+- `other_findings` — anything not in the above categories
+
 ## Installation
 
 ```sh
@@ -101,6 +125,11 @@ a `container` section distinguishes the capture wrapper from the payload types:
   "error_count": 0,
   "findings_truncated": false,
   "findings_dropped_count": 0,
+  "findings_buckets": {
+    "parse_errors": 0,
+    "stream_order_warnings": 106,
+    "other_findings": 0
+  },
   "container": {
     "container_records": 100,
     "raw_bmp_payloads": 0,

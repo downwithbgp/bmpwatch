@@ -40,6 +40,11 @@ cargo run --bin bmpdoctor -- \
   "error_count": 0,
   "findings_truncated": false,
   "findings_dropped_count": 0,
+  "findings_buckets": {
+    "parse_errors": 0,
+    "stream_order_warnings": 106,
+    "other_findings": 0
+  },
   "container": {
     "container_records": 100,
     "openbmp_wrapped_payloads": 100,
