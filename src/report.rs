@@ -291,6 +291,15 @@ pub fn render_inspect(state: &DoctorState, truncated: bool, max_peers: usize) {
         println!(
             "  Interpretation: likely mid-stream capture; stream-order warnings are expected."
         );
+        let stream_warn = compute_buckets(&state.findings).stream_order_warnings;
+        if stream_warn > lifecycle.rm_before_peer_up_warnings {
+            println!(
+                "    ({} total stream-order warnings: {} RM-before-Peer-Up, {} other)",
+                stream_warn,
+                lifecycle.rm_before_peer_up_warnings,
+                stream_warn - lifecycle.rm_before_peer_up_warnings,
+            );
+        }
     } else if state.malformed_messages > 0 || compute_buckets(&state.findings).parse_errors > 0 {
         println!(
             "  Interpretation: parse issues need investigation ({} malformed, {} parse errors).",
@@ -1197,5 +1206,45 @@ mod tests {
         let buckets = compute_buckets(&state.findings);
         assert!(state.malformed_messages > 0);
         assert!(buckets.parse_errors > 0);
+    }
+
+    #[test]
+    fn test_lifecycle_rm_warnings_subset_of_stream_warnings() {
+        use crate::state::{Finding, Severity};
+        let findings = vec![
+            Finding {
+                severity: Severity::Warn,
+                rule: "route_monitoring_before_peer_up".into(),
+                offset: None,
+                peer: None,
+                message: "".into(),
+            },
+            Finding {
+                severity: Severity::Warn,
+                rule: "route_monitoring_before_peer_up".into(),
+                offset: None,
+                peer: None,
+                message: "".into(),
+            },
+            Finding {
+                severity: Severity::Warn,
+                rule: "timestamp_regression".into(),
+                offset: None,
+                peer: None,
+                message: "".into(),
+            },
+        ];
+        let state = DoctorState {
+            total_messages: 3,
+            findings,
+            ..Default::default()
+        };
+        let lifecycle = compute_lifecycle(&state);
+        let buckets = compute_buckets(&state.findings);
+        // RM-before-Peer-Up = 2
+        assert_eq!(lifecycle.rm_before_peer_up_warnings, 2);
+        // Stream-order warnings = 3 (2 RM + 1 timestamp)
+        assert_eq!(buckets.stream_order_warnings, 3);
+        assert!(buckets.stream_order_warnings > lifecycle.rm_before_peer_up_warnings);
     }
 }
