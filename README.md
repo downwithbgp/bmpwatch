@@ -23,22 +23,22 @@ The recommended workflow from zero to verified results:
    kcat -b stream.routeviews.org:9092 -L
    ```
 
-2. **Record a `.obmp` capture**:
+2. **Record a `.bmpd` capture**:
    ```sh
    cargo run --bin record_openbmp_kafka -- \
      --topic-regex '^routeviews.*\.bmp_raw$' \
-     --out samples/capture.obmp \
+     --out samples/capture.bmpd \
      --max-messages 100
    ```
 
 3. **Inspect** (format auto-detected):
    ```sh
    cargo run --bin bmpdoctor -- \
-     inspect samples/capture.obmp --summary-json
+     inspect samples/capture.bmpd --summary-json
    ```
 
 4. **Understand the layers** (see [Terminology](#terminology)):
-   - `.obmp` = BMPDoctor capture container (`BMPDOPENBMP1\n`)
+   - `.bmpd` = BMPDoctor capture container (`BMPDOPENBMP1\n`)
    - `OBMP` = upstream OpenBMP wrapper inside Kafka payloads
    - Inner frame = RFC 7854 BMP message
 
@@ -48,11 +48,11 @@ The recommended workflow from zero to verified results:
 cargo test obmp_reader::tests::test_committed_fixture_two_openbmp_records
 ```
 
-Verifies that the committed 2-record `.obmp` fixture (`tests/fixtures/openbmp-two-records.obmp`) parses correctly without network dependency.
+Verifies that the committed 2-record `.bmpd` fixture (`tests/fixtures/openbmp-two-records.bmpd`) parses correctly without network dependency.
 
 **Fixture provenance:** This is a tiny deterministic regression fixture, not a
 captured live RouteViews sample. It contains two synthetic OpenBMP-wrapped
-records in the BMPDoctor `.obmp` container:
+records in the BMPDoctor `.bmpd` container:
 1. Peer Up for AS65000 (private/synthetic ASN)
 2. Route Monitoring for the same peer
 
@@ -67,14 +67,14 @@ metadata present.
   treat them as **read-only** — no test writes to this directory.
 - Generated or captured output belongs in `samples/` or a temporary
   directory, not under `tests/fixtures/`.
-- `samples/*.obmp` is intentionally gitignored.
+- `samples/*.bmpd` is intentionally gitignored.
 - This keeps repeated parallel `cargo test` runs deterministic.
 
 ### Offline smoke test (committed fixture, no network)
 
 ```sh
 cargo run --bin bmpdoctor -- \
-  inspect tests/fixtures/openbmp-two-records.obmp --summary-json
+  inspect tests/fixtures/openbmp-two-records.bmpd --summary-json
 ```
 
 Expected: `malformed_messages=0`, `total_messages=2`, `container.container_records=2`,
@@ -84,7 +84,7 @@ Shell one-liner (exits 0 on pass, 1 on failure):
 
 ```sh
 cargo run --bin bmpdoctor -- \
-  inspect tests/fixtures/openbmp-two-records.obmp --summary-json \
+  inspect tests/fixtures/openbmp-two-records.bmpd --summary-json \
   | python3 -c "
 import json,sys; d=json.load(sys.stdin);
 ok = d['malformed_messages']==0 and d['total_messages']==2 \
@@ -133,11 +133,11 @@ The 2-step workflow to verify end-to-end health against real RouteViews data:
 ```sh
 # Step 1: capture 100 messages
 cargo run --bin record_openbmp_kafka -- \
-  --out samples/smoke.obmp --max-messages 100 --min-messages 1
+  --out samples/smoke.bmpd --max-messages 100 --min-messages 1
 
 # Step 2: inspect, check for malformed
 cargo run --bin bmpdoctor -- \
-  inspect samples/smoke.obmp --summary-json
+  inspect samples/smoke.bmpd --summary-json
 ```
 
 Pass condition: `malformed_messages == 0`. Warnings from mid-stream capture
@@ -146,7 +146,7 @@ Unlike the offline smoke test, this requires network access to
 `stream.routeviews.org:9092` and may produce stream-order warnings.
 A useful capture should show `status: ok` and `messages_written > 0` in
 the recorder summary; `status: no_messages` means the file only contains
-the `.obmp` container magic and should not be used as a validation sample.
+the `.bmpd` container magic and should not be used as a validation sample.
 The capture step uses `--min-messages 1` to exit non-zero on magic-only
 captures.
 See [Real-sample validation](docs/real-sample-validation.md) for an example
@@ -171,11 +171,11 @@ cargo install --path .
 
 | First bytes | Detected format |
 |-------------|-----------------|
-| `BMPDOPENBMP1\n` | `openbmp-len` |
+| `BMPDOPENBMP1\n` | `bmpd` |
 | `0x03` | `raw-bmp` |
 | Unknown / empty / short | `raw-bmp` (diagnostic fallback — let the parser report errors) |
 
-Explicit `--format raw-bmp` or `--format openbmp-len` overrides auto-detection
+Explicit `--format raw-bmp` or `--format bmpd` overrides auto-detection
 and can intentionally produce malformed/error output if the wrong format is
 forced (useful for debugging or format-level misuse testing).
 
@@ -194,13 +194,13 @@ both peer-list sections while keeping aggregate counts (`peers_observed`,
 `active_peers`). In `--summary-json`, the `peers` array is absent when
 `--max-peers` is 0.
 
-With `--summary-json`, outputs machine-readable totals. For `.obmp` files,
+With `--summary-json`, outputs machine-readable totals. For `.bmpd` files,
 a `container` section distinguishes the capture wrapper from the payload types:
 
 ```json
 {
-  "file": "samples/routeviews-broad-100.obmp",
-  "format": "OpenBMP length-delimited",
+  "file": "samples/routeviews-broad-100.bmpd",
+  "format": "BMPDoctor container",
   "size_bytes": 27630,
   "total_messages": 100,
   "malformed_messages": 0,
@@ -242,9 +242,9 @@ a `container` section distinguishes the capture wrapper from the payload types:
 ```
 
 The `container` section is intentionally absent for `raw-bmp` input, which
-has no `.obmp` record layer. `openbmp_metadata` appears only when records
+has no `.bmpd` record layer. `openbmp_metadata` appears only when records
 contain an OpenBMP `OBMP` wrapper with populated fields; it is not guaranteed
-for all `.obmp` files. Zero-value container fields and absent metadata keys
+for all `.bmpd` files. Zero-value container fields and absent metadata keys
 are omitted from the output to keep the JSON compact.
 
 The `inspect` text output shows the same metadata between the peer list and
@@ -257,11 +257,11 @@ OpenBMP metadata:
   Router IP:  185.33.111.234
 ```
 
-`container` counters (present for `.obmp` input, absent for `raw-bmp`):
+`container` counters (present for `.bmpd` input, absent for `raw-bmp`):
 
 | Counter | Meaning |
 |---------|---------|
-| `container_records` | Total `.obmp` records in the file |
+| `container_records` | Total `.bmpd` records in the file |
 | `raw_bmp_payloads` | Records with a raw RFC 7854 BMP frame (starts `0x03`) |
 | `openbmp_wrapped_payloads` | Records with an `OBMP` wrapper (mutually exclusive with `raw_bmp_payloads` per record) |
 | `unrecognized_payloads` | Records that are neither raw BMP nor `OBMP` |
@@ -310,7 +310,7 @@ BMPDoctor checks for:
 
 | Term | Meaning |
 |------|---------|
-| `.obmp` | BMPDoctor's local capture container format. `BMPDOPENBMP1\n` magic + `u32` BE length-prefixed records. |
+| `.bmpd` | BMPDoctor's local capture container format. `BMPDOPENBMP1\n` magic + `u32` BE length-prefixed records. |
 | `OBMP` | OpenBMP upstream wrapper inside each RouteViews Kafka `*.bmp_raw` payload. Stripped automatically before BMP frame parsing. |
 | Inner frame | The RFC 7854 BMP message (common header + per-peer header + body). This is what BMPDoctor's parser operates on. |
 
@@ -345,7 +345,7 @@ Broad regex capture with the recorder produced 100 messages, 27,630 bytes.
 See [RouteViews Kafka verification](docs/routeviews-kafka-verification.md).
 
 - `record_openbmp_kafka.rs` — **Implemented and verified** (100 msgs, 4s capture)
-- `--format openbmp-len` — **Implemented and verified** (100 msgs, 18 peers, 0 malformed)
+- `--format bmpd` — **Implemented and verified** (100 msgs, 18 peers, 0 malformed)
 
 ### Active priority
 

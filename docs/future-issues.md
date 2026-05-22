@@ -20,7 +20,7 @@ unreachable. See `docs/caida-kafka-verification.md`.
 cargo run --bin record_openbmp_kafka -- \
   --broker stream.routeviews.org:9092 \
   --topic-regex '^routeviews.*\.bmp_raw$' \
-  --out samples/routeviews-broad-100.obmp \
+  --out samples/routeviews-broad-100.bmpd \
   --max-messages 100 \
   --max-seconds 60 \
   --from-end
@@ -36,7 +36,7 @@ data to local files.
 - Connect to a Kafka broker (configurable host/port)
 - Subscribe to topics matching `^openbmp\.router--.+\.peer-as--.+\.bmp_raw`
 - Consume messages as raw BMP frames (no OpenBMP wrapper at the Kafka layer)
-- Write frames to a local `.obmp` file (OpenBMP length-delimited format with
+- Write frames to a local `.bmpd` file (BMPDoctor container format with
   `BMPDOPENBMP1` magic + `u32` BE length prefix per frame), preserving
   byte-for-byte fidelity
 - Optional: rotate output files by size or time
@@ -79,12 +79,12 @@ fn main() {
 
 ---
 
-## 2. --format openbmp-len
+## 2. --format bmpd
 
 **Status:** Implemented and verified
-**Scope:** `--format openbmp-len` flag on `inspect`/`lint`/`dump`
+**Scope:** `--format bmpd` flag on `inspect`/`lint`/`dump`
 
-Parses `.obmp` container files (`BMPDOPENBMP1\n` magic + `u32` BE length-
+Parses `.bmpd` container files (`BMPDOPENBMP1\n` magic + `u32` BE length-
 prefixed records). Detects raw BMP (first byte `0x03`) and OpenBMP-wrapped
 payloads (first bytes `OBMP`). OpenBMP unwrap uses bgpkit-parser's
 `parse_openbmp_header` to strip the wrapper, then passes the inner RFC 7854
@@ -98,10 +98,10 @@ elements, 0 malformed.
 - Richer display of OpenBMP metadata (collector ID, router IP, admin ID)
   during `inspect` output
 - Live-stream diagnostics (incremental counter tracking between repeated
-  `.obmp` file reads)
+  `.bmpd` file reads)
 - Richer format detection: standalone upstream `OBMP` payload files,
   surfacing detected format in more output modes, exposing detection
-  as a library API. (Basic `.obmp` container detection via
+  as a library API. (Basic `.bmpd` container detection via
   `BMPDOPENBMP1\n` is already implemented in `--format auto`.)
 
 ---

@@ -616,7 +616,7 @@ mod tests {
             }),
         };
         let summary = serde_json::to_string(&InspectSummary {
-            file: "t.obmp",
+            file: "t.bmpd",
             format: "OpenBMP length-delimited",
             size_bytes: 100,
             total_messages: 1,
@@ -657,7 +657,7 @@ mod tests {
             openbmp_metadata: None,
         };
         let summary = serde_json::to_string(&InspectSummary {
-            file: "t.obmp",
+            file: "t.bmpd",
             format: "OpenBMP length-delimited",
             size_bytes: 100,
             total_messages: 1,
@@ -830,7 +830,7 @@ mod tests {
         );
 
         let state = DoctorState {
-            file_path: "t.obmp".into(),
+            file_path: "t.bmpd".into(),
             format: "test".into(),
             peers,
             total_messages: 2,
@@ -895,7 +895,7 @@ mod tests {
     #[test]
     fn test_json_peers_absent_with_max_peers_zero() {
         let summary = serde_json::to_string(&InspectSummary {
-            file: "t.obmp",
+            file: "t.bmpd",
             format: "test",
             size_bytes: 0,
             total_messages: 0,
@@ -942,7 +942,7 @@ mod tests {
         }
 
         let state = DoctorState {
-            file_path: "t.obmp".into(),
+            file_path: "t.bmpd".into(),
             format: "test".into(),
             peers,
             total_messages: 5,

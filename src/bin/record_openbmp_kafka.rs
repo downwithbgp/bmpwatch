@@ -17,7 +17,7 @@ const DEFAULT_TOPIC_LIMIT: usize = 20;
 #[command(
     name = "record_openbmp_kafka",
     version,
-    about = "Record RouteViews Kafka BMP messages to a local .obmp file"
+    about = "Record RouteViews Kafka BMP messages to a local .bmpd file"
 )]
 struct Cli {
     #[arg(long, default_value = "stream.routeviews.org:9092")]
@@ -35,8 +35,8 @@ struct Cli {
 
     #[arg(
         long,
-        default_value = "samples/routeviews-sample.obmp",
-        help = "Output .obmp file path"
+        default_value = "samples/routeviews-sample.bmpd",
+        help = "Output .bmpd file path"
     )]
     out: PathBuf,
 
@@ -233,7 +233,7 @@ fn run_record(cli: &Cli, topics: Vec<String>) -> Result<()> {
         .subscribe(&topic_strs)
         .context("Failed to subscribe to topics")?;
 
-    let mut writer = ObmpWriter::create(&cli.out).context("Failed to create output .obmp file")?;
+    let mut writer = ObmpWriter::create(&cli.out).context("Failed to create output .bmpd file")?;
 
     eprintln!(
         "Recording to {} (max {} msgs, {} secs, from_end={})",

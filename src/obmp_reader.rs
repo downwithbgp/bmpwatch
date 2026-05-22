@@ -8,7 +8,7 @@ use crate::error::DoctorError;
 use crate::obmp_writer::MAGIC;
 use crate::raw_bmp::{parse_frame_from_bytes, RawBmpFrame};
 
-/// Payload classification for `.obmp` container records.
+/// Payload classification for `.bmpd` container records.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PayloadKind {
     RawBmp,
@@ -16,7 +16,7 @@ pub enum PayloadKind {
     Unrecognized,
 }
 
-/// Container-level statistics for `.obmp` files.
+/// Container-level statistics for `.bmpd` files.
 #[derive(Debug, Clone, Default)]
 pub struct ContainerStats {
     pub container_records: u64,
@@ -41,7 +41,7 @@ impl ContainerStats {
 }
 
 /// Normalized OpenBMP metadata extracted from the first successfully
-/// unwrapped `OBMP` payload in a `.obmp` container.
+/// unwrapped `OBMP` payload in a `.bmpd` container.
 #[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct OpenBmpMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -101,7 +101,7 @@ fn try_unwrap_openbmp(payload: &[u8]) -> Result<UnwrapResult, String> {
     }
 }
 
-/// Result of parsing a `.obmp` record payload.
+/// Result of parsing a `.bmpd` record payload.
 struct RecordResult {
     frame: Result<RawBmpFrame, DoctorError>,
     kind: PayloadKind,
@@ -117,7 +117,7 @@ fn parse_record_payload(payload: &[u8], frame_offset: u64, frame_index: u64) -> 
     if payload.is_empty() {
         return RecordResult {
             frame: Err(DoctorError::Frame(format!(
-                ".obmp frame {frame_index} at offset {frame_offset}: empty payload"
+                ".bmpd frame {frame_index} at offset {frame_offset}: empty payload"
             ))),
             kind: PayloadKind::Unrecognized,
             metadata: None,
@@ -141,7 +141,7 @@ fn parse_record_payload(payload: &[u8], frame_offset: u64, frame_index: u64) -> 
                 })
                 .map_err(|e| {
                     DoctorError::Frame(format!(
-                        ".obmp frame {frame_index} at offset {frame_offset}: {e}"
+                        ".bmpd frame {frame_index} at offset {frame_offset}: {e}"
                     ))
                 }),
             None,
@@ -155,21 +155,21 @@ fn parse_record_payload(payload: &[u8], frame_offset: u64, frame_index: u64) -> 
                     })
                     .map_err(|e| {
                         DoctorError::Frame(format!(
-                            ".obmp frame {frame_index} at offset {frame_offset}: {e}"
+                            ".bmpd frame {frame_index} at offset {frame_offset}: {e}"
                         ))
                     }),
                 Some(result.metadata),
             ),
             Err(msg) => (
                 Err(DoctorError::Frame(format!(
-                    ".obmp frame {frame_index} at offset {frame_offset}: {msg}"
+                    ".bmpd frame {frame_index} at offset {frame_offset}: {msg}"
                 ))),
                 None,
             ),
         },
         PayloadKind::Unrecognized => (
             Err(DoctorError::Frame(format!(
-                ".obmp frame {frame_index} at offset {frame_offset}: unrecognized payload (first byte 0x{:02x})",
+                ".bmpd frame {frame_index} at offset {frame_offset}: unrecognized payload (first byte 0x{:02x})",
                 payload[0]
             ))),
             None,
@@ -202,7 +202,7 @@ impl ObmpReader {
             Ok(()) => {
                 if magic_buf != *MAGIC {
                     return Err(DoctorError::Frame(format!(
-                        "Invalid .obmp magic at offset 0: expected {:?}, got {:?}",
+                        "Invalid .bmpd magic at offset 0: expected {:?}, got {:?}",
                         std::str::from_utf8(MAGIC).unwrap_or("<binary>"),
                         std::str::from_utf8(&magic_buf).unwrap_or("<binary>"),
                     )));
@@ -210,7 +210,7 @@ impl ObmpReader {
             }
             Err(e) => {
                 return Err(DoctorError::Frame(format!(
-                    "Cannot read .obmp magic header: {e}"
+                    "Cannot read .bmpd magic header: {e}"
                 )));
             }
         }
@@ -243,7 +243,7 @@ impl Iterator for ObmpReader {
                 self.eof = true;
                 if self.frame_index == 0 {
                     return Some(Err(DoctorError::Frame(format!(
-                        "Truncated length prefix at .obmp offset {_record_start}: {e}"
+                        "Truncated length prefix at .bmpd offset {_record_start}: {e}"
                     ))));
                 }
                 return None;
@@ -260,7 +260,7 @@ impl Iterator for ObmpReader {
             Err(e) => {
                 self.eof = true;
                 return Some(Err(DoctorError::Frame(format!(
-                    "Truncated payload at .obmp offset {}: declared length {payload_len} exceeds available data: {e}",
+                    "Truncated payload at .bmpd offset {}: declared length {payload_len} exceeds available data: {e}",
                     self.file_offset
                 ))));
             }
@@ -442,7 +442,7 @@ mod tests {
         let result = ObmpReader::open(&path);
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
-        assert!(err.contains("Invalid .obmp magic"));
+        assert!(err.contains("Invalid .bmpd magic"));
     }
 
     #[test]
@@ -491,7 +491,7 @@ mod tests {
 
     #[test]
     fn test_valid_container_malformed_bmp() {
-        // Create a valid .obmp wrapper around an invalid BMP frame (wrong version)
+        // Create a valid .bmpd wrapper around an invalid BMP frame (wrong version)
         let malformed = vec![0xFF, 0x00, 0x00, 0x00, 0x0A, 0x00, 1, 2, 3, 4];
         let data = fixtures::make_valid_obmp(&[malformed]);
 
@@ -587,7 +587,7 @@ mod tests {
         // Read-only regression test against committed fixture.
         // The fixture was generated by the fixture-generation helper and
         // committed; tests must not mutate it.
-        let reader = ObmpReader::open("tests/fixtures/openbmp-two-records.obmp").unwrap();
+        let reader = ObmpReader::open("tests/fixtures/openbmp-two-records.bmpd").unwrap();
         let frames: Vec<_> = reader.collect::<Result<Vec<_>, _>>().unwrap();
         assert_eq!(frames.len(), 2);
         assert_eq!(frames[0].msg_type_raw, 3); // PeerUp
@@ -598,7 +598,7 @@ mod tests {
     #[test]
     fn test_container_stats_committed_fixture() {
         // Read-only stats check against committed fixture.
-        let mut reader = ObmpReader::open("tests/fixtures/openbmp-two-records.obmp").unwrap();
+        let mut reader = ObmpReader::open("tests/fixtures/openbmp-two-records.bmpd").unwrap();
         for _ in reader.by_ref() {}
         let stats = &reader.stats;
         assert_eq!(stats.container_records, 2);

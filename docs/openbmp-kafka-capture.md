@@ -79,7 +79,7 @@ cargo run --bin record_openbmp_kafka -- --list-topics --asn 13335
 # Step 2: record from that exact topic
 cargo run --bin record_openbmp_kafka -- \
   --topic routeviews.chicago.13335.bmp_raw \
-  --out samples/chicago-13335.obmp \
+  --out samples/chicago-13335.bmpd \
   --max-messages 100
 ```
 
@@ -123,27 +123,27 @@ kafka-console-consumer \
   --max-messages 100
 ```
 
-## 5. Capture to a local .obmp file (using the recorder binary)
+## 5. Capture to a local .bmpd file (using the recorder binary)
 
 The `record_openbmp_kafka` binary handles Kafka connection and writes
-BMP messages to a `.obmp` file:
+BMP messages to a `.bmpd` file:
 
 ```sh
 # Exact topic
 cargo run --bin record_openbmp_kafka -- \
   --topic routeviews.nwax.13335.bmp_raw \
-  --out samples/nwax-sample.obmp \
+  --out samples/nwax-sample.bmpd \
   --max-messages 100
 
 # Topic regex (subscribes to all matching topics)
 cargo run --bin record_openbmp_kafka -- \
   --topic-regex '^route-?views\..*\.bmp_raw$' \
-  --out samples/routeviews-sample.obmp \
+  --out samples/routeviews-sample.bmpd \
   --max-messages 10 \
   --max-seconds 30
 ```
 
-The `.obmp` file uses the `BMPDOPENBMP1\n` magic header followed by
+The `.bmpd` file uses the `BMPDOPENBMP1\n` magic header followed by
 repeated `u32` BE length + payload frames. Format is auto-detected by
 BMPDoctor; use `inspect`, `lint`, or `dump` directly.
 
@@ -156,15 +156,15 @@ sudo apt-get install librdkafka-dev  # Debian/Ubuntu
 Then inspect with BMPDoctor (auto-detected, no `--format` flag needed):
 
 ```sh
-bmpdoctor inspect samples/nwax-sample.obmp --summary-json
-bmpdoctor dump samples/nwax-sample.obmp --jsonl | head -5
+bmpdoctor inspect samples/nwax-sample.bmpd --summary-json
+bmpdoctor dump samples/nwax-sample.bmpd --jsonl | head -5
 ```
 
 ## Notes
 
 - Messages arrive as raw BMP frames (common header + payload). No OpenBMP
   length-delimited wrapper is applied to individual Kafka messages.
-- When captured to a `.obmp` file, the `examples/record_openbmp_kafka.rs`
+- When captured to a `.bmpd` file, the `examples/record_openbmp_kafka.rs`
   tool (future) will add the `BMPDOPENBMP1` + `u32` BE length wrapper to
   each frame on write.
 - The broker may throttle or close connections that consume too fast.

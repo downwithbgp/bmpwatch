@@ -64,7 +64,7 @@ mod tests {
     #[test]
     fn test_create_writes_magic() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("test.obmp");
+        let path = dir.path().join("test.bmpd");
         let w = ObmpWriter::create(&path).unwrap();
         w.finish().unwrap();
 
@@ -76,7 +76,7 @@ mod tests {
     #[test]
     fn test_write_single_frame() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("test.obmp");
+        let path = dir.path().join("test.bmpd");
         let mut w = ObmpWriter::create(&path).unwrap();
 
         let payload = b"hello world";
@@ -94,7 +94,7 @@ mod tests {
     #[test]
     fn test_write_multiple_frames() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("test.obmp");
+        let path = dir.path().join("test.bmpd");
         let mut w = ObmpWriter::create(&path).unwrap();
 
         let p1 = b"first";
@@ -121,7 +121,7 @@ mod tests {
     #[test]
     fn test_counts() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("test.obmp");
+        let path = dir.path().join("test.bmpd");
         let mut w = ObmpWriter::create(&path).unwrap();
 
         w.write_frame(b"a").unwrap();
@@ -140,7 +140,7 @@ mod tests {
     #[test]
     fn test_creates_parent_dir() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("sub").join("nested").join("test.obmp");
+        let path = dir.path().join("sub").join("nested").join("test.bmpd");
         let w = ObmpWriter::create(&path).unwrap();
         w.finish().unwrap();
         assert!(path.exists());
@@ -149,7 +149,7 @@ mod tests {
     #[test]
     fn test_empty_payload() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("test.obmp");
+        let path = dir.path().join("test.bmpd");
         let mut w = ObmpWriter::create(&path).unwrap();
 
         w.write_frame(b"").unwrap();

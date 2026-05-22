@@ -65,7 +65,7 @@ BMPDoctor for this workflow.
 | Mode              | Input format                       | Status        |
 |-------------------|------------------------------------|---------------|
 | `raw-bmp`         | Raw RFC 7854 frames (.rawbmp)      | Implemented   |
-| `openbmp-len`     | OpenBMP length-delimited (.obmp)   | Planned       |
+| `bmpd`     | BMPDoctor container (.bmpd)   | Planned       |
 | `bgpreader-psv`   | bgpreader PSV event stream         | Not planned   |
 
 A `bgpreader-psv` mode could summarize decoded BGP event streams for

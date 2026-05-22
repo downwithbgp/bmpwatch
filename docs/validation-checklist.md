@@ -68,10 +68,10 @@ nc -l 5000 > capture.rawbmp
 - [x] Run `kcat -b stream.routeviews.org:9092 -L` — **Topics listed**
 - [x] Observed topics match `^route-?views\..*\.bmp_raw$`
 - [x] Broad regex capture with recorder — **100 msgs, 27,630 bytes, 4s**
-- [x] `.obmp` container parsing via `--format openbmp-len` — **100 msgs, 18 peers, 0 malformed**
+- [x] `.bmpd` container parsing via `--format bmpd` — **100 msgs, 18 peers, 0 malformed**
 - [ ] Subscribe to exact topic and capture 100 messages
 - [ ] Verify messages are valid BMP frames (inspect first 5 with `xxd`)
-- [ ] Run `bmpdoctor inspect` on captured `.obmp` (format auto-detected)
+- [ ] Run `bmpdoctor inspect` on captured `.bmpd` (format auto-detected)
 - [ ] Confirm peer addresses and ASNs match expected RouteViews feed data
 
 See `docs/routeviews-kafka-verification.md` for the full test log.
@@ -115,7 +115,7 @@ See `docs/caida-kafka-verification.md`.
 - [ ] Route Mirroring TLVs not parsed
 - [ ] Peer Down reason codes reported as raw integers, not labels
 - [ ] No compression support (`.bz2`, `.gz`)
-- [ ] No OpenBMP length-delimited format support (`.obmp`)
+- [ ] No BMPDoctor container format support (`.bmpd`)
 - [ ] Findings are capped at `--max-findings` (default 1000); findings
       beyond the cap are silently dropped with a truncation warning
 - [ ] No TCP listener or streaming input mode

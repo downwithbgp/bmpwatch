@@ -8,7 +8,7 @@ Record of a verified end-to-end test against a live RouteViews Kafka capture.
 cargo run --bin record_openbmp_kafka -- \
   --broker stream.routeviews.org:9092 \
   --topic-regex '^routeviews.*\.bmp_raw$' \
-  --out samples/routeviews-broad-100.obmp \
+  --out samples/routeviews-broad-100.bmpd \
   --max-messages 100 \
   --max-seconds 60 \
   --from-end
@@ -21,13 +21,13 @@ cargo run --bin record_openbmp_kafka -- \
 
 ```sh
 cargo run --bin bmpdoctor -- \
-  inspect samples/routeviews-broad-100.obmp --summary-json
+  inspect samples/routeviews-broad-100.bmpd --summary-json
 ```
 
 ```json
 {
-  "file": "samples/routeviews-broad-100.obmp",
-  "format": "OpenBMP length-delimited",
+  "file": "samples/routeviews-broad-100.bmpd",
+  "format": "BMPDoctor container",
   "size_bytes": 27630,
   "total_messages": 100,
   "malformed_messages": 0,
@@ -78,7 +78,7 @@ OpenBMP metadata:
 
 Metadata is captured from the first successfully unwrapped `OBMP` payload.
 It is present only when records contain an OpenBMP wrapper with populated
-fields; it is not guaranteed for all `.obmp` files.
+fields; it is not guaranteed for all `.bmpd` files.
 
 ### Container counter semantics
 
@@ -121,6 +121,6 @@ also increment `inner_bmp_parse_errors`, and vice versa.
 ## Status
 
 BMPDoctor's end-to-end pipeline is verified against live RouteViews data:
-Kafka capture → `.obmp` container → OpenBMP unwrap → BMP frame parse →
+Kafka capture → `.bmpd` container → OpenBMP unwrap → BMP frame parse →
 peer tracking → BGP element counting. Zero malformed messages in a 100-
 message sample demonstrates production-readiness for the implemented formats.

@@ -42,7 +42,7 @@ pub enum Command {
         /// Output machine-readable JSON summary instead of text
         #[arg(long)]
         summary_json: bool,
-        /// Input format: auto, raw-bmp, or openbmp-len
+        /// Input format: auto, raw-bmp, or bmpd
         #[arg(long, default_value = "auto")]
         format: InputFormat,
         /// Maximum peers to display (0 suppresses peer sections)
@@ -56,7 +56,7 @@ pub enum Command {
         /// Cap findings at N (default 1000)
         #[arg(long, default_value_t = DEFAULT_MAX_FINDINGS)]
         max_findings: usize,
-        /// Input format: auto, raw-bmp, or openbmp-len
+        /// Input format: auto, raw-bmp, or bmpd
         #[arg(long, default_value = "auto")]
         format: InputFormat,
     },
@@ -70,7 +70,7 @@ pub enum Command {
         /// Cap findings at N (default 1000)
         #[arg(long, default_value_t = DEFAULT_MAX_FINDINGS)]
         max_findings: usize,
-        /// Input format: auto, raw-bmp, or openbmp-len
+        /// Input format: auto, raw-bmp, or bmpd
         #[arg(long, default_value = "auto")]
         format: InputFormat,
     },

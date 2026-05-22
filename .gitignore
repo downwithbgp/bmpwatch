@@ -1,4 +1,5 @@
 /target/
 **/*.rs.bk
 fixture*.bin
+samples/*.bmpd
 samples/*.obmp

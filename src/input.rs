@@ -9,7 +9,7 @@ use crate::obmp_writer::MAGIC;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InputFormat {
     RawBmp,
-    OpenBmpLen,
+    Bmpd,
     Auto,
 }
 
@@ -17,7 +17,7 @@ impl InputFormat {
     pub fn as_str(&self) -> &'static str {
         match self {
             InputFormat::RawBmp => "raw-bmp",
-            InputFormat::OpenBmpLen => "openbmp-len",
+            InputFormat::Bmpd => "bmpd",
             InputFormat::Auto => "auto",
         }
     }
@@ -29,10 +29,10 @@ impl FromStr for InputFormat {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "raw-bmp" => Ok(InputFormat::RawBmp),
-            "openbmp-len" => Ok(InputFormat::OpenBmpLen),
+            "bmpd" => Ok(InputFormat::Bmpd),
             "auto" => Ok(InputFormat::Auto),
             other => Err(format!(
-                "unknown format '{other}'. Expected 'raw-bmp', 'openbmp-len', or 'auto'"
+                "unknown format '{other}'. Expected 'raw-bmp', 'bmpd', or 'auto'"
             )),
         }
     }
@@ -47,7 +47,7 @@ impl std::fmt::Display for InputFormat {
 /// Auto-detect the input format from file content.
 ///
 /// Reads the first byte(s) of the file to determine the format:
-/// - Starts with `BMPDOPENBMP1\n` → OpenBmpLen
+/// - Starts with `BMPDOPENBMP1\n` → Bmpd
 /// - Starts with `0x03` (BMP version 3) → RawBmp
 /// - Otherwise (unknown, short, empty) → RawBmp (diagnostic fallback: the
 ///   parser will report appropriate errors)
@@ -57,7 +57,7 @@ pub fn detect_format(path: &Path) -> Result<InputFormat, DoctorError> {
     let n = file.read(&mut buf)?;
 
     if n >= MAGIC.len() && buf == *MAGIC {
-        return Ok(InputFormat::OpenBmpLen);
+        return Ok(InputFormat::Bmpd);
     }
     if n >= 1 && buf[0] == 0x03 {
         return Ok(InputFormat::RawBmp);
@@ -83,7 +83,7 @@ pub fn file_size_and_format(path: &Path, fmt: InputFormat) -> Result<(u64, Strin
             Some("bmpr") => "BMP replay format".to_string(),
             _ => "raw BMP frames".to_string(),
         },
-        InputFormat::OpenBmpLen => "OpenBMP length-delimited".to_string(),
+        InputFormat::Bmpd => "BMPDoctor container".to_string(),
     };
 
     Ok((size, format_str))
@@ -100,7 +100,7 @@ mod tests {
         let mut tmp = tempfile::NamedTempFile::new().unwrap();
         tmp.write_all(data).unwrap();
         let path = tmp.into_temp_path();
-        assert_eq!(detect_format(&path).unwrap(), InputFormat::OpenBmpLen);
+        assert_eq!(detect_format(&path).unwrap(), InputFormat::Bmpd);
     }
 
     #[test]

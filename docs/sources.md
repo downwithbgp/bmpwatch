@@ -12,9 +12,9 @@ Sources ordered by implementation status and verification level.
 |------|------------------------------------|--------------|-------------------------|
 | 1    | Synthetic fixtures                 | (in-memory)  | Implemented, 17 tests   |
 | 2    | Local FRR/GoBGP raw BMP            | `.rawbmp`    | Planned, not tested     |
-| 3    | RouteViews Kafka                   | `.obmp`      | Verified, 100 msg capture |
+| 3    | RouteViews Kafka                   | `.bmpd`      | Verified, 100 msg capture |
 | 4    | BGPReader routeviews-stream        | N/A          | Comparison only         |
-| —    | CAIDA/OpenBMP Kafka (historical)   | `.obmp`      | Unreachable (blocked)   |
+| —    | CAIDA/OpenBMP Kafka (historical)   | `.bmpd`      | Unreachable (blocked)   |
 
 ### Tier 1: Synthetic fixtures
 
@@ -26,10 +26,10 @@ dependency.
 
 BMP speakers like FRR and GoBGP can write raw BMP frame files to disk. These
 provide real BGP data for integration testing. The `.rawbmp` extension
-distinguishes raw concatenated BMP frames from OpenBMP length-delimited
+distinguishes raw concatenated BMP frames from BMPDoctor container
 captures.
 
-### Tier 3: RouteViews Kafka `.obmp` — active next milestone
+### Tier 3: RouteViews Kafka `.bmpd` — active next milestone
 
 `stream.routeviews.org:9092` is the verified working OpenBMP Kafka broker
 for BMPDoctor integration. It serves live BMP data from RouteViews
@@ -117,7 +117,7 @@ $ kcat -b bmp.bgpstream.caida.org:9092 -L
 Broker transport failure
 ```
 
-Kafka-based capture and `.obmp` file support are blocked until a reachable
+Kafka-based capture and `.bmpd` file support are blocked until a reachable
 broker is confirmed.
 
 ### References
@@ -126,7 +126,7 @@ broker is confirmed.
 - [BGPStream V2 docs - realtime OpenBMP Kafka](https://bgpstream.caida.org/docs/api/bgpstreamv2)
 - [OpenBMP Kafka message format](https://www.openbmp.org/#!docs/message_bus.md)
 
-## OpenBMP length-delimited files (.obmp)
+## BMPDoctor container files (.bmpd)
 
 OpenBMP can write BMP data to disk with a length-delimited wrapper:
 

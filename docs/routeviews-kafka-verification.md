@@ -66,13 +66,13 @@ Metadata for all topics (from broker -1: stream.routeviews.org:9092/bootstrap):
   regex `^routeviews.*\.bmp_raw$`. Successful capture: 100 messages,
   27,630 bytes in 4 seconds. Exact single-topic captures may be quiet;
   broad regex is the recommended smoke test.
-- `--format openbmp-len` (`.obmp`) parser is **implemented and verified**.
-  Captured `.obmp` files parse correctly: 100 Route Monitoring messages,
+- `--format bmpd` (`.bmpd`) parser is **implemented and verified**.
+  Captured `.bmpd` files parse correctly: 100 Route Monitoring messages,
   18 peers, 29 BGP elements. RouteViews Kafka `*.bmp_raw` payloads are
   OpenBMP `OBMP`-wrapped, not raw RFC 7854. BMPDoctor's OpenBMP unwrap
   uses `bgpkit_parser::parse_openbmp_header` to strip the wrapper,
   then passes the inner RFC 7854 BMP frame to our existing parser.
-- Our `.obmp` is a local capture container (`BMPDOPENBMP1\n` magic +
+- Our `.bmpd` is a local capture container (`BMPDOPENBMP1\n` magic +
   `u32` BE length prefix). `OBMP` is the upstream OpenBMP wrapper
   inside each RouteViews Kafka payload.
 
@@ -82,11 +82,11 @@ Metadata for all topics (from broker -1: stream.routeviews.org:9092/bootstrap):
 cargo run --bin record_openbmp_kafka -- \
   --broker stream.routeviews.org:9092 \
   --topic-regex '^routeviews.*\.bmp_raw$' \
-  --out samples/routeviews-broad-100.obmp \
+  --out samples/routeviews-broad-100.bmpd \
   --max-messages 100 \
   --max-seconds 60 \
   --from-end
 ```
 
 **Observed result:** messages_written=100, bytes_written=27630,
-duration_secs=4, output_path=samples/routeviews-broad-100.obmp.
+duration_secs=4, output_path=samples/routeviews-broad-100.bmpd.
