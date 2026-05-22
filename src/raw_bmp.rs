@@ -174,6 +174,62 @@ pub struct RawBmpFrame {
     pub full_data: Vec<u8>,
 }
 
+/// Parse a single raw BMP frame from a byte slice.
+/// `file_offset` is the byte offset within the source file where this frame begins.
+pub fn parse_frame_from_bytes(data: &[u8], file_offset: u64) -> Result<RawBmpFrame, DoctorError> {
+    if data.len() < BMP_COMMON_HEADER_SIZE {
+        return Err(DoctorError::Frame(format!(
+            "Incomplete BMP common header at offset {file_offset}: need {BMP_COMMON_HEADER_SIZE} bytes, have {}",
+            data.len()
+        )));
+    }
+
+    let version = data[0];
+    let msg_len = u32::from_be_bytes([data[1], data[2], data[3], data[4]]);
+    let msg_type_raw = data[5];
+    let msg_type = BmpMessageType::from_u8(msg_type_raw);
+
+    if msg_len < BMP_COMMON_HEADER_SIZE as u32 {
+        return Err(DoctorError::Frame(format!(
+            "Invalid BMP message length {msg_len} at offset {file_offset}: must be >= {BMP_COMMON_HEADER_SIZE}"
+        )));
+    }
+
+    let total = msg_len as usize;
+    if data.len() < total {
+        return Err(DoctorError::Frame(format!(
+            "Truncated BMP frame at offset {file_offset}: declared length {msg_len} exceeds available {} bytes",
+            data.len()
+        )));
+    }
+
+    let payload = &data[BMP_COMMON_HEADER_SIZE..total];
+
+    let per_peer_header = if let Some(mt) = msg_type {
+        if mt.has_per_peer_header() {
+            PerPeerHeader::parse(payload)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let mut full_data = Vec::with_capacity(total);
+    full_data.extend_from_slice(&data[..total]);
+
+    Ok(RawBmpFrame {
+        offset: file_offset,
+        version,
+        msg_len,
+        msg_type_raw,
+        msg_type,
+        per_peer_header,
+        payload: payload.to_vec(),
+        full_data,
+    })
+}
+
 pub struct RawBmpIterator {
     reader: BufReader<File>,
     offset: u64,
@@ -490,7 +546,6 @@ mod tests {
     #[test]
     fn test_raw_bmp_iterator_truncated_frame() {
         let bad = fixtures::make_truncated_frame();
-
         let mut tmp = tempfile::NamedTempFile::new().unwrap();
         tmp.write_all(&bad).unwrap();
         let path = tmp.into_temp_path();

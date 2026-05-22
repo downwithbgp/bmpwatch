@@ -4,8 +4,9 @@ use bytes::Bytes;
 
 use crate::error::DoctorError;
 use crate::event::{emit_jsonl, JsonlEvent};
-use crate::input;
+use crate::input::{self, InputFormat};
 use crate::lint;
+use crate::obmp_reader::ObmpReader;
 use crate::raw_bmp::{
     BmpMessageType, PerPeerHeader, RawBmpFrame, RawBmpIterator, BMP_EXPECTED_VERSION,
     BMP_PER_PEER_HEADER_SIZE,
@@ -17,22 +18,43 @@ pub struct Doctor {
     pub events: Vec<JsonlEvent>,
     max_findings: usize,
     findings_truncated: bool,
+    format: InputFormat,
 }
 
 const DEFAULT_MAX_FINDINGS: usize = 1000;
 
+enum FrameSource {
+    RawBmp(RawBmpIterator),
+    Obmp(ObmpReader),
+}
+
+impl Iterator for FrameSource {
+    type Item = Result<RawBmpFrame, DoctorError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            FrameSource::RawBmp(iter) => iter.next(),
+            FrameSource::Obmp(reader) => reader.next(),
+        }
+    }
+}
+
 impl Doctor {
     #[allow(dead_code)]
     pub fn new(file_path: &Path) -> Result<Self, DoctorError> {
-        Self::with_max_findings(file_path, DEFAULT_MAX_FINDINGS)
+        Self::with_max_findings(file_path, DEFAULT_MAX_FINDINGS, InputFormat::RawBmp)
     }
 
-    pub fn with_max_findings(file_path: &Path, max_findings: usize) -> Result<Self, DoctorError> {
-        let (file_size, format) = input::file_size_and_format(file_path)?;
+    pub fn with_max_findings(
+        file_path: &Path,
+        max_findings: usize,
+        format: InputFormat,
+    ) -> Result<Self, DoctorError> {
+        let (file_size, format_str) = input::file_size_and_format(file_path, format)?;
         let state = DoctorState {
             file_path: file_path.to_string_lossy().to_string(),
             file_size,
-            format,
+            format: format_str,
             ..Default::default()
         };
         Ok(Doctor {
@@ -40,6 +62,7 @@ impl Doctor {
             events: Vec::new(),
             max_findings,
             findings_truncated: false,
+            format,
         })
     }
 
@@ -57,7 +80,12 @@ impl Doctor {
     }
 
     pub fn process(&mut self, collect_events: bool) -> Result<(), DoctorError> {
-        let iter = RawBmpIterator::open(&self.state.file_path)?;
+        let iter: FrameSource = match self.format {
+            InputFormat::RawBmp => {
+                FrameSource::RawBmp(RawBmpIterator::open(&self.state.file_path)?)
+            }
+            InputFormat::OpenBmpLen => FrameSource::Obmp(ObmpReader::open(&self.state.file_path)?),
+        };
 
         for frame_result in iter {
             match frame_result {
@@ -619,7 +647,7 @@ mod tests {
         let path = tmp.into_temp_path();
 
         // Each invalid-version frame generates 1 finding. Cap at 2.
-        let mut doctor = Doctor::with_max_findings(&path, 2).unwrap();
+        let mut doctor = Doctor::with_max_findings(&path, 2, InputFormat::RawBmp).unwrap();
         doctor.process(false).unwrap();
 
         assert_eq!(doctor.state.findings.len(), 2);
@@ -636,7 +664,7 @@ mod tests {
         let path = tmp.into_temp_path();
 
         // Cap at 0: all findings dropped.
-        let mut doctor = Doctor::with_max_findings(&path, 0).unwrap();
+        let mut doctor = Doctor::with_max_findings(&path, 0, InputFormat::RawBmp).unwrap();
         doctor.process(false).unwrap();
 
         assert_eq!(doctor.state.findings.len(), 0);

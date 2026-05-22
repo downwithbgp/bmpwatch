@@ -5,6 +5,7 @@ use clap::{Parser, Subcommand};
 
 use crate::doctor::Doctor;
 use crate::event::max_exit_code;
+use crate::input::InputFormat;
 use crate::report;
 
 const DEFAULT_MAX_FINDINGS: usize = 1000;
@@ -28,6 +29,9 @@ pub enum Command {
         /// Output machine-readable JSON summary instead of text
         #[arg(long)]
         summary_json: bool,
+        /// Input format: raw-bmp (default) or openbmp-len
+        #[arg(long, default_value = "raw-bmp")]
+        format: InputFormat,
     },
     /// Machine-oriented lint output with exit codes
     Lint {
@@ -36,6 +40,9 @@ pub enum Command {
         /// Cap findings at N (default 1000)
         #[arg(long, default_value_t = DEFAULT_MAX_FINDINGS)]
         max_findings: usize,
+        /// Input format: raw-bmp (default) or openbmp-len
+        #[arg(long, default_value = "raw-bmp")]
+        format: InputFormat,
     },
     /// Debug/development JSONL output
     Dump {
@@ -47,6 +54,9 @@ pub enum Command {
         /// Cap findings at N (default 1000)
         #[arg(long, default_value_t = DEFAULT_MAX_FINDINGS)]
         max_findings: usize,
+        /// Input format: raw-bmp (default) or openbmp-len
+        #[arg(long, default_value = "raw-bmp")]
+        format: InputFormat,
     },
 }
 
@@ -58,8 +68,9 @@ pub fn run() {
             file,
             max_findings,
             summary_json,
+            format,
         } => {
-            let mut doctor = match Doctor::with_max_findings(&file, max_findings.max(1)) {
+            let mut doctor = match Doctor::with_max_findings(&file, max_findings.max(1), format) {
                 Ok(d) => d,
                 Err(e) => {
                     eprintln!("Error opening file: {e}");
@@ -76,8 +87,12 @@ pub fn run() {
                 report::render_inspect(&doctor.state, doctor.was_truncated());
             }
         }
-        Command::Lint { file, max_findings } => {
-            let mut doctor = match Doctor::with_max_findings(&file, max_findings.max(1)) {
+        Command::Lint {
+            file,
+            max_findings,
+            format,
+        } => {
+            let mut doctor = match Doctor::with_max_findings(&file, max_findings.max(1), format) {
                 Ok(d) => d,
                 Err(e) => {
                     eprintln!("Error opening file: {e}");
@@ -99,8 +114,9 @@ pub fn run() {
             file,
             jsonl: true,
             max_findings,
+            format,
         } => {
-            let mut doctor = match Doctor::with_max_findings(&file, max_findings.max(1)) {
+            let mut doctor = match Doctor::with_max_findings(&file, max_findings.max(1), format) {
                 Ok(d) => d,
                 Err(e) => {
                     eprintln!("Error opening file: {e}");
