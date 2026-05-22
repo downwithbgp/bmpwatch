@@ -3,3 +3,4 @@
 fixture*.bin
 samples/*.bmpd
 samples/*.obmp
+samples/*.rawbmp

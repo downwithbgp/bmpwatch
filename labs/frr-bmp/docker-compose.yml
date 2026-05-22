@@ -1,0 +1,50 @@
+services:
+  frr1:
+    image: frrouting/frr:latest
+    container_name: frr1
+    hostname: frr1
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./frr1/daemons:/etc/frr/daemons:ro
+      - ./frr1/frr.conf:/etc/frr/frr.conf:ro
+    networks:
+      bmp-net:
+        ipv4_address: 172.30.0.2
+    restart: unless-stopped
+
+  frr2:
+    image: frrouting/frr:latest
+    container_name: frr2
+    hostname: frr2
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./frr2/daemons:/etc/frr/daemons:ro
+      - ./frr2/frr.conf:/etc/frr/frr.conf:ro
+    networks:
+      bmp-net:
+        ipv4_address: 172.30.0.3
+    restart: unless-stopped
+
+  bmp-capture:
+    image: alpine:latest
+    container_name: bmp-capture
+    command: >
+      sh -c "apk add --no-cache socat &&
+             socat TCP-LISTEN:1790,reuseaddr,fork OPEN:/samples/frr-smoke.rawbmp,creat,append"
+    volumes:
+      - ../../samples:/samples
+    networks:
+      bmp-net:
+        ipv4_address: 172.30.0.10
+    restart: unless-stopped
+
+networks:
+  bmp-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
