@@ -769,4 +769,26 @@ mod tests {
         assert_eq!(term.termination_reason, Some(2));
         assert!(crate::raw_bmp::termination_reason_name(2).contains("closed"));
     }
+
+    #[test]
+    fn test_init_term_tlv_rawbmp_fixture() {
+        // Read-only regression test against raw BMP fixture (no container)
+        let mut doctor = Doctor::with_max_findings(
+            Path::new("tests/fixtures/init-term-tlvs.rawbmp"),
+            1000,
+            InputFormat::RawBmp,
+        )
+        .unwrap();
+        doctor.process(false).unwrap();
+
+        assert_eq!(doctor.state.total_messages, 2);
+        assert_eq!(doctor.state.malformed_messages, 0);
+
+        let init = doctor.state.initiation_info.as_ref().unwrap();
+        assert_eq!(init.strings[0].value, "FRRouting");
+        assert_eq!(init.strings[1].value, "bmp-speaker");
+
+        let term = doctor.state.termination_info.as_ref().unwrap();
+        assert_eq!(term.termination_reason, Some(2));
+    }
 }

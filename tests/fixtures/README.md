@@ -39,3 +39,20 @@ bgpkit-parser's `parse_openbmp_header`.
 TLV decoding (sysDescr, sysName, termination reason names).
 
 **Validated by:** `doctor::tests::test_init_term_tlv_fixture`
+
+## `init-term-tlvs.rawbmp`
+
+| Property | Value |
+|----------|-------|
+| Container | None — concatenated raw RFC 7854 BMP frames |
+| Records | 2 |
+| Payload type | Raw BMP |
+| Record 1 | Initiation Message: sysDescr `FRRouting`, sysName `bmp-speaker` |
+| Record 2 | Termination Message: reason code 2 (Administratively closed) |
+| Size | 46 bytes |
+
+**Purpose:** Regression test for raw BMP input (`--format raw-bmp`) with
+auto-detection and RFC 7854 TLV decoding. Mirrors `init-term-tlvs.bmpd`
+without the `.bmpd` container framing.
+
+**Validated by:** `doctor::tests::test_init_term_tlv_rawbmp_fixture`
