@@ -1,4 +1,4 @@
-use crate::raw_bmp::BmpMessageType;
+use crate::raw_bmp::{termination_reason_name, BmpMessageType};
 use crate::state::{DoctorState, Finding, Severity};
 use serde::Serialize;
 
@@ -217,7 +217,10 @@ pub fn render_inspect(state: &DoctorState, truncated: bool, max_peers: usize) {
         println!();
         println!("Termination info:");
         if let Some(reason) = tlv.termination_reason {
-            println!("  Reason code: {reason}");
+            println!(
+                "  Reason: {} (code {reason})",
+                termination_reason_name(reason)
+            );
         }
         for s in &tlv.strings {
             println!("  {}: {}", s.type_name, s.value);

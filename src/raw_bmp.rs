@@ -202,6 +202,20 @@ fn init_tlv_name(t: u16) -> &'static str {
     }
 }
 
+/// Known BMP Termination reason code names (RFC 7854 Section 3.8 + IANA BMP Parameters).
+pub fn termination_reason_name(code: u16) -> &'static str {
+    match code {
+        0 => "Reserved",
+        1 => "Administratively prohibited",
+        2 => "Administratively closed",
+        3 => "Unspecified",
+        4 => "Out of resources",
+        5 => "Redundant connection",
+        6 => "Permanently administratively prohibited",
+        _ => "Unknown",
+    }
+}
+
 /// Parse Information TLVs from Initiation or Termination message payload.
 /// RFC 7854, Section 3.7: TLV format is Type(2) + Length(2) + Value(variable).
 fn parse_tlvs(payload: &[u8], msg_type: BmpMessageType) -> Option<TlvInfo> {
@@ -727,6 +741,13 @@ mod tests {
         let tlv = frame.tlv_info.as_ref().unwrap();
         assert_eq!(tlv.termination_reason, Some(2));
         assert!(tlv.strings.is_empty());
+    }
+
+    #[test]
+    fn test_termination_reason_names() {
+        assert_eq!(termination_reason_name(1), "Administratively prohibited");
+        assert_eq!(termination_reason_name(2), "Administratively closed");
+        assert_eq!(termination_reason_name(999), "Unknown");
     }
 
     #[test]
