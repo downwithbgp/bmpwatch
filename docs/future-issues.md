@@ -129,3 +129,18 @@ Collect or generate a set of BMP fixture files covering:
 - All BMP message types (0–6)
 
 Store in `tests/fixtures/` with metadata describing expected behavior.
+
+---
+
+## 5. PCAP / PCAPNG support
+
+**Status:** Deferred  
+**Scope:** `--format pcap` for BMP-over-TCP packet captures
+
+BMP runs over TCP, so PCAP support requires TCP stream reassembly before
+BMP frame parsing. This adds significant complexity (segment reordering,
+retransmission handling, flow selection). See
+[docs/pcap-support.md](pcap-support.md) for a full design assessment.
+
+**Near-term workflow:** Extract BMP TCP stream payloads to `.rawbmp` using
+external tools (`tshark`, `tcpflow`), then run BMPDoctor normally.

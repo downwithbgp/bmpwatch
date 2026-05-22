@@ -368,6 +368,8 @@ network (see [verification log](docs/caida-kafka-verification.md)).
 ### Future
 
 - RouteViews `bgpreader` PSV comparison tooling
+- PCAP/PCAPNG support (deferred; use external tools to extract BMP TCP
+  streams to `.rawbmp` — see [PCAP support note](docs/pcap-support.md))
 - Prometheus metrics export
 - Parquet export
 
