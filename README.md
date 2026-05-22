@@ -51,7 +51,40 @@ cargo test obmp_reader::tests::test_committed_fixture_two_openbmp_records
 Verifies that the committed 2-record `.obmp` fixture (PeerUp + RouteMonitoring,
 both OpenBMP-wrapped) parses correctly without network dependency.
 
-### Smoke test (RouteViews live capture)
+### Offline smoke test (committed fixture, no network)
+
+```sh
+cargo run --bin bmpdoctor -- \
+  inspect tests/fixtures/openbmp-two-records.obmp --summary-json
+```
+
+Expected: `malformed_messages=0`, `total_messages=2`, `container.container_records=2`,
+`container.openbmp_wrapped_payloads=2`, `container.openbmp_metadata` present.
+
+Shell one-liner (exits 0 on pass, 1 on failure):
+
+```sh
+cargo run --bin bmpdoctor -- \
+  inspect tests/fixtures/openbmp-two-records.obmp --summary-json \
+  | python3 -c "
+import json,sys; d=json.load(sys.stdin);
+ok = d['malformed_messages']==0 and d['total_messages']==2 \
+     and d['container']['container_records']==2 \
+     and d['container']['openbmp_wrapped_payloads']==2 \
+     and 'openbmp_metadata' in d['container'];
+print('PASS' if ok else 'FAIL'); sys.exit(0 if ok else 1)
+"
+```
+
+Also available as a unit test:
+
+```sh
+cargo test obmp_reader::tests::test_committed_fixture_two_openbmp_records
+```
+
+Verifies the same fixture parses correctly without network dependency.
+
+### RouteViews smoke test (live capture, network required)
 
 The 2-step workflow to verify end-to-end health against real RouteViews data:
 
@@ -67,6 +100,8 @@ cargo run --bin bmpdoctor -- \
 
 Pass condition: `malformed_messages == 0`. Warnings from mid-stream capture
 (typically `stream_order_warnings`) are expected observations, not failures.
+Unlike the offline smoke test, this requires network access to
+`stream.routeviews.org:9092` and may produce stream-order warnings.
 See [Real-sample validation](docs/real-sample-validation.md) for an example
 of expected output with 106 warnings / 0 parse errors.
 
