@@ -56,3 +56,30 @@ auto-detection and RFC 7854 TLV decoding. Mirrors `init-term-tlvs.bmpd`
 without the `.bmpd` container framing.
 
 **Validated by:** `doctor::tests::test_init_term_tlv_rawbmp_fixture`
+
+## Manual validation
+
+All fixtures can be inspected offline with `bmpdoctor`. These are
+deterministic checks — no network required.
+
+```sh
+# OpenBMP-wrapped in .bmpd container
+cargo run --bin bmpdoctor -- \
+  inspect tests/fixtures/openbmp-two-records.bmpd --summary-json
+# Expected: total_messages=2, malformed_messages=0,
+#   container_records=2, openbmp_wrapped_payloads=2, metadata present
+
+# Raw BMP in .bmpd container
+cargo run --bin bmpdoctor -- \
+  inspect tests/fixtures/init-term-tlvs.bmpd --summary-json
+# Expected: total_messages=2, malformed_messages=0,
+#   Initiation info: sysDescr/bmp-speaker,
+#   Termination info: Reason Administratively closed (code 2)
+
+# Raw BMP frames (no container)
+cargo run --bin bmpdoctor -- \
+  inspect tests/fixtures/init-term-tlvs.rawbmp --summary-json
+# Expected: total_messages=2, malformed_messages=0,
+#   format auto-detected as raw-bmp,
+#   Initiation/Termination TLV output same as .bmpd variant
+```
