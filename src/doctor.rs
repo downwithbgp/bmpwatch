@@ -122,6 +122,7 @@ impl Doctor {
                             0,
                             "malformed",
                             0,
+                            None,
                             &[finding],
                         );
                         self.events.push(event);
@@ -255,6 +256,22 @@ impl Doctor {
             }
         }
 
+        // Collect Initiation / Termination TLV info from the first
+        // such message encountered.
+        if let Some(ref tlv) = frame.tlv_info {
+            match frame.msg_type {
+                Some(BmpMessageType::InitiationMessage) if self.state.initiation_info.is_none() => {
+                    self.state.initiation_info = Some(tlv.clone());
+                }
+                Some(BmpMessageType::TerminationMessage)
+                    if self.state.termination_info.is_none() =>
+                {
+                    self.state.termination_info = Some(tlv.clone());
+                }
+                _ => {}
+            }
+        }
+
         for f in &frame_findings {
             self.push_finding(f.clone());
         }
@@ -274,6 +291,7 @@ impl Doctor {
                 frame.msg_len,
                 parse_status,
                 bgp_elems_count,
+                frame.tlv_info.as_ref(),
                 &frame_findings,
             );
             self.events.push(event);

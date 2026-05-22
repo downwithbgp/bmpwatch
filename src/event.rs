@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::raw_bmp::BmpMessageType;
+use crate::raw_bmp::{BmpMessageType, TlvInfo};
 use crate::state::{Finding, PeerKey};
 
 #[derive(Debug, Clone, Serialize)]
@@ -16,6 +16,8 @@ pub struct JsonlEvent {
     pub message_length: u32,
     pub parse_status: String,
     pub bgp_elems_count: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tlv_info: Option<TlvInfo>,
     pub findings: Vec<JsonlFinding>,
 }
 
@@ -37,6 +39,7 @@ impl JsonlEvent {
         msg_len: u32,
         parse_status: &str,
         bgp_elems_count: u64,
+        tlv_info: Option<&TlvInfo>,
         findings: &[Finding],
     ) -> Self {
         let (ts_sec, ts_us) = timestamp.unwrap_or((0, 0));
@@ -52,6 +55,7 @@ impl JsonlEvent {
             message_length: msg_len,
             parse_status: parse_status.to_string(),
             bgp_elems_count,
+            tlv_info: tlv_info.cloned(),
             findings: findings
                 .iter()
                 .map(|f| JsonlFinding {

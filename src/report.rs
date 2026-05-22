@@ -203,6 +203,27 @@ pub fn render_inspect(state: &DoctorState, truncated: bool, max_peers: usize) {
         }
     }
 
+    if let Some(ref tlv) = state.initiation_info {
+        if !tlv.strings.is_empty() {
+            println!();
+            println!("Initiation info:");
+            for s in &tlv.strings {
+                println!("  {}: {}", s.type_name, s.value);
+            }
+        }
+    }
+
+    if let Some(ref tlv) = state.termination_info {
+        println!();
+        println!("Termination info:");
+        if let Some(reason) = tlv.termination_reason {
+            println!("  Reason code: {reason}");
+        }
+        for s in &tlv.strings {
+            println!("  {}: {}", s.type_name, s.value);
+        }
+    }
+
     println!();
     println!("Findings summary:");
 

@@ -2,6 +2,7 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 
 use crate::obmp_reader::ContainerStats;
+use crate::raw_bmp::TlvInfo;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub struct PeerKey {
@@ -89,4 +90,6 @@ pub struct DoctorState {
     pub findings_dropped: u64,
     pub bgp_elem_count: u64,
     pub container_stats: ContainerStats,
+    pub initiation_info: Option<TlvInfo>,
+    pub termination_info: Option<TlvInfo>,
 }

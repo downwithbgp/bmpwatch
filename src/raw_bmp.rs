@@ -172,6 +172,100 @@ pub struct RawBmpFrame {
     pub per_peer_header: Option<PerPeerHeader>,
     pub payload: Vec<u8>,
     pub full_data: Vec<u8>,
+    pub tlv_info: Option<TlvInfo>,
+}
+
+/// BMP Information TLV entry (RFC 7854, Sections 3.7–3.8).
+/// Used by Initiation and Termination messages.
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub struct TlvInfo {
+    /// Known information strings (sysDescr, sysName, etc.).
+    pub strings: Vec<TlvString>,
+    /// Termination reason code, if present (type=1, 2-byte value).
+    pub termination_reason: Option<u16>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TlvString {
+    pub tlv_type: u16,
+    pub type_name: String,
+    pub value: String,
+}
+
+/// Known Initiation TLV type names (RFC 7854 + IANA BMP Parameters).
+fn init_tlv_name(t: u16) -> &'static str {
+    match t {
+        0 => "String",
+        1 => "sysDescr",
+        2 => "sysName",
+        _ => "Unknown",
+    }
+}
+
+/// Parse Information TLVs from Initiation or Termination message payload.
+/// RFC 7854, Section 3.7: TLV format is Type(2) + Length(2) + Value(variable).
+fn parse_tlvs(payload: &[u8], msg_type: BmpMessageType) -> Option<TlvInfo> {
+    if payload.len() < 4 {
+        return None;
+    }
+
+    let mut strings = Vec::new();
+    let mut termination_reason = None;
+    let mut pos = 0;
+
+    while pos + 4 <= payload.len() {
+        let tlv_type = u16::from_be_bytes([payload[pos], payload[pos + 1]]);
+        let tlv_len = u16::from_be_bytes([payload[pos + 2], payload[pos + 3]]) as usize;
+        pos += 4;
+
+        if pos + tlv_len > payload.len() {
+            // Truncated TLV — stop parsing, what we have is valid
+            break;
+        }
+
+        let value = &payload[pos..pos + tlv_len];
+        pos += tlv_len;
+
+        match msg_type {
+            BmpMessageType::InitiationMessage => {
+                let type_name = init_tlv_name(tlv_type).to_string();
+                if let Ok(s) = std::str::from_utf8(value) {
+                    strings.push(TlvString {
+                        tlv_type,
+                        type_name,
+                        value: s.trim_end_matches('\0').to_string(),
+                    });
+                } else {
+                    strings.push(TlvString {
+                        tlv_type,
+                        type_name,
+                        value: format!("(non-UTF8, {tlv_len} bytes)"),
+                    });
+                }
+            }
+            BmpMessageType::TerminationMessage => {
+                if tlv_type == 1 && value.len() >= 2 {
+                    termination_reason = Some(u16::from_be_bytes([value[0], value[1]]));
+                } else if let Ok(s) = std::str::from_utf8(value) {
+                    strings.push(TlvString {
+                        tlv_type,
+                        type_name: if tlv_type == 0 { "String" } else { "Unknown" }.to_string(),
+                        value: s.trim_end_matches('\0').to_string(),
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if strings.is_empty() && termination_reason.is_none() {
+        None
+    } else {
+        Some(TlvInfo {
+            strings,
+            termination_reason,
+        })
+    }
 }
 
 /// Parse a single raw BMP frame from a byte slice.
@@ -215,6 +309,13 @@ pub fn parse_frame_from_bytes(data: &[u8], file_offset: u64) -> Result<RawBmpFra
         None
     };
 
+    let tlv_info = match msg_type {
+        Some(BmpMessageType::InitiationMessage | BmpMessageType::TerminationMessage) => {
+            parse_tlvs(payload, msg_type.unwrap())
+        }
+        _ => None,
+    };
+
     let mut full_data = Vec::with_capacity(total);
     full_data.extend_from_slice(&data[..total]);
 
@@ -227,6 +328,7 @@ pub fn parse_frame_from_bytes(data: &[u8], file_offset: u64) -> Result<RawBmpFra
         per_peer_header,
         payload: payload.to_vec(),
         full_data,
+        tlv_info,
     })
 }
 
@@ -301,6 +403,13 @@ impl Iterator for RawBmpIterator {
         full_data.extend_from_slice(&header_buf);
         full_data.extend_from_slice(&payload);
 
+        let tlv_info = match msg_type {
+            Some(BmpMessageType::InitiationMessage | BmpMessageType::TerminationMessage) => {
+                parse_tlvs(&payload, msg_type.unwrap())
+            }
+            _ => None,
+        };
+
         Some(Ok(RawBmpFrame {
             offset: frame_offset,
             version,
@@ -310,6 +419,7 @@ impl Iterator for RawBmpIterator {
             per_peer_header,
             payload,
             full_data,
+            tlv_info,
         }))
     }
 }
@@ -583,5 +693,81 @@ mod tests {
         assert_eq!(frames.len(), 1);
         assert_eq!(frames[0].msg_type, Some(BmpMessageType::InitiationMessage));
         assert!(frames[0].per_peer_header.is_none());
+    }
+
+    #[test]
+    fn test_parse_initiation_tlvs() {
+        // Build Initiation message with sysDescr (type=1) and sysName (type=2)
+        let sys_descr = b"FRRouting 8.5.1";
+        let sys_name = b"bmp-speaker";
+
+        let tlv1 = make_tlv(1, sys_descr);
+        let tlv2 = make_tlv(2, sys_name);
+        let payload = [tlv1, tlv2].concat();
+
+        let frame = make_bmp_message(4, &payload);
+        let frame = parse_frame_from_bytes(&frame, 0).unwrap();
+        assert_eq!(frame.msg_type, Some(BmpMessageType::InitiationMessage));
+        let tlv = frame.tlv_info.as_ref().unwrap();
+        assert_eq!(tlv.strings.len(), 2);
+        assert_eq!(tlv.strings[0].tlv_type, 1);
+        assert_eq!(tlv.strings[0].value, "FRRouting 8.5.1");
+        assert_eq!(tlv.strings[1].tlv_type, 2);
+        assert_eq!(tlv.strings[1].value, "bmp-speaker");
+    }
+
+    #[test]
+    fn test_parse_termination_tlv_reason() {
+        // Build Termination message with reason TLV (type=1, 2-byte value)
+        let reason: u16 = 2; // Administrative shutdown
+        let tlv = make_tlv(1, &reason.to_be_bytes());
+        let payload = tlv;
+        let frame = make_bmp_message(5, &payload);
+        let frame = parse_frame_from_bytes(&frame, 0).unwrap();
+        let tlv = frame.tlv_info.as_ref().unwrap();
+        assert_eq!(tlv.termination_reason, Some(2));
+        assert!(tlv.strings.is_empty());
+    }
+
+    #[test]
+    fn test_parse_tlvs_truncated() {
+        // TLV with declared length exceeding available data
+        let mut payload = vec![0u8; 8];
+        payload[0..2].copy_from_slice(&1u16.to_be_bytes()); // type=sysDescr
+        payload[2..4].copy_from_slice(&100u16.to_be_bytes()); // len=100, only 4 bytes available
+        let frame = make_bmp_message(4, &payload);
+        // Should not panic, just return None for tlv_info
+        let frame = parse_frame_from_bytes(&frame, 0).unwrap();
+        assert!(frame.tlv_info.is_none());
+    }
+
+    #[test]
+    fn test_parse_tlvs_unknown_type() {
+        let tlv = make_tlv(99, b"unknown data");
+        let payload = tlv;
+        let frame = make_bmp_message(4, &payload);
+        let frame = parse_frame_from_bytes(&frame, 0).unwrap();
+        let tlv = frame.tlv_info.as_ref().unwrap();
+        assert_eq!(tlv.strings.len(), 1);
+        assert_eq!(tlv.strings[0].type_name, "Unknown");
+        assert_eq!(tlv.strings[0].tlv_type, 99);
+    }
+
+    fn make_tlv(t: u16, value: &[u8]) -> Vec<u8> {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&t.to_be_bytes());
+        buf.extend_from_slice(&(value.len() as u16).to_be_bytes());
+        buf.extend_from_slice(value);
+        buf
+    }
+
+    fn make_bmp_message(msg_type: u8, payload: &[u8]) -> Vec<u8> {
+        let mut buf = Vec::new();
+        buf.push(3); // version
+        let msg_len = (6 + payload.len()) as u32;
+        buf.extend_from_slice(&msg_len.to_be_bytes());
+        buf.push(msg_type);
+        buf.extend_from_slice(payload);
+        buf
     }
 }
