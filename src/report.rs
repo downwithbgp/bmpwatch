@@ -172,6 +172,25 @@ struct InspectSummary<'a> {
     error_count: usize,
     findings_truncated: bool,
     findings_dropped_count: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    container: Option<ContainerSummary>,
+}
+
+#[derive(Serialize)]
+struct ContainerSummary {
+    container_records: u64,
+    raw_bmp_payloads: u64,
+    openbmp_wrapped_payloads: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    unrecognized_payloads: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    openbmp_unwrap_errors: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    inner_bmp_parse_errors: u64,
+}
+
+fn is_zero(v: &u64) -> bool {
+    *v == 0
 }
 
 pub fn render_inspect_json(state: &DoctorState, truncated: bool) {
@@ -210,6 +229,19 @@ pub fn render_inspect_json(state: &DoctorState, truncated: bool) {
         None
     };
 
+    let container = if state.container_stats.has_data() {
+        Some(ContainerSummary {
+            container_records: state.container_stats.container_records,
+            raw_bmp_payloads: state.container_stats.raw_bmp_payloads,
+            openbmp_wrapped_payloads: state.container_stats.openbmp_wrapped_payloads,
+            unrecognized_payloads: state.container_stats.unrecognized_payloads,
+            openbmp_unwrap_errors: state.container_stats.openbmp_unwrap_errors,
+            inner_bmp_parse_errors: state.container_stats.inner_bmp_parse_errors,
+        })
+    } else {
+        None
+    };
+
     let summary = InspectSummary {
         file: &state.file_path,
         format: &state.format,
@@ -225,6 +257,7 @@ pub fn render_inspect_json(state: &DoctorState, truncated: bool) {
         error_count,
         findings_truncated: truncated,
         findings_dropped_count: state.findings_dropped,
+        container,
     };
 
     let json = serde_json::to_string_pretty(&summary)

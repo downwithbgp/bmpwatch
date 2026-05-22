@@ -8,6 +8,31 @@ use crate::error::DoctorError;
 use crate::obmp_writer::MAGIC;
 use crate::raw_bmp::{parse_frame_from_bytes, RawBmpFrame};
 
+/// Payload classification for `.obmp` container records.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PayloadKind {
+    RawBmp,
+    OpenBmpWrapped,
+    Unrecognized,
+}
+
+/// Container-level statistics for `.obmp` files.
+#[derive(Debug, Clone, Default)]
+pub struct ContainerStats {
+    pub container_records: u64,
+    pub raw_bmp_payloads: u64,
+    pub openbmp_wrapped_payloads: u64,
+    pub unrecognized_payloads: u64,
+    pub openbmp_unwrap_errors: u64,
+    pub inner_bmp_parse_errors: u64,
+}
+
+impl ContainerStats {
+    pub fn has_data(&self) -> bool {
+        self.container_records > 0
+    }
+}
+
 /// Unwrap an OpenBMP header from a payload and return the inner raw BMP bytes.
 ///
 /// RouteViews Kafka `*.bmp_raw` messages start with an OpenBMP wrapper
@@ -39,6 +64,8 @@ fn try_unwrap_openbmp(payload: &[u8]) -> Result<Vec<u8>, String> {
 
 /// Parse a record payload that may be raw BMP or OpenBMP-wrapped.
 ///
+/// Returns the parsed frame (or error) and the payload kind for container stats.
+///
 /// - If payload starts with `0x03` (BMP version 3), parse as raw BMP.
 /// - If payload starts with `OBMP`, strip the OpenBMP header and parse inner BMP.
 /// - Otherwise, report malformed.
@@ -46,42 +73,68 @@ fn parse_record_payload(
     payload: &[u8],
     frame_offset: u64,
     frame_index: u64,
-) -> Result<RawBmpFrame, DoctorError> {
+) -> (Result<RawBmpFrame, DoctorError>, PayloadKind) {
     if payload.is_empty() {
-        return Err(DoctorError::Frame(format!(
-            ".obmp frame {frame_index} at offset {frame_offset}: empty payload"
-        )));
+        return (
+            Err(DoctorError::Frame(format!(
+                ".obmp frame {frame_index} at offset {frame_offset}: empty payload"
+            ))),
+            PayloadKind::Unrecognized,
+        );
     }
 
-    let inner = if payload[0] == 0x03 {
-        // Raw BMP frame — parse directly
-        payload.to_vec()
+    let kind = if payload[0] == 0x03 {
+        PayloadKind::RawBmp
     } else if payload.len() >= 4 && &payload[..4] == b"OBMP" {
-        // OpenBMP-wrapped — strip header
-        match try_unwrap_openbmp(payload) {
-            Ok(bytes) => bytes,
-            Err(msg) => {
-                return Err(DoctorError::Frame(format!(
-                    ".obmp frame {frame_index} at offset {frame_offset}: {msg}"
-                )));
-            }
-        }
+        PayloadKind::OpenBmpWrapped
     } else {
-        return Err(DoctorError::Frame(format!(
-            ".obmp frame {frame_index} at offset {frame_offset}: unrecognized payload (first byte 0x{:02x})",
-            payload[0]
-        )));
+        PayloadKind::Unrecognized
     };
 
-    match parse_frame_from_bytes(&inner, frame_offset) {
-        Ok(mut frame) => {
-            frame.offset = frame_offset;
-            Ok(frame)
+    let result = match kind {
+        PayloadKind::RawBmp => {
+            // Parse directly
+            parse_frame_from_bytes(payload, frame_offset)
+                .map(|mut frame| {
+                    frame.offset = frame_offset;
+                    frame
+                })
+                .map_err(|e| {
+                    DoctorError::Frame(format!(
+                        ".obmp frame {frame_index} at offset {frame_offset}: {e}"
+                    ))
+                })
         }
-        Err(e) => Err(DoctorError::Frame(format!(
-            ".obmp frame {frame_index} at offset {frame_offset}: {e}"
-        ))),
-    }
+        PayloadKind::OpenBmpWrapped => {
+            match try_unwrap_openbmp(payload) {
+                Ok(inner) => {
+                    parse_frame_from_bytes(&inner, frame_offset)
+                        .map(|mut frame| {
+                            frame.offset = frame_offset;
+                            frame
+                        })
+                        .map_err(|e| {
+                            DoctorError::Frame(format!(
+                                ".obmp frame {frame_index} at offset {frame_offset}: {e}"
+                            ))
+                        })
+                }
+                Err(msg) => {
+                    Err(DoctorError::Frame(format!(
+                        ".obmp frame {frame_index} at offset {frame_offset}: {msg}"
+                    )))
+                }
+            }
+        }
+        PayloadKind::Unrecognized => {
+            Err(DoctorError::Frame(format!(
+                ".obmp frame {frame_index} at offset {frame_offset}: unrecognized payload (first byte 0x{:02x})",
+                payload[0]
+            )))
+        }
+    };
+
+    (result, kind)
 }
 
 #[derive(Debug)]
@@ -90,6 +143,7 @@ pub struct ObmpReader {
     file_offset: u64,
     frame_index: u64,
     eof: bool,
+    pub stats: ContainerStats,
 }
 
 impl ObmpReader {
@@ -120,6 +174,7 @@ impl ObmpReader {
             file_offset: MAGIC.len() as u64,
             frame_index: 0,
             eof: false,
+            stats: ContainerStats::default(),
         })
     }
 }
@@ -170,7 +225,33 @@ impl Iterator for ObmpReader {
         let idx = self.frame_index;
         self.frame_index += 1;
 
-        Some(parse_record_payload(&payload, frame_offset, idx))
+        let (result, kind) = parse_record_payload(&payload, frame_offset, idx);
+
+        // Update container stats
+        self.stats.container_records += 1;
+        match kind {
+            PayloadKind::RawBmp => {
+                self.stats.raw_bmp_payloads += 1;
+                if result.is_err() {
+                    self.stats.inner_bmp_parse_errors += 1;
+                }
+            }
+            PayloadKind::OpenBmpWrapped => {
+                self.stats.openbmp_wrapped_payloads += 1;
+                if let Err(e) = &result {
+                    let msg = e.to_string();
+                    self.stats.openbmp_unwrap_errors += 1;
+                    if !msg.contains("Malformed OpenBMP wrapper") {
+                        self.stats.inner_bmp_parse_errors += 1;
+                    }
+                }
+            }
+            PayloadKind::Unrecognized => {
+                self.stats.unrecognized_payloads += 1;
+            }
+        }
+
+        Some(result)
     }
 }
 
@@ -465,5 +546,88 @@ mod tests {
         assert_eq!(frames[0].msg_type_raw, 3); // PeerUp
         assert_eq!(frames[0].per_peer_header.as_ref().unwrap().peer_asn, 65000);
         assert_eq!(frames[1].msg_type_raw, 0); // RouteMonitoring
+    }
+
+    #[test]
+    fn test_container_stats_committed_fixture() {
+        // Ensure fixture is written first
+        let inner1 = crate::raw_bmp::fixtures::make_peer_up_frame(65000, [10, 0, 0, 1], 1000, 0);
+        let inner2 =
+            crate::raw_bmp::fixtures::make_route_monitoring_frame(65000, [10, 0, 0, 1], 2000, 0);
+        let wrapped1 = fixtures::make_openbmp_wrapped(&inner1);
+        let wrapped2 = fixtures::make_openbmp_wrapped(&inner2);
+        let data = fixtures::make_valid_obmp(&[wrapped1, wrapped2]);
+        std::fs::write("tests/fixtures/openbmp-two-records.obmp", &data).unwrap();
+
+        let mut reader = ObmpReader::open("tests/fixtures/openbmp-two-records.obmp").unwrap();
+        while let Some(_) = reader.next() {}
+        let stats = &reader.stats;
+        assert_eq!(stats.container_records, 2);
+        assert_eq!(stats.openbmp_wrapped_payloads, 2);
+        assert_eq!(stats.raw_bmp_payloads, 0);
+        assert_eq!(stats.unrecognized_payloads, 0);
+    }
+
+    #[test]
+    fn test_container_stats_raw_bmp_payloads() {
+        let raw1 = crate::raw_bmp::fixtures::make_peer_up_frame(65000, [10, 0, 0, 1], 100, 0);
+        let raw2 =
+            crate::raw_bmp::fixtures::make_route_monitoring_frame(65000, [10, 0, 0, 1], 200, 0);
+        let data = fixtures::make_valid_obmp(&[raw1, raw2]);
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut reader = ObmpReader::open(&path).unwrap();
+        while let Some(_) = reader.next() {}
+        let stats = &reader.stats;
+        assert_eq!(stats.container_records, 2);
+        assert_eq!(stats.raw_bmp_payloads, 2);
+        assert_eq!(stats.openbmp_wrapped_payloads, 0);
+        assert_eq!(stats.unrecognized_payloads, 0);
+    }
+
+    #[test]
+    fn test_container_stats_unrecognized_payload() {
+        let bad = vec![0xAB, 0xCD, 0xEF, 0x00, 0x01, 0x02]; // not 0x03, not OBMP
+        let data = fixtures::make_valid_obmp(&[bad]);
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut reader = ObmpReader::open(&path).unwrap();
+        // Drain iterator, keeping reader alive for stats access
+        while let Some(_) = reader.next() {}
+        let stats = &reader.stats;
+        assert_eq!(stats.container_records, 1);
+        assert_eq!(stats.unrecognized_payloads, 1);
+        assert_eq!(stats.raw_bmp_payloads, 0);
+        assert_eq!(stats.openbmp_wrapped_payloads, 0);
+    }
+
+    #[test]
+    fn test_container_stats_openbmp_unwrap_error() {
+        // Valid OBMP magic but bad header content (wrong version)
+        let bad_openbmp = {
+            let mut v = b"OBMP\xFF\xFF".to_vec(); // bad version
+            v.extend_from_slice(&[0u8; 50]); // garbage rest
+            v
+        };
+        let data = fixtures::make_valid_obmp(&[bad_openbmp]);
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut reader = ObmpReader::open(&path).unwrap();
+        while let Some(r) = reader.next() {
+            assert!(r.is_err());
+        }
+        let stats = &reader.stats;
+        assert_eq!(stats.container_records, 1);
+        assert_eq!(stats.openbmp_wrapped_payloads, 1);
+        assert_eq!(stats.openbmp_unwrap_errors, 1);
     }
 }

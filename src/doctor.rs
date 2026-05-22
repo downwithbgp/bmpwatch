@@ -6,7 +6,7 @@ use crate::error::DoctorError;
 use crate::event::{emit_jsonl, JsonlEvent};
 use crate::input::{self, InputFormat};
 use crate::lint;
-use crate::obmp_reader::ObmpReader;
+use crate::obmp_reader::{ContainerStats, ObmpReader};
 use crate::raw_bmp::{
     BmpMessageType, PerPeerHeader, RawBmpFrame, RawBmpIterator, BMP_EXPECTED_VERSION,
     BMP_PER_PEER_HEADER_SIZE,
@@ -26,6 +26,15 @@ const DEFAULT_MAX_FINDINGS: usize = 1000;
 enum FrameSource {
     RawBmp(RawBmpIterator),
     Obmp(ObmpReader),
+}
+
+impl FrameSource {
+    fn container_stats(&self) -> Option<&ContainerStats> {
+        match self {
+            FrameSource::Obmp(reader) => Some(&reader.stats),
+            FrameSource::RawBmp(_) => None,
+        }
+    }
 }
 
 impl Iterator for FrameSource {
@@ -80,14 +89,14 @@ impl Doctor {
     }
 
     pub fn process(&mut self, collect_events: bool) -> Result<(), DoctorError> {
-        let iter: FrameSource = match self.format {
+        let mut iter: FrameSource = match self.format {
             InputFormat::RawBmp => {
                 FrameSource::RawBmp(RawBmpIterator::open(&self.state.file_path)?)
             }
             InputFormat::OpenBmpLen => FrameSource::Obmp(ObmpReader::open(&self.state.file_path)?),
         };
 
-        for frame_result in iter {
+        for frame_result in &mut iter {
             match frame_result {
                 Ok(frame) => {
                     self.process_frame(frame, collect_events);
@@ -120,6 +129,12 @@ impl Doctor {
                 Err(e) => return Err(e),
             }
         }
+
+        // Copy container stats for --summary-json output
+        if let Some(stats) = iter.container_stats() {
+            self.state.container_stats = stats.clone();
+        }
+
         Ok(())
     }
 
