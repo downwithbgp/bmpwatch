@@ -41,10 +41,46 @@ sudo apt-get install kafkacat
 nc -vz stream.routeviews.org 9092
 ```
 
-## 2. List available topics
+## 2. Discover topics (recorder-based)
+
+Use the recorder's built-in topic discovery:
+
+```sh
+# List all topics from a collector group
+cargo run --bin record_openbmp_kafka -- --list-topics --collector chicago
+
+# List by peer ASN
+cargo run --bin record_openbmp_kafka -- --list-topics --asn 13335
+
+# Narrow to one collector + one ASN
+cargo run --bin record_openbmp_kafka -- --list-topics --collector chicago --asn 13335
+
+# JSON output for scripts
+cargo run --bin record_openbmp_kafka -- --list-topics-json --collector nwax
+```
+
+`--collector` filters by a case-insensitive fragment in the topic name
+(collector or router group). `--asn` filters topics ending with
+`.<ASN>.bmp_raw`. Both apply after regex matching and before the
+`--topic-limit` safety guard.
+
+### Low-level discovery (kcat)
 
 ```sh
 kcat -b stream.routeviews.org:9092 -L
+```
+
+### Discover then record
+
+```sh
+# Step 1: find a topic
+cargo run --bin record_openbmp_kafka -- --list-topics --asn 13335
+
+# Step 2: record from that exact topic
+cargo run --bin record_openbmp_kafka -- \
+  --topic routeviews.chicago.13335.bmp_raw \
+  --out samples/chicago-13335.obmp \
+  --max-messages 100
 ```
 
 Look for topics matching `^route-?views\..*\.bmp_raw$`.

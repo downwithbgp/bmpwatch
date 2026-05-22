@@ -84,6 +84,29 @@ cargo test obmp_reader::tests::test_committed_fixture_two_openbmp_records
 
 Verifies the same fixture parses correctly without network dependency.
 
+### Choose a RouteViews feed
+
+Before recording, discover available feeds from the broker:
+
+```sh
+# List all topics from a collector group (case-insensitive)
+record_openbmp_kafka --list-topics --collector chicago
+
+# List topics for a specific peer ASN
+record_openbmp_kafka --list-topics --asn 13335
+
+# Narrow to one collector + one ASN
+record_openbmp_kafka --list-topics --collector chicago --asn 13335
+
+# JSON output (scriptable)
+record_openbmp_kafka --list-topics-json --collector nwax
+```
+
+`--collector` filters topic names by a case-insensitive fragment (collector
+or router group name). `--asn` filters topics ending with `.<ASN>.bmp_raw`.
+Both apply after regex matching and before the `--topic-limit` safety guard,
+which refuses subscriptions matching more than 20 topics by default.
+
 ### RouteViews smoke test (live capture, network required)
 
 The 2-step workflow to verify end-to-end health against real RouteViews data:
