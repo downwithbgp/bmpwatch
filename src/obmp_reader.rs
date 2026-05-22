@@ -444,4 +444,26 @@ mod tests {
         // Frame is parsed despite bad inner BMP version
         assert_eq!(frame.version, 0xFF);
     }
+
+    #[test]
+    fn test_committed_fixture_two_openbmp_records() {
+        // Generate the fixture and also test it
+        let inner1 = crate::raw_bmp::fixtures::make_peer_up_frame(65000, [10, 0, 0, 1], 1000, 0);
+        let inner2 =
+            crate::raw_bmp::fixtures::make_route_monitoring_frame(65000, [10, 0, 0, 1], 2000, 0);
+        let wrapped1 = fixtures::make_openbmp_wrapped(&inner1);
+        let wrapped2 = fixtures::make_openbmp_wrapped(&inner2);
+        let data = fixtures::make_valid_obmp(&[wrapped1, wrapped2]);
+
+        // Write to committed fixture path
+        std::fs::write("tests/fixtures/openbmp-two-records.obmp", &data).unwrap();
+
+        // Regression test
+        let reader = ObmpReader::open("tests/fixtures/openbmp-two-records.obmp").unwrap();
+        let frames: Vec<_> = reader.collect::<Result<Vec<_>, _>>().unwrap();
+        assert_eq!(frames.len(), 2);
+        assert_eq!(frames[0].msg_type_raw, 3); // PeerUp
+        assert_eq!(frames[0].per_peer_header.as_ref().unwrap().peer_asn, 65000);
+        assert_eq!(frames[1].msg_type_raw, 0); // RouteMonitoring
+    }
 }

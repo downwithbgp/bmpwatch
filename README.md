@@ -68,11 +68,21 @@ BMPDoctor checks for:
 | `peer_down_without_peer_up`        | WARN     | Peer Down for a peer that was not active            |
 | `timestamp_regression`             | WARN     | Timestamp went backwards for a given peer           |
 
+## Terminology
+
+| Term | Meaning |
+|------|---------|
+| `.obmp` | BMPDoctor's local capture container format. `BMPDOPENBMP1\n` magic + `u32` BE length-prefixed records. |
+| `OBMP` | OpenBMP upstream wrapper inside each RouteViews Kafka `*.bmp_raw` payload. Stripped by `--format openbmp-len` before BMP frame parsing. |
+| Inner frame | The RFC 7854 BMP message (common header + per-peer header + body). This is what BMPDoctor's parser operates on. |
+
 ## Limitations
 
 BMPDoctor evaluates observed ordering within the input file. If a file starts
 mid-session, warnings like `route_monitoring_before_peer_up` may indicate an
-incomplete capture rather than a broken BMP feed.
+incomplete capture rather than a broken BMP feed. Warnings from live RouteViews
+captures are expected — they reflect real-world stream ordering, not parser
+failures.
 
 Frame-level validation checks the BMP common header (version, length, type) but
 does not perform deep BGP attribute validation beyond what BGPKIT Parser provides.
@@ -86,6 +96,7 @@ streaming inputs are out of scope for the MVP.
 - [Data sources reference](docs/sources.md) — CAIDA/OpenBMP Kafka broker details
 - [OpenBMP Kafka capture guide](docs/openbmp-kafka-capture.md) — connectivity testing with `nc`/`kcat`
 - [Future issues](docs/future-issues.md) — planned features and their scope
+- [Real-sample validation](docs/real-sample-validation.md) — verified capture + parse results
 
 ## Roadmap (not yet implemented)
 
