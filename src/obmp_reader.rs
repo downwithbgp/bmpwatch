@@ -295,8 +295,9 @@ impl Iterator for ObmpReader {
                 self.stats.openbmp_wrapped_payloads += 1;
                 if let Err(e) = &record.frame {
                     let msg = e.to_string();
-                    self.stats.openbmp_unwrap_errors += 1;
-                    if !msg.contains("Malformed OpenBMP wrapper") {
+                    if msg.contains("Malformed OpenBMP wrapper") {
+                        self.stats.openbmp_unwrap_errors += 1;
+                    } else {
                         self.stats.inner_bmp_parse_errors += 1;
                     }
                 }
@@ -718,5 +719,72 @@ mod tests {
         let mut reader = ObmpReader::open(&path).unwrap();
         for _ in reader.by_ref() {}
         assert!(reader.stats.openbmp_metadata.is_none());
+    }
+
+    #[test]
+    fn test_committed_fixture_has_metadata() {
+        let inner1 = crate::raw_bmp::fixtures::make_peer_up_frame(65000, [10, 0, 0, 1], 1000, 0);
+        let inner2 =
+            crate::raw_bmp::fixtures::make_route_monitoring_frame(65000, [10, 0, 0, 1], 2000, 0);
+        let wrapped1 = fixtures::make_openbmp_wrapped(&inner1);
+        let wrapped2 = fixtures::make_openbmp_wrapped(&inner2);
+        let data = fixtures::make_valid_obmp(&[wrapped1, wrapped2]);
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut reader = ObmpReader::open(&path).unwrap();
+        for _ in reader.by_ref() {}
+        let stats = &reader.stats;
+        assert!(stats.openbmp_metadata.is_some());
+        let meta = stats.openbmp_metadata.as_ref().unwrap();
+        assert!(meta.collector.is_some());
+        assert!(meta.router.is_some());
+        assert!(meta.router_ip.is_some());
+    }
+
+    #[test]
+    fn test_container_stats_mixed_payloads() {
+        // One raw BMP record + one OpenBMP-wrapped record
+        let raw = crate::raw_bmp::fixtures::make_peer_up_frame(65000, [10, 0, 0, 1], 100, 0);
+        let inner =
+            crate::raw_bmp::fixtures::make_route_monitoring_frame(65000, [10, 0, 0, 1], 200, 0);
+        let wrapped = fixtures::make_openbmp_wrapped(&inner);
+        let data = fixtures::make_valid_obmp(&[raw, wrapped]);
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut reader = ObmpReader::open(&path).unwrap();
+        for _ in reader.by_ref() {}
+        let stats = &reader.stats;
+        assert_eq!(stats.container_records, 2);
+        assert_eq!(stats.raw_bmp_payloads, 1);
+        assert_eq!(stats.openbmp_wrapped_payloads, 1);
+        assert_eq!(stats.unrecognized_payloads, 0);
+    }
+
+    #[test]
+    fn test_container_stats_inner_bmp_parse_error() {
+        // Valid OpenBMP wrapper around an inner BMP with msg_len < 6.
+        // Unwrap succeeds but parse_frame_from_bytes rejects the inner frame.
+        let malformed_inner = vec![0x03, 0x00, 0x00, 0x00, 0x01, 0x00]; // msg_len=1 < 6
+        let wrapped = fixtures::make_openbmp_wrapped(&malformed_inner);
+        let data = fixtures::make_valid_obmp(&[wrapped]);
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut reader = ObmpReader::open(&path).unwrap();
+        for _ in reader.by_ref() {}
+        let stats = &reader.stats;
+        assert_eq!(stats.container_records, 1);
+        assert_eq!(stats.openbmp_wrapped_payloads, 1);
+        // Unwrap succeeded (valid header), inner BMP parse failed
+        assert_eq!(stats.openbmp_unwrap_errors, 0);
+        assert!(stats.inner_bmp_parse_errors > 0);
     }
 }

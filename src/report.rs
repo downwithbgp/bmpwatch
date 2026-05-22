@@ -596,4 +596,56 @@ mod tests {
         assert_eq!(buckets.stream_order_warnings, 0);
         assert_eq!(buckets.other_findings, 0);
     }
+
+    #[test]
+    fn test_buckets_parse_errors() {
+        use crate::state::Severity;
+        for rule in &[
+            "invalid_bmp_version",
+            "truncated_frame",
+            "unknown_bmp_type",
+            "parse_error",
+        ] {
+            let findings = vec![Finding {
+                severity: Severity::Error,
+                rule: rule.to_string(),
+                offset: None,
+                peer: None,
+                message: "test".into(),
+            }];
+            let buckets = compute_buckets(&findings);
+            assert_eq!(
+                buckets.parse_errors, 1,
+                "rule '{rule}' should be parse_errors"
+            );
+            assert_eq!(buckets.stream_order_warnings, 0);
+            assert_eq!(buckets.other_findings, 0);
+        }
+    }
+
+    #[test]
+    fn test_buckets_stream_order_warnings() {
+        use crate::state::Severity;
+        for rule in &[
+            "route_monitoring_before_peer_up",
+            "duplicate_peer_up",
+            "peer_down_without_peer_up",
+            "timestamp_regression",
+        ] {
+            let findings = vec![Finding {
+                severity: Severity::Warn,
+                rule: rule.to_string(),
+                offset: None,
+                peer: None,
+                message: "test".into(),
+            }];
+            let buckets = compute_buckets(&findings);
+            assert_eq!(
+                buckets.stream_order_warnings, 1,
+                "rule '{rule}' should be stream_order_warnings"
+            );
+            assert_eq!(buckets.parse_errors, 0);
+            assert_eq!(buckets.other_findings, 0);
+        }
+    }
 }
