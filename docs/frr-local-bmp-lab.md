@@ -1,7 +1,8 @@
 # FRR Local BMP Lab
 
-Planned workflow for generating real `.rawbmp` BMP data using FRR and
-Docker Compose in a private-AS, local-only lab. **Not yet manually verified.**
+FRR local BGP lab verified; FRR BMP output not verified. Use RouteViews
+Kafka captures and synthetic fixtures as primary BMPDoctor validation
+sources. This lab is preserved for future FRR BMP retesting.
 
 ## Quick start
 

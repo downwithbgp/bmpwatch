@@ -382,9 +382,8 @@ Historical tags (`v0.1.*`) are checkpoints, not polished releases.
 - More synthetic fixtures for edge-case coverage
 - Better peer/session lifecycle summaries
 - Additional real RouteViews sample validation notes
-- Local FRR `.rawbmp` integration testing
-  (BGP verified; BMP output blocked on FRR 8.4 Docker image —
-  see [FRR local BMP lab](docs/frr-local-bmp-lab.md))
+- Local FRR BGP lab verified; FRR BMP output blocked on tested images
+  (see [FRR local BMP lab](docs/frr-local-bmp-lab.md))
 
 ### B. Useful later
 

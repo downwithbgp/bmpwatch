@@ -67,3 +67,5 @@ Historical tags (`v0.1.*`) are checkpoints, not polished releases.
 - TCP listener mode
 - RFC 8671 / 9069 / 9736 interpretation until base RFC 7854 behavior is mature
 - CAIDA Kafka integration (`bmp.bgpstream.caida.org:9092` remains unreachable)
+- FRR BMP local lab: BGP verified; BMP output blocked on tested FRR images
+  (8.4_git, 10.6.1_git) — see `docs/frr-local-bmp-lab.md`
