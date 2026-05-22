@@ -103,7 +103,7 @@ handling. All produce findings or errors; none should panic.
 | `malformed/truncated-common-header.rawbmp` | raw BMP | 4 bytes (< 6) | `truncated_frame` finding, exit 2 |
 | `malformed/bad-version.rawbmp` | raw BMP | Version 0xFF | `invalid_bmp_version` finding |
 | `malformed/truncated-per-peer-header.rawbmp` | raw BMP | Payload < 42 bytes | Frame parsed, no per-peer header, no peer tracked |
-| `malformed/bad-magic.bmpd` | `.bmpd` | Wrong container magic | `ObmpReader::open` returns error |
+| `malformed/bad-magic.bmpd` | `.bmpd` | Wrong container magic | `ObmpReader::open` returns error. Auto-detection falls back to raw BMP; use `--format bmpd` to test container parsing. |
 | `malformed/truncated-record-length.bmpd` | `.bmpd` | Partial length prefix | Iterator yields error frame |
 
 ```sh

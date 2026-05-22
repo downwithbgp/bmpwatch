@@ -198,6 +198,10 @@ cargo install --path .
 | `0x03` | `raw-bmp` |
 | Unknown / empty / short | `raw-bmp` (diagnostic fallback — let the parser report errors) |
 
+> Auto-detection only recognizes valid `.bmpd` magic (`BMPDOPENBMP1\n`)
+> and raw BMP (`0x03` first byte). Use explicit `--format bmpd` for
+> container-level diagnostics on corrupted `.bmpd` files.
+
 Explicit `--format raw-bmp` or `--format bmpd` overrides auto-detection
 and can intentionally produce malformed/error output if the wrong format is
 forced (useful for debugging or format-level misuse testing).
