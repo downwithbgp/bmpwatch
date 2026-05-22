@@ -48,8 +48,18 @@ The recommended workflow from zero to verified results:
 cargo test obmp_reader::tests::test_committed_fixture_two_openbmp_records
 ```
 
-Verifies that the committed 2-record `.obmp` fixture (PeerUp + RouteMonitoring,
-both OpenBMP-wrapped) parses correctly without network dependency.
+Verifies that the committed 2-record `.obmp` fixture (`tests/fixtures/openbmp-two-records.obmp`) parses correctly without network dependency.
+
+**Fixture provenance:** This is a tiny deterministic regression fixture, not a
+captured live RouteViews sample. It contains two synthetic OpenBMP-wrapped
+records in the BMPDoctor `.obmp` container:
+1. Peer Up for AS65000 (private/synthetic ASN)
+2. Route Monitoring for the same peer
+
+It is safe to commit: synthetic private ASN, tiny size (351 bytes), no live
+third-party capture data, fully deterministic. Expected validation:
+2 messages, 0 malformed, container records=2, OpenBMP-wrapped payloads=2,
+metadata present.
 
 ### Offline smoke test (committed fixture, no network)
 
