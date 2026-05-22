@@ -175,6 +175,15 @@ pub struct RawBmpFrame {
     pub tlv_info: Option<TlvInfo>,
     /// Stats Report entries, if message type is StatisticsReport (1).
     pub stats_info: Option<StatsInfo>,
+    /// Peer Down reason code, if message type is PeerDownNotification (2).
+    pub peer_down_info: Option<PeerDownInfo>,
+}
+
+/// Peer Down Notification reason (RFC 7854, Section 3.5).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PeerDownInfo {
+    pub reason_code: u8,
+    pub reason_name: String,
 }
 
 /// Stats Report information (RFC 7854, Section 3.4).
@@ -433,6 +442,17 @@ pub fn parse_frame_from_bytes(data: &[u8], file_offset: u64) -> Result<RawBmpFra
         _ => None,
     };
 
+    let peer_down_info =
+        match msg_type {
+            Some(BmpMessageType::PeerDownNotification) => payload
+                .get(BMP_PER_PEER_HEADER_SIZE)
+                .map(|&code| PeerDownInfo {
+                    reason_code: code,
+                    reason_name: peer_down_reason_name(code).to_string(),
+                }),
+            _ => None,
+        };
+
     let mut full_data = Vec::with_capacity(total);
     full_data.extend_from_slice(&data[..total]);
 
@@ -447,6 +467,7 @@ pub fn parse_frame_from_bytes(data: &[u8], file_offset: u64) -> Result<RawBmpFra
         full_data,
         tlv_info,
         stats_info,
+        peer_down_info,
     })
 }
 
@@ -536,6 +557,16 @@ impl Iterator for RawBmpIterator {
             _ => None,
         };
 
+        let peer_down_info = match msg_type {
+            Some(BmpMessageType::PeerDownNotification) => payload
+                .get(BMP_PER_PEER_HEADER_SIZE)
+                .map(|&code| PeerDownInfo {
+                    reason_code: code,
+                    reason_name: peer_down_reason_name(code).to_string(),
+                }),
+            _ => None,
+        };
+
         Some(Ok(RawBmpFrame {
             offset: frame_offset,
             version,
@@ -547,6 +578,7 @@ impl Iterator for RawBmpIterator {
             full_data,
             tlv_info,
             stats_info,
+            peer_down_info,
         }))
     }
 }

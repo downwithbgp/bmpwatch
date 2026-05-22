@@ -320,7 +320,9 @@ bmpdoctor dump path/to/bmp-data.rawbmp --jsonl
 ```
 
 Emits one JSON object per observed BMP message including offset, type, peer identity,
-timestamp, parse status, and associated findings.
+timestamp, parse status, and associated findings. Per-message detail objects
+(`tlv_info`, `stats_info`, `peer_down_info`) appear only when the message type
+carries that information.
 
 ## Detected issues
 

@@ -124,6 +124,7 @@ impl Doctor {
                             0,
                             None,
                             None,
+                            None,
                             &[finding],
                         );
                         self.events.push(event);
@@ -301,6 +302,7 @@ impl Doctor {
                 bgp_elems_count,
                 frame.tlv_info.as_ref(),
                 frame.stats_info.as_ref(),
+                frame.peer_down_info.as_ref(),
                 &frame_findings,
             );
             self.events.push(event);
