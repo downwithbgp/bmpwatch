@@ -94,7 +94,7 @@ streaming inputs are out of scope for the MVP.
 RouteViews Kafka (`stream.routeviews.org:9092`) is verified reachable.
 See [RouteViews Kafka verification](docs/routeviews-kafka-verification.md).
 
-- `examples/record_openbmp_kafka.rs` — Kafka consumer writing to local `.obmp`
+- `examples/record_openbmp_kafka.rs` — **Implemented** as `src/bin/record_openbmp_kafka.rs`
 - `--format openbmp-len` — OpenBMP length-delimited files (`.obmp`)
 
 ### Active priority

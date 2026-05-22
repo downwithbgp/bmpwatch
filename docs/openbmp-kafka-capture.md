@@ -87,20 +87,41 @@ kafka-console-consumer \
   --max-messages 100
 ```
 
-## 5. Capture to a local .obmp file
+## 5. Capture to a local .obmp file (using the recorder binary)
+
+The `record_openbmp_kafka` binary handles Kafka connection and writes
+BMP messages to a `.obmp` file:
 
 ```sh
-kcat -b stream.routeviews.org:9092 \
-  -t routeviews.sg.64050.bmp_raw \
-  -C -o beginning -c 1000 \
-  > captured_peer.obmp
+# Exact topic
+cargo run --bin record_openbmp_kafka -- \
+  --topic routeviews.nwax.13335.bmp_raw \
+  --out samples/nwax-sample.obmp \
+  --max-messages 100
+
+# Topic regex (subscribes to all matching topics)
+cargo run --bin record_openbmp_kafka -- \
+  --topic-regex '^route-?views\..*\.bmp_raw$' \
+  --out samples/routeviews-sample.obmp \
+  --max-messages 10 \
+  --max-seconds 30
+```
+
+The `.obmp` file uses the `BMPDOPENBMP1\n` magic header followed by
+repeated `u32` BE length + payload frames. Parsing support via
+`bmpdoctor --format openbmp-len` is planned but not yet implemented.
+
+**Prerequisite:** librdkafka must be installed:
+```sh
+brew install librdkafka          # macOS
+sudo apt-get install librdkafka-dev  # Debian/Ubuntu
 ```
 
 Then inspect with BMPDoctor (once `--format openbmp-len` is implemented):
 
 ```sh
-# Future: bmpdoctor inspect captured_peer.obmp --format openbmp-len
-# Future: bmpdoctor dump captured_peer.obmp --format openbmp-len --jsonl | head -5
+# Future: bmpdoctor inspect samples/nwax-sample.obmp --format openbmp-len
+# Future: bmpdoctor dump samples/nwax-sample.obmp --format openbmp-len --jsonl | head -5
 ```
 
 ## Notes

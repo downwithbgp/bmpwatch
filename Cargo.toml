@@ -18,6 +18,9 @@ serde_json = "1"
 bgpkit-parser = "0.16"
 bytes = "1"
 hex = "0.4"
+rdkafka = "0.36"
+ctrlc = "3"
+regex = "1"
 
 [dev-dependencies]
 tempfile = "3"

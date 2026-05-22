@@ -4,8 +4,8 @@ Planned work items for post-MVP development. These are not implemented.
 
 ## 1. examples/record_openbmp_kafka.rs
 
-**Status:** Active next external-data milestone  
-**Scope:** Standalone example binary, not integrated into `bmpdoctor` core CLI
+**Status:** Implemented (as `src/bin/record_openbmp_kafka.rs`)  
+**Scope:** Standalone binary, not integrated into `bmpdoctor` core CLI
 
 A Kafka consumer that connects to the RouteViews OpenBMP broker
 (`stream.routeviews.org:9092`) and writes captured BMP data to local
