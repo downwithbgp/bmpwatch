@@ -135,29 +135,39 @@ Expected pass conditions:
 
 ## Status
 
-**BGP verified; BMP output blocked on FRR 8.4 image.**
+**BGP verified; BMP output not yet produced.**
 
 | Component | Status |
 |-----------|--------|
 | Docker Compose lab | Starts cleanly |
+| FRR version | 10.6.1_git (`quay.io/frrouting/frr:10.6.1`) |
 | zebra / bgpd | Start (with `SYS_ADMIN`) |
 | BGP session | AS65000 ↔ AS65001, confirmed via `show bgp summary` |
-| `bgpd_bmp.so` | Loads with `-M bmp` |
-| BMP config | Parses; `show bmp` shows target/listener |
-| frr1 ↔ bmp-capture:1790 | TCP reachable |
-| BMP TCP connection | **Never initiated by bgpd** |
+| `bgpd_bmp` module | Loaded and recognized (`show modules`) |
+| BMP config | Accepted; `show bmp` shows target/listener |
+| frr1 ↔ bmp-capture:1790 | TCP reachable (`nc -vz` succeeds) |
+| BMP TCP connection | **Never initiated by bgpd** (confirmed via `tcpdump`) |
 | `samples/frr-smoke.rawbmp` | **0 bytes** |
 
-FRR 8.4_git BMP module appears non-functional for outbound connections.
-Newer 9.x/10.x tags were not available on Docker Hub during testing.
+Tested with both FRR 8.4_git (`frrouting/frr:latest` from Docker Hub)
+and FRR 10.6.1_git (`quay.io/frrouting/frr:10.6.1`). Behavior is
+identical in both versions.
 
-### Next hypotheses
+### Hypothesis
 
-1. Test a newer FRR Docker image if one becomes available.
-2. Build a local FRR image from source/packages if FRR BMP support is
-   confirmed in a newer release and no pre-built image exists.
+FRR BMP may operate in **server/listen mode**: the `bmp listener` command
+configures FRR to accept incoming BMP station connections rather than
+initiating outbound connections to a collector. The BMP protocol (RFC 7854)
+has the monitoring station initiate the TCP connection to the router, so
+FRR listening for connections would be the expected server behavior. Our
+`socat` listener is also in server mode — both sides waiting for the other
+to connect.
+
+### Next steps
+
+1. Test with a BMP collector that initiates connections to FRR
+   (reverse the flow: collector connects to `frr1:1790`).
+2. Investigate FRR `bmp connect` or `bmp station` commands if they exist
+   in newer FRR builds not yet tested.
 3. Continue using RouteViews Kafka `.bmpd` and synthetic fixtures as
-   primary validation sources for BMPDoctor.
-
-The lab infrastructure (networking, BGP, capture listener) is verified
-and can be reused when a functional FRR BMP image is available.
+   primary validation sources.

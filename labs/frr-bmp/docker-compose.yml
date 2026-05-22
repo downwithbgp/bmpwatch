@@ -1,6 +1,6 @@
 services:
   frr1:
-    image: frrouting/frr:latest
+    image: quay.io/frrouting/frr:10.6.1
     container_name: frr1
     hostname: frr1
     cap_add:
@@ -17,7 +17,7 @@ services:
     restart: unless-stopped
 
   frr2:
-    image: frrouting/frr:latest
+    image: quay.io/frrouting/frr:10.6.1
     container_name: frr2
     hostname: frr2
     cap_add:
