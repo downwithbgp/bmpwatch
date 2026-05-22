@@ -61,6 +61,15 @@ third-party capture data, fully deterministic. Expected validation:
 2 messages, 0 malformed, container records=2, OpenBMP-wrapped payloads=2,
 metadata present.
 
+### Fixture hygiene
+
+- `tests/fixtures/` contains committed regression fixtures. Tests must
+  treat them as **read-only** — no test writes to this directory.
+- Generated or captured output belongs in `samples/` or a temporary
+  directory, not under `tests/fixtures/`.
+- `samples/*.obmp` is intentionally gitignored.
+- This keeps repeated parallel `cargo test` runs deterministic.
+
 ### Offline smoke test (committed fixture, no network)
 
 ```sh
