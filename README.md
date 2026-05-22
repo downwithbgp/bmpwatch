@@ -68,6 +68,37 @@ bmpdoctor inspect path/to/bmp-data.rawbmp
 Outputs file metadata, message type counts, per-peer statistics, active peer count,
 top peers by route-monitoring messages, and a findings summary.
 
+With `--summary-json`, outputs machine-readable totals. For `.obmp` files,
+a `container` section distinguishes the capture wrapper from the payload types:
+
+```json
+{
+  "file": "samples/routeviews-broad-100.obmp",
+  "format": "OpenBMP length-delimited",
+  "size_bytes": 27630,
+  "total_messages": 100,
+  "malformed_messages": 0,
+  "bgp_elem_count": 29,
+  "by_type": { "RouteMonitoring": 100 },
+  "peers_observed": 18,
+  "active_peers": 0,
+  "info_count": 0,
+  "warn_count": 106,
+  "error_count": 0,
+  "findings_truncated": false,
+  "findings_dropped_count": 0,
+  "container": {
+    "container_records": 100,
+    "raw_bmp_payloads": 0,
+    "openbmp_wrapped_payloads": 100
+  }
+}
+```
+
+The `container` section is intentionally absent for `raw-bmp` input, which
+has no `.obmp` record layer. Zero-value container fields are omitted from
+the output to keep the JSON compact.
+
 ### lint
 
 ```sh

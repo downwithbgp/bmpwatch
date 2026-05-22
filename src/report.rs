@@ -179,7 +179,9 @@ struct InspectSummary<'a> {
 #[derive(Serialize)]
 struct ContainerSummary {
     container_records: u64,
+    #[serde(skip_serializing_if = "is_zero")]
     raw_bmp_payloads: u64,
+    #[serde(skip_serializing_if = "is_zero")]
     openbmp_wrapped_payloads: u64,
     #[serde(skip_serializing_if = "is_zero")]
     unrecognized_payloads: u64,
@@ -263,4 +265,100 @@ pub fn render_inspect_json(state: &DoctorState, truncated: bool) {
     let json = serde_json::to_string_pretty(&summary)
         .unwrap_or_else(|_| r#"{"error":"serialization failed"}"#.to_string());
     println!("{json}");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::obmp_reader::ContainerStats;
+    use crate::state::DoctorState;
+
+    fn make_state(with_container: bool) -> DoctorState {
+        let mut state = DoctorState::default();
+        state.file_path = "test.rawbmp".into();
+        state.format = "raw BMP frames".into();
+        state.file_size = 100;
+        state.total_messages = 3;
+        if with_container {
+            state.container_stats = ContainerStats {
+                container_records: 3,
+                openbmp_wrapped_payloads: 3,
+                ..Default::default()
+            };
+        }
+        state
+    }
+
+    #[test]
+    fn test_summary_json_container_absent_for_raw_bmp() {
+        let state = make_state(false);
+        let summary = serde_json::to_string(&InspectSummary {
+            file: &state.file_path,
+            format: &state.format,
+            size_bytes: state.file_size,
+            total_messages: state.total_messages,
+            malformed_messages: 0,
+            bgp_elem_count: None,
+            by_type: std::collections::BTreeMap::new(),
+            peers_observed: 0,
+            active_peers: 0,
+            info_count: 0,
+            warn_count: 0,
+            error_count: 0,
+            findings_truncated: false,
+            findings_dropped_count: 0,
+            container: None,
+        })
+        .unwrap();
+
+        assert!(!summary.contains("container"));
+    }
+
+    #[test]
+    fn test_summary_json_container_present_for_obmp() {
+        let mut state = make_state(false);
+        state.format = "OpenBMP length-delimited".into();
+        state.container_stats = ContainerStats {
+            container_records: 3,
+            openbmp_wrapped_payloads: 3,
+            ..Default::default()
+        };
+
+        let container = ContainerSummary {
+            container_records: 3,
+            raw_bmp_payloads: 0,
+            openbmp_wrapped_payloads: 3,
+            unrecognized_payloads: 0,
+            openbmp_unwrap_errors: 0,
+            inner_bmp_parse_errors: 0,
+        };
+
+        let summary = serde_json::to_string(&InspectSummary {
+            file: &state.file_path,
+            format: &state.format,
+            size_bytes: state.file_size,
+            total_messages: state.total_messages,
+            malformed_messages: 0,
+            bgp_elem_count: None,
+            by_type: std::collections::BTreeMap::new(),
+            peers_observed: 0,
+            active_peers: 0,
+            info_count: 0,
+            warn_count: 0,
+            error_count: 0,
+            findings_truncated: false,
+            findings_dropped_count: 0,
+            container: Some(container),
+        })
+        .unwrap();
+
+        assert!(summary.contains("container"));
+        assert!(summary.contains("container_records"));
+        assert!(summary.contains("openbmp_wrapped_payloads"));
+        // Zero-value fields skipped via serde is_zero:
+        assert!(!summary.contains("unrecognized_payloads"));
+        assert!(!summary.contains("openbmp_unwrap_errors"));
+        assert!(!summary.contains("inner_bmp_parse_errors"));
+        assert!(!summary.contains("raw_bmp_payloads"));
+    }
 }
