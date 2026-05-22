@@ -99,8 +99,10 @@ elements, 0 malformed.
   during `inspect` output
 - Live-stream diagnostics (incremental counter tracking between repeated
   `.obmp` file reads)
-- `--format openbmp-len` auto-detection (skip `--format` flag when magic
-  matches)
+- Richer format detection: standalone upstream `OBMP` payload files,
+  surfacing detected format in more output modes, exposing detection
+  as a library API. (Basic `.obmp` container detection via
+  `BMPDOPENBMP1\n` is already implemented in `--format auto`.)
 
 ---
 
