@@ -135,39 +135,35 @@ Expected pass conditions:
 
 ## Status
 
-**BGP verified; BMP output not yet produced.**
+**BGP verified; BMP output not produced by FRR 10.6.1 or 8.4.**
 
 | Component | Status |
 |-----------|--------|
 | Docker Compose lab | Starts cleanly |
-| FRR version | 10.6.1_git (`quay.io/frrouting/frr:10.6.1`) |
+| FRR versions tested | 8.4_git, 10.6.1_git |
 | zebra / bgpd | Start (with `SYS_ADMIN`) |
 | BGP session | AS65000 ↔ AS65001, confirmed via `show bgp summary` |
 | `bgpd_bmp` module | Loaded and recognized (`show modules`) |
-| BMP config | Accepted; `show bmp` shows target/listener |
+| BMP config | Accepted; `show bmp` shows target/listener entry |
 | frr1 ↔ bmp-capture:1790 | TCP reachable (`nc -vz` succeeds) |
-| BMP TCP connection | **Never initiated by bgpd** (confirmed via `tcpdump`) |
+| BMP TCP connection | **Never observed** (neither direction) |
 | `samples/frr-smoke.rawbmp` | **0 bytes** |
 
-Tested with both FRR 8.4_git (`frrouting/frr:latest` from Docker Hub)
-and FRR 10.6.1_git (`quay.io/frrouting/frr:10.6.1`). Behavior is
-identical in both versions.
+Both connection modes were tested:
+- **FRR outbound** (socat listens on 1790): FRR never connects. `show bmp`
+  shows the listener entry but `bgpd` never opens a TCP socket.
+- **FRR inbound** (socat connects to FRR:1790): Connection refused. FRR
+  does not bind a TCP listening socket for BMP.
 
-### Hypothesis
+### Conclusion
 
-FRR BMP may operate in **server/listen mode**: the `bmp listener` command
-configures FRR to accept incoming BMP station connections rather than
-initiating outbound connections to a collector. The BMP protocol (RFC 7854)
-has the monitoring station initiate the TCP connection to the router, so
-FRR listening for connections would be the expected server behavior. Our
-`socat` listener is also in server mode — both sides waiting for the other
-to connect.
+The `bgpd_bmp` module in FRR 8.4 and 10.6.1 recognizes BMP configuration
+but does not establish BMP sessions in either direction. This is likely a
+module-level behavior limitation, not a configuration error. The lab
+infrastructure (networking, BGP, capture) is verified working.
 
 ### Next steps
 
-1. Test with a BMP collector that initiates connections to FRR
-   (reverse the flow: collector connects to `frr1:1790`).
-2. Investigate FRR `bmp connect` or `bmp station` commands if they exist
-   in newer FRR builds not yet tested.
-3. Continue using RouteViews Kafka `.bmpd` and synthetic fixtures as
-   primary validation sources.
+Continue using RouteViews Kafka `.bmpd` and synthetic fixtures as primary
+validation sources. The FRR Docker lab can be revisited if a future FRR
+release resolves the BMP module behavior.

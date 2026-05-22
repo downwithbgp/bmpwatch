@@ -38,7 +38,7 @@ services:
     container_name: bmp-capture
     command: >
       sh -c "apk add --no-cache socat &&
-             socat -v TCP-LISTEN:1790,reuseaddr,fork OPEN:/samples/frr-smoke.rawbmp,creat,append 2>/tmp/socat.log"
+             socat TCP-LISTEN:1790,reuseaddr,fork OPEN:/samples/frr-smoke.rawbmp,creat,append"
     volumes:
       - ../../samples:/samples
     networks:
