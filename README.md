@@ -159,6 +159,17 @@ OpenBMP metadata:
   Router IP:  185.33.111.234
 ```
 
+`container` counters (present for `.obmp` input, absent for `raw-bmp`):
+
+| Counter | Meaning |
+|---------|---------|
+| `container_records` | Total `.obmp` records in the file |
+| `raw_bmp_payloads` | Records with a raw RFC 7854 BMP frame (starts `0x03`) |
+| `openbmp_wrapped_payloads` | Records with an `OBMP` wrapper (mutually exclusive with `raw_bmp_payloads` per record) |
+| `unrecognized_payloads` | Records that are neither raw BMP nor `OBMP` |
+| `openbmp_unwrap_errors` | `OBMP` wrapper header parsing failures |
+| `inner_bmp_parse_errors` | `OBMP` unwrap succeeded but inner BMP frame parsing failed (mutually exclusive with `openbmp_unwrap_errors`) |
+
 ### lint
 
 ```sh

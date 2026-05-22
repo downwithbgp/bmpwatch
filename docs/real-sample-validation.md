@@ -70,6 +70,19 @@ Metadata is captured from the first successfully unwrapped `OBMP` payload.
 It is present only when records contain an OpenBMP wrapper with populated
 fields; it is not guaranteed for all `.obmp` files.
 
+### Container counter semantics
+
+The `container` counters distinguish two failure modes for OpenBMP-wrapped records:
+
+- `openbmp_unwrap_errors` — the `OBMP` wrapper header itself was malformed
+  and could not be parsed (bad magic, wrong version, unsupported object type).
+- `inner_bmp_parse_errors` — the OpenBMP wrapper was parsed successfully,
+  but the inner RFC 7854 BMP frame failed to parse (truncated, invalid length,
+  bad version).
+
+These are mutually exclusive. A record with a malformed wrapper does not
+also increment `inner_bmp_parse_errors`, and vice versa.
+
 ## Interpretation
 
 - **100 messages, 0 malformed:** All 100 Kafka payloads were successfully
