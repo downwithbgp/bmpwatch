@@ -362,39 +362,45 @@ streaming inputs are out of scope for the MVP.
 - [Future issues](docs/future-issues.md) — planned features and their scope
 - [Real-sample validation](docs/real-sample-validation.md) — verified capture + parse results
 
-## Roadmap (not yet implemented)
+## Roadmap
 
-### Active next external-data milestones
+Historical tags (`v0.1.*`) are checkpoints, not polished releases.
 
-RouteViews Kafka (`stream.routeviews.org:9092`) is verified reachable.
-Broad regex capture with the recorder produced 100 messages, 27,630 bytes.
-See [RouteViews Kafka verification](docs/routeviews-kafka-verification.md).
+### A. Near-term (good next BMPDoctor work)
 
-- `record_openbmp_kafka.rs` — **Implemented and verified** (100 msgs, 4s capture)
-- `--format bmpd` — **Implemented and verified** (100 msgs, 18 peers, 0 malformed)
-
-### Active priority
-
-- Public BMP fixture corpus
+- Better RFC 7854 message summaries and TLV display
+- More synthetic fixtures for edge-case coverage
+- Better peer/session lifecycle summaries
+- Additional real RouteViews sample validation notes
 - Local FRR/GoBGP `.rawbmp` integration testing
+
+### B. Useful later
+
+- PCAP/PCAPNG via external extraction first; native support deferred
+  (see [PCAP support note](docs/pcap-support.md))
+- Standalone `OBMP` payload file support if real samples justify it
 - Compressed input (`.bz2`, `.gz`)
 - `.bmpr` capture format support
-- TCP listener mode
-
-### Blocked
-
-CAIDA's `bmp.bgpstream.caida.org:9092` is unreachable from the developer's
-network (see [verification log](docs/caida-kafka-verification.md)).
-
-- Kafka input (integrated into core CLI)
-
-### Future
-
 - RouteViews `bgpreader` PSV comparison tooling
-- PCAP/PCAPNG support (deferred; use external tools to extract BMP TCP
-  streams to `.rawbmp` — see [PCAP support note](docs/pcap-support.md))
-- Prometheus metrics export
-- Parquet export
+- More output formats if there is a clear consumer
+
+### C. Explicitly not now
+
+- Deep BGP UPDATE semantic validation
+- Full observability platform / storage backend
+- Prometheus metrics / Parquet export
+- Native Kafka input in core `bmpdoctor`
+- TCP listener mode
+- RFC 8671 / 9069 / 9736 interpretation until base RFC 7854 behavior is mature
+
+### Implemented and verified
+
+- `record_openbmp_kafka.rs` — RouteViews Kafka recorder (100 msgs, 4s)
+- `--format bmpd` — BMPDoctor container with OpenBMP unwrap (100 msgs,
+  18 peers, 0 malformed)
+- `--format auto` — content-based format detection
+- 8 lint rules, findings buckets, peer inventory, Initiation/Termination
+  TLV decoding
 
 ## License
 
