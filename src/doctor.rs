@@ -833,4 +833,29 @@ mod tests {
             .any(|f| f.rule == "peer_down_without_peer_up");
         assert!(!has_down_without_up);
     }
+
+    #[test]
+    fn test_stats_report_rawbmp_fixture() {
+        // Read-only regression test: Stats Report decoding
+        let mut doctor = Doctor::with_max_findings(
+            Path::new("tests/fixtures/stats-report.rawbmp"),
+            1000,
+            InputFormat::RawBmp,
+        )
+        .unwrap();
+        doctor.process(false).unwrap();
+
+        assert_eq!(doctor.state.total_messages, 1);
+        assert_eq!(doctor.state.malformed_messages, 0);
+        assert_eq!(*doctor.state.by_type.get(&1).unwrap_or(&0), 1);
+
+        let stats = doctor.state.stats_info.as_ref().unwrap();
+        assert_eq!(stats.entries.len(), 2);
+        assert_eq!(stats.entries[0].stat_type, 7);
+        assert_eq!(stats.entries[0].stat_value, 42);
+        assert!(stats.entries[0].stat_name.contains("Adj-RIBs-In"));
+        assert_eq!(stats.entries[1].stat_type, 8);
+        assert_eq!(stats.entries[1].stat_value, 10);
+        assert!(stats.entries[1].stat_name.contains("Loc-RIB"));
+    }
 }

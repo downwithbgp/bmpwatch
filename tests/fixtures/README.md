@@ -78,6 +78,27 @@ is not a BMP framing or lifecycle failure.
 
 **Validated by:** `doctor::tests::test_peer_up_down_rawbmp_fixture`
 
+## `stats-report.rawbmp`
+
+| Property | Value |
+|----------|-------|
+| Container | None — raw RFC 7854 BMP frames |
+| Records | 1 |
+| Payload type | Raw BMP |
+| Record 1 | Stats Report: Adj-RIBs-In = 42, Loc-RIB = 10 |
+| Size | 68 bytes |
+
+**Purpose:** Regression test for RFC 7854 Stats Report decoding.
+No Peer Up message included — avoids synthetic BGP OPEN parse warnings.
+
+**Validated by:** `doctor::tests::test_stats_report_rawbmp_fixture`
+
+```sh
+cargo run --bin bmpdoctor -- \
+  inspect tests/fixtures/stats-report.rawbmp --summary-json
+# Expected: total_messages=1, malformed_messages=0,
+#   Stats Report info: Adj-RIBs-In=42, Loc-RIB=10
+
 ```sh
 cargo run --bin bmpdoctor -- \
   inspect tests/fixtures/peer-up-down.rawbmp --summary-json
