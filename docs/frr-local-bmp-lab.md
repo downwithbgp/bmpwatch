@@ -135,16 +135,18 @@ Expected pass conditions:
 
 ## Status
 
-**Partially verified.** BGP peering works (AS65000 ↔ AS65001, `show bgp
-summary` confirms session is up). FRR daemons (zebra, bgpd) start cleanly
-after adding `SYS_ADMIN` capability.
+**BMP output not observed.** BGP peering works (AS65000 ↔ AS65001,
+confirmed via `show bgp summary`). FRR daemons start cleanly. The
+`bgpd_bmp.so` module loads, BMP configuration is accepted, and
+`show bmp` shows the listener target. However, `bgpd` does not open
+TCP connections to the BMP listener — no bytes are written to
+`samples/frr-smoke.rawbmp`.
 
-BMP output has not yet been produced. The FRR 8.4 image (`frrouting/frr:latest`)
-has the `bgpd_bmp.so` module and accepts `bmp` configuration commands in
-`frr.conf`, but `bgpd` did not connect to the BMP listener during testing.
-This may be an FRR version limitation; newer FRR releases (9.x+) or a
-different image may be required.
+This was tested with `frrouting/frr:latest` (FRR 8.4_git). The BMP
+module may not be fully functional in this version. Newer FRR releases
+(9.x+) are expected to have more complete BMP support but currently
+no tagged images beyond `latest` are available on Docker Hub.
 
-**Next steps:** try a newer FRR image (e.g., `frrouting/frr:9.1`), verify
-BMP module version compatibility, and test with a `bmp connect` command if
-supported by the FRR version.
+**Lab infrastructure verified:** Docker networking, BGP peering, socat
+capture listener, and BMP config parsing all work correctly. The blocker
+is FRR 8.4 BMP module behavior.
