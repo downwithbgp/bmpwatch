@@ -241,6 +241,14 @@ a `container` section distinguishes the capture wrapper from the payload types:
     "stream_order_warnings": 106,
     "other_findings": 0
   },
+  "session_lifecycle": {
+    "peers_observed": 18,
+    "active_peers": 0,
+    "route_monitoring_messages": 100,
+    "peer_up_messages": 0,
+    "peer_down_messages": 0,
+    "rm_before_peer_up_warnings": 100
+  },
   "peers": [
     {
       "peer_asn": 3303,

@@ -45,6 +45,14 @@ cargo run --bin bmpdoctor -- \
     "stream_order_warnings": 106,
     "other_findings": 0
   },
+  "session_lifecycle": {
+    "peers_observed": 18,
+    "active_peers": 0,
+    "route_monitoring_messages": 100,
+    "peer_up_messages": 0,
+    "peer_down_messages": 0,
+    "rm_before_peer_up_warnings": 100
+  },
   "peers": [
     {
       "peer_asn": 3303,
@@ -108,6 +116,10 @@ also increment `inner_bmp_parse_errors`, and vice versa.
     mid-stream with `--from-end`, so no Peer Up notifications were observed
   - `timestamp_regression` — can occur in real BMP feeds due to collector
     clock adjustments or multi-threaded feed assembly
+  - The `session_lifecycle` breakdown shows 100 RM-before-Peer-Up warnings
+    and the `findings_buckets` show 106 total stream-order warnings; the
+    remaining 6 are timestamp regressions (106 − 100 = 6). Neither indicates
+    a parser failure.
 
 - **29 BGP elements:** Across the 100 Route Monitoring messages, 29
   individual BGP prefix announcements/withdrawals were counted by the
