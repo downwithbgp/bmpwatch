@@ -1,5 +1,4 @@
 # FRR daemons configuration
-# Enable zebra (routing table) and bgpd (BGP daemon)
 zebra=yes
 bgpd=yes
-# BMP support is built into bgpd; no separate daemon needed
+bgpd_options="-M bmp"

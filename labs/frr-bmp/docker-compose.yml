@@ -6,9 +6,11 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
+      - SYS_ADMIN
     volumes:
       - ./frr1/daemons:/etc/frr/daemons:ro
       - ./frr1/frr.conf:/etc/frr/frr.conf:ro
+      - ./vtysh.conf:/etc/frr/vtysh.conf:ro
     networks:
       bmp-net:
         ipv4_address: 172.30.0.2
@@ -21,9 +23,11 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
+      - SYS_ADMIN
     volumes:
       - ./frr2/daemons:/etc/frr/daemons:ro
       - ./frr2/frr.conf:/etc/frr/frr.conf:ro
+      - ./vtysh.conf:/etc/frr/vtysh.conf:ro
     networks:
       bmp-net:
         ipv4_address: 172.30.0.3

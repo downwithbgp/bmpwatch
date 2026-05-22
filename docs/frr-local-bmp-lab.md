@@ -52,7 +52,9 @@ may require adjustment for specific FRR versions.
 
 ## FRR BMP notes
 
-BMP configuration is under `router bgp <ASN>`:
+BMP configuration is under `router bgp <ASN>`. The configuration commands
+are accepted by FRR 8.4 but may require a newer FRR version to actually
+produce BMP output.
 
 ```
 bmp mirror buffer-limit 0
@@ -60,12 +62,15 @@ bmp targets <name>
 bmp listener <IP> port <PORT>
 ```
 
-- The `bmp` command syntax may vary by FRR version.
-- BMP support is built into `bgpd`; no separate daemon required.
-- If `bmp` commands are not recognized, ensure the FRR image includes BMP
-  support and check the `bgpd` logs for module loading errors.
-- If BMP target by hostname does not work, use the IP address
-  (`172.30.0.10`) as shown in the config.
+- The `bgpd_bmp.so` module must be loaded. In this lab, `bgpd_options="-M bmp"`
+  in the `daemons` file passes the `-M bmp` flag to bgpd.
+- BMP support varies significantly by FRR version. FRR 8.4 parses the
+  configuration but may not establish BMP connections. FRR 9.x+ is expected
+  to have more complete BMP support.
+- Use `show bmp` in `vtysh` to verify BMP listener and connection state.
+- The `bmp` command in `vtysh` context-sensitive help (`?`) reports limited
+  options in FRR 8.4, but the configuration file parser may still accept a
+  wider range of commands.
 
 ## Expected message mix
 
@@ -108,6 +113,10 @@ Expected pass conditions:
 
 ## Troubleshooting
 
+- **`privs_init: initial cap_set_proc failed`** — the FRR image requires
+  `SYS_ADMIN` in `cap_add`. Ensure the Docker Compose file includes it.
+  This is a local-lab-only concession; FRR uses it for namespace and
+  routing table operations.
 - **No capture file:** check `docker compose logs bmp-capture`; verify FRR
   is sending BMP by checking `docker compose logs frr1 | grep -i bmp`.
 - **No BMP messages:** the FRR image may lack BMP support. Try
@@ -126,5 +135,16 @@ Expected pass conditions:
 
 ## Status
 
-**Planned — not yet manually verified.** Lab files are committed as
-reference; commands and config may require adjustments during actual testing.
+**Partially verified.** BGP peering works (AS65000 ↔ AS65001, `show bgp
+summary` confirms session is up). FRR daemons (zebra, bgpd) start cleanly
+after adding `SYS_ADMIN` capability.
+
+BMP output has not yet been produced. The FRR 8.4 image (`frrouting/frr:latest`)
+has the `bgpd_bmp.so` module and accepts `bmp` configuration commands in
+`frr.conf`, but `bgpd` did not connect to the BMP listener during testing.
+This may be an FRR version limitation; newer FRR releases (9.x+) or a
+different image may be required.
+
+**Next steps:** try a newer FRR image (e.g., `frrouting/frr:9.1`), verify
+BMP module version compatibility, and test with a `bmp connect` command if
+supported by the FRR version.
