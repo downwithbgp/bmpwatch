@@ -92,10 +92,11 @@ streaming inputs are out of scope for the MVP.
 ### Active next external-data milestones
 
 RouteViews Kafka (`stream.routeviews.org:9092`) is verified reachable.
+Broad regex capture with the recorder produced 100 messages, 27,630 bytes.
 See [RouteViews Kafka verification](docs/routeviews-kafka-verification.md).
 
-- `examples/record_openbmp_kafka.rs` — **Implemented** as `src/bin/record_openbmp_kafka.rs`
-- `--format openbmp-len` — OpenBMP length-delimited files (`.obmp`)
+- `record_openbmp_kafka.rs` — **Implemented and verified** (100 msgs, 4s capture)
+- `--format openbmp-len` — **Active next milestone**: OpenBMP `.obmp` parser
 
 ### Active priority
 

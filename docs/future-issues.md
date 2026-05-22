@@ -4,18 +4,29 @@ Planned work items for post-MVP development. These are not implemented.
 
 ## 1. examples/record_openbmp_kafka.rs
 
-**Status:** Implemented (as `src/bin/record_openbmp_kafka.rs`)  
+**Status:** Implemented and verified (as `src/bin/record_openbmp_kafka.rs`)
 **Scope:** Standalone binary, not integrated into `bmpdoctor` core CLI
 
-A Kafka consumer that connects to the RouteViews OpenBMP broker
-(`stream.routeviews.org:9092`) and writes captured BMP data to local
-`.obmp` files.
+RouteViews broad regex capture verified: 100 messages, 27,630 bytes,
+4-second duration. See `docs/routeviews-kafka-verification.md`.
 
 **Target broker:** `stream.routeviews.org:9092` — verified reachable.
-See `docs/routeviews-kafka-verification.md`.
-
 **Historical broker:** CAIDA's `bmp.bgpstream.caida.org:9092` is
 unreachable. See `docs/caida-kafka-verification.md`.
+
+### Verified smoke command
+
+```sh
+cargo run --bin record_openbmp_kafka -- \
+  --broker stream.routeviews.org:9092 \
+  --topic-regex '^routeviews.*\.bmp_raw$' \
+  --out samples/routeviews-broad-100.obmp \
+  --max-messages 100 \
+  --max-seconds 60 \
+  --from-end
+```
+
+Observed: messages_written=100, bytes_written=27630, duration_secs=4.
 
 A Kafka consumer that connects to an OpenBMP broker and writes captured BMP
 data to local files.
@@ -70,12 +81,21 @@ fn main() {
 
 ## 2. --format openbmp-len
 
-**Status:** Active next external-data milestone  
+**Status:** Active next milestone
 **Scope:** New input format option for the `bmpdoctor` CLI
 
 Support for OpenBMP length-delimited files (`.obmp` extension convention).
-Can be tested against real BMP data captured from the RouteViews Kafka
-broker (`stream.routeviews.org:9092`).
+Captured `.obmp` files from RouteViews Kafka are non-empty and ready for
+parser validation. Implementation plan:
+
+1. Add `.obmp` reader for `BMPDOPENBMP1\n` magic + repeated `u32` BE
+   length + raw payload
+2. Wire as `--format openbmp-len` flag on `inspect`/`lint`/`dump`
+3. For each payload, parse as RFC 7854 BMP frame using existing raw
+   BMP logic
+4. Tests: empty `.obmp`, one frame, multiple frames, truncated length
+   prefix, declared length longer than remaining file, zero-length
+   frame, malformed contained BMP frame
 
 Support for OpenBMP length-delimited files (`.obmp` extension convention).
 

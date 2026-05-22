@@ -67,9 +67,10 @@ nc -l 5000 > capture.rawbmp
 - [x] Run `nc -vz stream.routeviews.org 9092` — **Connection succeeded**
 - [x] Run `kcat -b stream.routeviews.org:9092 -L` — **Topics listed**
 - [x] Observed topics match `^route-?views\..*\.bmp_raw$`
-- [ ] Subscribe to one topic and capture 100 messages
+- [x] Broad regex capture with recorder — **100 msgs, 27,630 bytes, 4s**
+- [ ] Subscribe to exact topic and capture 100 messages
 - [ ] Verify messages are valid BMP frames (inspect first 5 with `xxd`)
-- [ ] Run `bmpdoctor inspect` on captured output
+- [ ] Run `bmpdoctor inspect` on captured `.obmp` (needs `--format openbmp-len`)
 - [ ] Confirm peer addresses and ASNs match expected RouteViews feed data
 
 See `docs/routeviews-kafka-verification.md` for the full test log.

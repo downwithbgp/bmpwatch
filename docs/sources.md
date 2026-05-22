@@ -12,7 +12,7 @@ Sources ordered by implementation status and verification level.
 |------|------------------------------------|--------------|-------------------------|
 | 1    | Synthetic fixtures                 | (in-memory)  | Implemented, 17 tests   |
 | 2    | Local FRR/GoBGP raw BMP            | `.rawbmp`    | Planned, not tested     |
-| 3    | RouteViews Kafka                   | `.obmp`      | Verified reachable      |
+| 3    | RouteViews Kafka                   | `.obmp`      | Verified, 100 msg capture |
 | 4    | BGPReader routeviews-stream        | N/A          | Comparison only         |
 | —    | CAIDA/OpenBMP Kafka (historical)   | `.obmp`      | Unreachable (blocked)   |
 

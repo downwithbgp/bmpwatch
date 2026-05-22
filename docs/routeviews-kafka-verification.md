@@ -62,8 +62,25 @@ Metadata for all topics (from broker -1: stream.routeviews.org:9092/bootstrap):
 
 ## Impact on BMPDoctor
 
-- `examples/record_openbmp_kafka.rs` can proceed with RouteViews as the
-  target broker.
-- `--format openbmp-len` (`.obmp`) can be tested against real Kafka-captured
-  BMP data.
-- RouteViews Kafka is the active next external-data milestone for BMPDoctor.
+- `record_openbmp_kafka.rs` is **implemented and verified** with the broad
+  regex `^routeviews.*\.bmp_raw$`. Successful capture: 100 messages,
+  27,630 bytes in 4 seconds. Exact single-topic captures may be quiet;
+  broad regex is the recommended smoke test.
+- `--format openbmp-len` (`.obmp`) parser support is the active next
+  milestone. Captured `.obmp` files are non-empty and ready for parser
+  validation.
+
+### Verified recorder smoke test
+
+```sh
+cargo run --bin record_openbmp_kafka -- \
+  --broker stream.routeviews.org:9092 \
+  --topic-regex '^routeviews.*\.bmp_raw$' \
+  --out samples/routeviews-broad-100.obmp \
+  --max-messages 100 \
+  --max-seconds 60 \
+  --from-end
+```
+
+**Observed result:** messages_written=100, bytes_written=27630,
+duration_secs=4, output_path=samples/routeviews-broad-100.obmp.
