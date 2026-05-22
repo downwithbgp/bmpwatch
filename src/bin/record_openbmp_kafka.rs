@@ -58,10 +58,25 @@ struct Cli {
 
     #[arg(
         long,
+        help = "List matching topics as JSON array and exit (no recording)"
+    )]
+    list_topics_json: bool,
+
+    #[arg(
+        long,
         default_value_t = DEFAULT_TOPIC_LIMIT,
         help = "Refuse to subscribe if regex matches more than N topics"
     )]
     topic_limit: usize,
+
+    #[arg(
+        long,
+        help = "Filter topics containing this collector/router group fragment (e.g. chicago, linx)"
+    )]
+    collector: Option<String>,
+
+    #[arg(long, help = "Filter topics ending in .<ASN>.bmp_raw (e.g. 13335)")]
+    asn: Option<String>,
 }
 
 fn fetch_topics(broker: &str, pattern: &str) -> Result<Vec<String>> {
@@ -88,11 +103,27 @@ fn fetch_topics(broker: &str, pattern: &str) -> Result<Vec<String>> {
     Ok(matched)
 }
 
+fn apply_filters(topics: Vec<String>, collector: Option<&str>, asn: Option<&str>) -> Vec<String> {
+    let mut v = topics;
+    if let Some(frag) = collector {
+        let lower = frag.to_lowercase();
+        v.retain(|t| t.to_lowercase().contains(&lower));
+    }
+    if let Some(asn_val) = asn {
+        let suffix = format!(".{asn_val}.bmp_raw");
+        v.retain(|t| t.ends_with(&suffix));
+    }
+    v
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
     if let Some(ref exact) = cli.topic {
-        // Exact topic mode — skip regex matching
+        if cli.list_topics_json {
+            println!("[\"{exact}\"]");
+            return Ok(());
+        }
         if cli.list_topics {
             println!("{exact}");
             return Ok(());
@@ -101,32 +132,44 @@ fn main() -> Result<()> {
     } else {
         let matched = fetch_topics(&cli.broker, &cli.topic_regex)?;
 
-        if matched.is_empty() {
-            anyhow::bail!(
-                "No topics matched regex '{}'. Check --broker and --topic-regex.",
-                cli.topic_regex
-            );
+        let filtered = apply_filters(matched, cli.collector.as_deref(), cli.asn.as_deref());
+
+        if filtered.is_empty() {
+            let hint = if cli.collector.is_some() || cli.asn.is_some() {
+                ". Try removing --collector/--asn filters or broadening --topic-regex."
+            } else {
+                ". Check --broker and --topic-regex."
+            };
+            anyhow::bail!("No topics matched after applying filters{hint}");
         }
 
-        if cli.list_topics {
-            for t in &matched {
-                println!("{t}");
-            }
-            eprintln!("{} topics matched", matched.len());
+        if cli.list_topics_json {
+            let json = serde_json::to_string_pretty(&filtered).unwrap_or_else(|_| "[]".to_string());
+            println!("{json}");
             return Ok(());
         }
 
-        if matched.len() > cli.topic_limit {
-            let show = matched.len().min(3);
-            let sample: Vec<_> = matched.iter().take(show).collect();
+        if cli.list_topics {
+            for t in &filtered {
+                println!("{t}");
+            }
+            eprintln!("{} topics matched", filtered.len());
+            return Ok(());
+        }
+
+        if filtered.len() > cli.topic_limit {
+            let show = filtered.len().min(3);
+            let sample: Vec<_> = filtered.iter().take(show).collect();
             anyhow::bail!(
-                "Regex matched {} topics but --topic-limit is {}.\n\
+                "Regex matched {} topics (after filters) but --topic-limit is {}.\n\
                  First {} topic(s):\n  {}\n\n\
                  Choose one of:\n  \
                  --topic <exact-topic>       pick a single topic\n  \
+                 --collector <fragment>      filter by collector/router name\n  \
+                 --asn <ASN>                 filter by peer ASN\n  \
                  --topic-limit <N>           raise the limit\n  \
                  --list-topics              see all matching topics",
-                matched.len(),
+                filtered.len(),
                 cli.topic_limit,
                 show,
                 sample
@@ -140,10 +183,10 @@ fn main() -> Result<()> {
         eprintln!(
             "Regex '{}' matched {} topics (limit {})",
             cli.topic_regex,
-            matched.len(),
+            filtered.len(),
             cli.topic_limit,
         );
-        run_record(&cli, matched)
+        run_record(&cli, filtered)
     }
 }
 
@@ -206,7 +249,6 @@ fn run_record(cli: &Cli, topics: Vec<String>) -> Result<()> {
     let byte_count = writer.bytes_written();
     writer.finish().context("Failed to finalize output file")?;
 
-    // Summary to stdout
     println!("broker: {}", cli.broker);
     println!("topic/s: {}", topics.join(", "));
     println!("messages_written: {msg_count}");
@@ -214,7 +256,6 @@ fn run_record(cli: &Cli, topics: Vec<String>) -> Result<()> {
     println!("output_path: {}", cli.out.display());
     println!("duration_secs: {}", start.elapsed().as_secs());
 
-    // Zero-message diagnostic
     if msg_count == 0 {
         eprintln!(
             "No messages received in {}s. The broker may be quiet with --from-end.\n\
@@ -224,4 +265,71 @@ fn run_record(cli: &Cli, topics: Vec<String>) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_filter_by_collector_fragment() {
+        let topics = vec![
+            "routeviews.chicago.65000.bmp_raw".into(),
+            "routeviews.linx.8714.bmp_raw".into(),
+            "routeviews.sg.64050.bmp_raw".into(),
+        ];
+        let filtered = apply_filters(topics, Some("chicago"), None);
+        assert_eq!(filtered.len(), 1);
+        assert!(filtered[0].contains("chicago"));
+    }
+
+    #[test]
+    fn test_filter_by_collector_case_insensitive() {
+        let topics = vec![
+            "routeviews.LINX.8714.bmp_raw".into(),
+            "routeviews.sg.64050.bmp_raw".into(),
+        ];
+        let filtered = apply_filters(topics, Some("linx"), None);
+        assert_eq!(filtered.len(), 1);
+        assert!(filtered[0].contains("LINX"));
+    }
+
+    #[test]
+    fn test_filter_by_asn_suffix() {
+        let topics = vec![
+            "routeviews.chicago.65000.bmp_raw".into(),
+            "routeviews.linx.8714.bmp_raw".into(),
+            "routeviews.sg.64050.bmp_raw".into(),
+        ];
+        let filtered = apply_filters(topics, None, Some("8714"));
+        assert_eq!(filtered.len(), 1);
+        assert!(filtered[0].ends_with(".8714.bmp_raw"));
+    }
+
+    #[test]
+    fn test_filter_combined_collector_and_asn() {
+        let topics = vec![
+            "routeviews.chicago.65000.bmp_raw".into(),
+            "routeviews.chicago.13335.bmp_raw".into(),
+            "routeviews.linx.13335.bmp_raw".into(),
+        ];
+        let filtered = apply_filters(topics, Some("chicago"), Some("13335"));
+        assert_eq!(filtered.len(), 1);
+        assert!(filtered[0].contains("chicago"));
+        assert!(filtered[0].ends_with(".13335.bmp_raw"));
+    }
+
+    #[test]
+    fn test_filter_no_matches() {
+        let topics = vec!["routeviews.chicago.65000.bmp_raw".into()];
+        let filtered = apply_filters(topics, Some("nonexistent"), None);
+        assert!(filtered.is_empty());
+    }
+
+    #[test]
+    fn test_filter_no_filters_returns_all() {
+        let topics = vec!["routeviews.a.bmp_raw".into(), "routeviews.b.bmp_raw".into()];
+        let filtered = apply_filters(topics.clone(), None, None);
+        assert_eq!(filtered, topics);
+    }
 }
