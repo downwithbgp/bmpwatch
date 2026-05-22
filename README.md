@@ -31,10 +31,10 @@ The recommended workflow from zero to verified results:
      --max-messages 100
    ```
 
-3. **Inspect with `--format openbmp-len`**:
+3. **Inspect** (format auto-detected):
    ```sh
    cargo run --bin bmpdoctor -- \
-     inspect samples/capture.obmp --format openbmp-len
+     inspect samples/capture.obmp --summary-json
    ```
 
 4. **Understand the layers** (see [Terminology](#terminology)):
@@ -58,6 +58,20 @@ cargo install --path .
 ```
 
 ## Usage
+
+### Input format
+
+`--format` defaults to `auto`, which reads the first bytes of the file:
+
+| First bytes | Detected format |
+|-------------|-----------------|
+| `BMPDOPENBMP1\n` | `openbmp-len` |
+| `0x03` | `raw-bmp` |
+| Unknown / empty / short | `raw-bmp` (diagnostic fallback — let the parser report errors) |
+
+Explicit `--format raw-bmp` or `--format openbmp-len` overrides auto-detection
+and can intentionally produce malformed/error output if the wrong format is
+forced (useful for debugging or format-level misuse testing).
 
 ### inspect
 
@@ -142,7 +156,7 @@ BMPDoctor checks for:
 | Term | Meaning |
 |------|---------|
 | `.obmp` | BMPDoctor's local capture container format. `BMPDOPENBMP1\n` magic + `u32` BE length-prefixed records. |
-| `OBMP` | OpenBMP upstream wrapper inside each RouteViews Kafka `*.bmp_raw` payload. Stripped by `--format openbmp-len` before BMP frame parsing. |
+| `OBMP` | OpenBMP upstream wrapper inside each RouteViews Kafka `*.bmp_raw` payload. Stripped automatically before BMP frame parsing. |
 | Inner frame | The RFC 7854 BMP message (common header + per-peer header + body). This is what BMPDoctor's parser operates on. |
 
 ## Limitations
