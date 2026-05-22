@@ -1,4 +1,4 @@
-use crate::raw_bmp::{termination_reason_name, BmpMessageType};
+use crate::raw_bmp::{peer_down_reason_name, termination_reason_name, BmpMessageType};
 use crate::state::{DoctorState, Finding, Severity};
 use serde::Serialize;
 
@@ -319,6 +319,25 @@ pub fn render_inspect(state: &DoctorState, truncated: bool, max_peers: usize) {
             state.malformed_messages,
             compute_buckets(&state.findings).parse_errors,
         );
+    }
+
+    let pd_peers: Vec<_> = state
+        .peers
+        .iter()
+        .filter(|(_, ps)| ps.last_peer_down_reason.is_some())
+        .collect();
+    if !pd_peers.is_empty() {
+        println!();
+        println!("Peer Down info:");
+        for (pk, ps) in &pd_peers {
+            if let Some(code) = ps.last_peer_down_reason {
+                println!(
+                    "  {} — {} (code {code})",
+                    pk.display(),
+                    peer_down_reason_name(code),
+                );
+            }
+        }
     }
 
     println!();

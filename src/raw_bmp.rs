@@ -284,6 +284,22 @@ fn init_tlv_name(t: u16) -> &'static str {
     }
 }
 
+/// Known BMP Peer Down reason code names (RFC 7854 Section 3.5 + IANA BMP Parameters).
+/// This is separate from Termination reason codes — they use different registries.
+pub fn peer_down_reason_name(code: u8) -> &'static str {
+    match code {
+        0 => "Reserved",
+        1 => "Local system closed, NOTIFICATION sent",
+        2 => "Local system closed, no NOTIFICATION",
+        3 => "Remote system closed, NOTIFICATION received",
+        4 => "Remote system closed, no data",
+        5 => "Peer de-configured",
+        6 => "Local system closed, session termination (NOTIFICATION sent)",
+        7 => "Local system closed, session termination (no NOTIFICATION)",
+        _ => "Unknown",
+    }
+}
+
 /// Known BMP Termination reason code names (RFC 7854 Section 3.8 + IANA BMP Parameters).
 pub fn termination_reason_name(code: u16) -> &'static str {
     match code {
@@ -845,6 +861,21 @@ mod tests {
         assert_eq!(termination_reason_name(1), "Administratively prohibited");
         assert_eq!(termination_reason_name(2), "Administratively closed");
         assert_eq!(termination_reason_name(999), "Unknown");
+    }
+
+    #[test]
+    fn test_peer_down_reason_names() {
+        // RFC 7854 Peer Down codes (separate registry from Termination)
+        assert_eq!(
+            peer_down_reason_name(1),
+            "Local system closed, NOTIFICATION sent"
+        );
+        assert_eq!(
+            peer_down_reason_name(2),
+            "Local system closed, no NOTIFICATION"
+        );
+        assert_eq!(peer_down_reason_name(5), "Peer de-configured");
+        assert_eq!(peer_down_reason_name(255), "Unknown");
     }
 
     #[test]
