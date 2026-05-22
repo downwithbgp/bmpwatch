@@ -48,7 +48,7 @@ labs/frr-bmp/
     frr.conf         # AS 65001
 ```
 
-All committed. Configuration uses `frrouting/frr:latest` image; the tag
+All committed. Configuration uses `quay.io/frrouting/frr:10.6.1` image; the tag
 may require adjustment for specific FRR versions.
 
 ## FRR BMP notes
