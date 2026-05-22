@@ -50,7 +50,38 @@ fn compute_buckets(findings: &[Finding]) -> FindingsBuckets {
 }
 
 pub fn render_inspect(state: &DoctorState, truncated: bool, max_peers: usize) {
+    let buckets = compute_buckets(&state.findings);
+
+    let (health_label, health_detail) = if state.malformed_messages > 0 || buckets.parse_errors > 0
+    {
+        (
+            "ISSUES",
+            format!(
+                "{} messages, {} malformed",
+                state.total_messages, state.malformed_messages
+            ),
+        )
+    } else if buckets.stream_order_warnings > 0 {
+        (
+            "OK_WITH_STREAM_WARNINGS",
+            format!(
+                "{} messages, 0 malformed, {} stream warnings",
+                state.total_messages, buckets.stream_order_warnings,
+            ),
+        )
+    } else {
+        (
+            "OK",
+            format!("{} messages, 0 malformed", state.total_messages),
+        )
+    };
+
     println!("=== BMPDoctor Inspect ===");
+    println!(
+        "Health: {health_label} — {health_detail}, {} peer{}",
+        state.peers.len(),
+        if state.peers.len() == 1 { "" } else { "s" },
+    );
     println!();
     println!("File:        {}", state.file_path);
     println!("Format:      {}", state.format);
@@ -179,7 +210,6 @@ pub fn render_inspect(state: &DoctorState, truncated: bool, max_peers: usize) {
     println!("  WARN:  {warn_count}");
     println!("  ERROR: {err_count}");
 
-    let buckets = compute_buckets(&state.findings);
     if buckets.parse_errors > 0 || buckets.stream_order_warnings > 0 || buckets.other_findings > 0 {
         println!("  Parse errors:          {}", buckets.parse_errors);
         println!("  Stream-order warnings: {}", buckets.stream_order_warnings);
@@ -936,5 +966,66 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&summary).unwrap();
         let arr = parsed["peers"].as_array().unwrap();
         assert_eq!(arr.len(), 3, "max_peers=3 should produce 3 entries");
+    }
+
+    #[test]
+    fn test_health_ok() {
+        let state = DoctorState {
+            total_messages: 10,
+            ..Default::default()
+        };
+        let buckets = compute_buckets(&state.findings);
+        assert_eq!(buckets.parse_errors, 0);
+        assert_eq!(buckets.stream_order_warnings, 0);
+        assert_eq!(state.malformed_messages, 0);
+    }
+
+    #[test]
+    fn test_health_ok_with_stream_warnings() {
+        use crate::state::{Finding, Severity};
+        let state = DoctorState {
+            total_messages: 100,
+            findings: vec![
+                Finding {
+                    severity: Severity::Warn,
+                    rule: "route_monitoring_before_peer_up".into(),
+                    offset: None,
+                    peer: None,
+                    message: "".into(),
+                },
+                Finding {
+                    severity: Severity::Warn,
+                    rule: "timestamp_regression".into(),
+                    offset: None,
+                    peer: None,
+                    message: "".into(),
+                },
+            ],
+            ..Default::default()
+        };
+        let buckets = compute_buckets(&state.findings);
+        assert_eq!(state.malformed_messages, 0);
+        assert_eq!(buckets.parse_errors, 0);
+        assert_eq!(buckets.stream_order_warnings, 2);
+    }
+
+    #[test]
+    fn test_health_issues() {
+        use crate::state::{Finding, Severity};
+        let state = DoctorState {
+            total_messages: 3,
+            malformed_messages: 1,
+            findings: vec![Finding {
+                severity: Severity::Error,
+                rule: "parse_error".into(),
+                offset: None,
+                peer: None,
+                message: "".into(),
+            }],
+            ..Default::default()
+        };
+        let buckets = compute_buckets(&state.findings);
+        assert!(state.malformed_messages > 0);
+        assert!(buckets.parse_errors > 0);
     }
 }
