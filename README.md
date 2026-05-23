@@ -414,6 +414,9 @@ Historical tags (`v0.1.*`) are checkpoints, not polished releases.
 
 - PCAP/PCAPNG via external extraction first; native support deferred
   (see [PCAP support note](docs/pcap-support.md))
+- BMPDoctor Observatory: public live learning UI for selected
+  RouteViews / OpenBMP-derived telemetry streams
+  (see [vision doc](docs/bmpdoctor-observatory-vision.md))
 - Standalone `OBMP` payload file support if real samples justify it
 - Compressed input (`.bz2`, `.gz`)
 - `.bmpr` capture format support
