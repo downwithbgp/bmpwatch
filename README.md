@@ -67,68 +67,29 @@ The recommended workflow from zero to verified results:
 
 ### Known-good smoke test
 
+The committed fixture `tests/fixtures/openbmp-two-records.bmpd` provides
+a deterministic offline validation (no network needed). It contains two
+synthetic OpenBMP-wrapped records (Peer Up AS65000 + Route Monitoring) in
+the BMPDoctor `.bmpd` container. Safe to commit: synthetic private ASN,
+351 bytes, no live data.
+
 ```sh
+# Unit test
 cargo test obmp_reader::tests::test_committed_fixture_two_openbmp_records
-```
 
-Verifies that the committed 2-record `.bmpd` fixture (`tests/fixtures/openbmp-two-records.bmpd`) parses correctly without network dependency.
-
-**Fixture provenance:** This is a tiny deterministic regression fixture, not a
-captured live RouteViews sample. It contains two synthetic OpenBMP-wrapped
-records in the BMPDoctor `.bmpd` container:
-1. Peer Up for AS65000 (private/synthetic ASN)
-2. Route Monitoring for the same peer
-
-It is safe to commit: synthetic private ASN, tiny size (351 bytes), no live
-third-party capture data, fully deterministic. Expected validation:
-2 messages, 0 malformed, container records=2, OpenBMP-wrapped payloads=2,
-metadata present.
-
-### Fixture hygiene
-
-- `tests/fixtures/` contains committed regression fixtures. Tests must
-  treat them as **read-only** — no test writes to this directory.
-- Generated or captured output belongs in `samples/` or a temporary
-  directory, not under `tests/fixtures/`.
-- `samples/*.bmpd` is intentionally gitignored.
-- This keeps repeated parallel `cargo test` runs deterministic.
-
-### Offline smoke test (committed fixture, no network)
-
-```sh
+# Inspect
 cargo run --bin bmpdoctor -- \
   inspect tests/fixtures/openbmp-two-records.bmpd --summary-json
 ```
 
-Expected: `malformed_messages=0`, `total_messages=2`, `container.container_records=2`,
-`container.openbmp_wrapped_payloads=2`, `container.openbmp_metadata` present.
-
-Shell one-liner (exits 0 on pass, 1 on failure):
-
-```sh
-cargo run --bin bmpdoctor -- \
-  inspect tests/fixtures/openbmp-two-records.bmpd --summary-json \
-  | python3 -c "
-import json,sys; d=json.load(sys.stdin);
-ok = d['malformed_messages']==0 and d['total_messages']==2 \
-     and d['container']['container_records']==2 \
-     and d['container']['openbmp_wrapped_payloads']==2 \
-     and 'openbmp_metadata' in d['container'];
-print('PASS' if ok else 'FAIL'); sys.exit(0 if ok else 1)
-"
-```
-
-Also available as a unit test:
-
-```sh
-cargo test obmp_reader::tests::test_committed_fixture_two_openbmp_records
-```
-
-Verifies the same fixture parses correctly without network dependency.
+Expected: `malformed_messages=0`, `total_messages=2`, `container_records=2`,
+`openbmp_wrapped_payloads=2`, metadata present.
 
 ### Choose a RouteViews feed
 
-Before recording, discover available feeds from the broker:
+Before recording, discover available feeds from the broker. Commands below
+assume `cargo install --path .` has been run; use `cargo run --bin` if
+building from source without installing.
 
 ```sh
 # List all topics from a collector group (case-insensitive)
@@ -386,9 +347,12 @@ separate RFC 7854 / IANA registry. Basic Stats Report type/value entries are
 decoded for diagnostics; BMPDoctor is not a time-series analytics tool or
 Prometheus exporter.
 
-Currently only raw BMP frame files are supported. OpenBMP wrapper files, `.bmpr`
-capture format, compressed files (`.bz2`/`.gz`), Kafka, TCP listeners, and
-streaming inputs are out of scope for the MVP.
+Core inspection supports `.rawbmp` and `.bmpd` formats. Other formats
+(PCAP, MRT/BGPReader, `.bmpr`, compressed `.bz2`/`.gz`) are not native
+inputs. RouteViews Kafka is supported through the separate
+`record_openbmp_kafka` binary; native Kafka input inside core `bmpdoctor`
+is out of scope. TCP listener mode and streaming inputs are out of scope
+for the MVP.
 
 ## Sources & capture
 
