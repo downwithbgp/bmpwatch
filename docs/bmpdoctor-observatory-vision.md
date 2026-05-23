@@ -1,8 +1,8 @@
 # BMPDoctor Observatory — Vision
 
-BMPDoctor Observatory is a public learning and diagnostic web UI for
-watching selected real-time BMP/BGP telemetry streams and understanding
-what is happening.
+BMPDoctor Observatory is a proposed future public learning and diagnostic
+web UI for watching selected real-time BMP/BGP telemetry streams and
+understanding what is happening. It does not exist yet.
 
 ## Audience
 
