@@ -417,6 +417,9 @@ Historical tags (`v0.1.*`) are checkpoints, not polished releases.
 - BMPDoctor Observatory: public live learning UI for selected
   RouteViews / OpenBMP-derived telemetry streams
   (see [vision doc](docs/bmpdoctor-observatory-vision.md))
+- `bmpdoctor watch`: replay/file-based rolling window summaries
+  as a stepping stone to live Observatory
+  (see [replay/watch design](docs/replay-watch-design.md))
 - Standalone `OBMP` payload file support if real samples justify it
 - Compressed input (`.bz2`, `.gz`)
 - `.bmpr` capture format support
