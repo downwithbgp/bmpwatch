@@ -79,6 +79,8 @@ Minimal, additive to existing `--summary-json` shape:
 
 ## Implementation notes
 
+- Rolling model implemented in `src/rolling.rs` (`RollingSummary`).
+- CLI command still future work.
 - Reuse existing parser and state tracking logic where possible.
 - Do not duplicate rule matching code.
 - Keep memory bounded to `--window-messages` records.

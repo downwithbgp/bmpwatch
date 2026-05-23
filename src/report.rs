@@ -18,13 +18,13 @@ fn format_size(bytes: u64) -> String {
 }
 
 #[derive(Serialize)]
-struct FindingsBuckets {
-    parse_errors: u64,
-    stream_order_warnings: u64,
-    other_findings: u64,
+pub(crate) struct FindingsBuckets {
+    pub(crate) parse_errors: u64,
+    pub(crate) stream_order_warnings: u64,
+    pub(crate) other_findings: u64,
 }
 
-fn compute_buckets(findings: &[Finding]) -> FindingsBuckets {
+pub(crate) fn compute_buckets(findings: &[Finding]) -> FindingsBuckets {
     let mut parse_errors = 0u64;
     let mut stream_order_warnings = 0u64;
     let mut other = 0u64;

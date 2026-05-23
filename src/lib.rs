@@ -8,4 +8,5 @@ pub mod obmp_reader;
 pub mod obmp_writer;
 pub mod raw_bmp;
 pub mod report;
+pub mod rolling;
 pub mod state;
