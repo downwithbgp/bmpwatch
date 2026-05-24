@@ -52,7 +52,12 @@ pub(crate) fn topic_browser(
         collector_map.entry(&pt.collector).or_default().push(pt);
     }
     let mut collectors: Vec<(&str, Vec<&ParsedTopic>)> = collector_map.into_iter().collect();
-    collectors.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+    collectors.sort_by(|a, b| {
+        let a_undef = a.0.contains("UNDEFINED");
+        let b_undef = b.0.contains("UNDEFINED");
+        a_undef.cmp(&b_undef)
+            .then_with(|| b.1.len().cmp(&a.1.len()))
+    });
 
     // Build flat display: collector headers + stream rows
     enum Row {
