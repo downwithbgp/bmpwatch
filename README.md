@@ -32,6 +32,7 @@ BMP literacy.
 
 BMPWatch scans binary BMP input and produces:
 
+- **dashboard** — live TUI for RouteViews streams with RPKI validation (the default mode)
 - **inspect** — human-readable summary of file contents, message counts, peer state
 - **lint** — machine-oriented finding output with severity levels and exit codes
 - **dump --jsonl** — one JSON object per message for debugging and automation
@@ -67,7 +68,7 @@ The recommended workflow from zero to verified results:
 
 5. **Watch a live stream** (TUI dashboard):
    ```sh
-   cargo run --bin bmpwatch -- dashboard --collector chicago --asn 13335
+   cargo run --bin bmpwatch -- --collector chicago --asn 13335
    ```
 
 ### Known-good smoke test
@@ -172,8 +173,8 @@ Explicit `--format raw-bmp` or `--format bmpd` overrides auto-detection
 and can intentionally produce malformed/error output if the wrong format is
 forced (useful for debugging or format-level misuse testing).
 
-> The `dashboard` subcommand always connects to a live Kafka broker, not a
-> file. It does not accept `--format`.
+> The dashboard connects to a live Kafka broker. `--format` is only used in
+> file replay mode (`bmpwatch <file>`).
 
 ### inspect
 
@@ -297,29 +298,29 @@ timestamp, parse status, and associated findings. Per-message detail objects
 (`tlv_info`, `stats_info`, `peer_down_info`) appear only when the message type
 carries that information.
 
-### watch
+### replay (file mode)
 
 ```sh
-bmpwatch watch <file> --window-messages <n> --interval-ms <n> [--format auto|raw-bmp|bmpd]
+bmpwatch <file> [--window-messages <n>] [--interval-ms <n>] [--format auto|raw-bmp|bmpd]
 ```
 
 Replays a `.bmpd` or `.rawbmp` capture file as a rolling window stream, emitting
-periodic JSON summary lines to stdout. A stepping stone for offline dashboard-style
-analysis of recorded captures.
+periodic JSON summary lines to stdout.
 
 ```json
 {"window_messages":10,"total_seen":2,"elapsed_ms":0,"by_type":{"PeerUpNotification":1,"RouteMonitoring":1},"peers_observed":1,...}
 ```
 
-### dashboard
+### dashboard (default)
 
 ```sh
-bmpwatch dashboard [--broker <host>] [--topic <exact>] [--collector <frag>] [--asn <n>]
+bmpwatch [--broker <host>] [--topic <exact>] [--collector <frag>] [--asn <n>]
 ```
 
-Opens an interactive TUI for live RouteViews BMP streams. If no `--topic` is given,
-fetches available topics from the Kafka broker and shows a hierarchical browser:
-region → collector → stream. Type to filter, arrows to navigate, Enter to select.
+The default mode — run `bmpwatch` with no arguments to open the live TUI. If no
+`--topic` is given, fetches available topics from the Kafka broker and shows a
+search-powered stream browser. Type to filter across ASN, name, collector, or
+topic. Arrow keys navigate, Enter connects.
 
 In the dashboard:
 - **Live message log** — scrolling view of BMP messages with timestamps, prefix
@@ -333,7 +334,7 @@ In the dashboard:
   prefixes show the expected ASN ("should be AS64496") or max prefix length
 - **Status bar** — RPKI counts (VAL/INV/NF), cumulative messages, rate,
   findings status, and keybindings
-- Paused state shows yellow header and centered ⏸ PAUSED indicator
+- Pause (`p`) freezes the display and shows a yellow header — log stays visible for study
 
 Keys: `q`/`Esc` quit, `b` back to stream browser, `p` pause/resume.
 
@@ -429,8 +430,7 @@ Historical tags (`v0.1.*`) are checkpoints, not polished releases.
 - BMPWatch Observatory: public live learning UI for selected
   RouteViews / OpenBMP-derived telemetry streams
   (see [vision doc](docs/bmpwatch-observatory-vision.md))
-- `bmpwatch watch`: replay/file-based rolling window summaries
-  as a stepping stone to live Observatory
+- File replay (`bmpwatch <file>`) as a stepping stone to live Observatory
   (see [replay/watch design](docs/replay-watch-design.md))
 - Standalone `OBMP` payload file support if real samples justify it
 - Compressed input (`.bz2`, `.gz`)
