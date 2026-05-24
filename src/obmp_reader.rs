@@ -113,7 +113,11 @@ pub(crate) struct RecordResult {
 /// Returns the parsed frame (or error), the payload kind for container stats,
 /// and OpenBMP metadata if the payload was OpenBMP-wrapped and unwrapped
 /// successfully.
-pub(crate) fn parse_record_payload(payload: &[u8], frame_offset: u64, frame_index: u64) -> RecordResult {
+pub(crate) fn parse_record_payload(
+    payload: &[u8],
+    frame_offset: u64,
+    frame_index: u64,
+) -> RecordResult {
     if payload.is_empty() {
         return RecordResult {
             frame: Err(DoctorError::Frame(format!(

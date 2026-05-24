@@ -17,10 +17,10 @@ use crate::kafka;
 use crate::lint;
 use crate::obmp_reader::parse_record_payload;
 use crate::raw_bmp::BMP_EXPECTED_VERSION;
-use bytes::Bytes;
 use crate::rolling::RollingSummary;
 use crate::rpki::RPKICache;
 use crate::state::{Finding, PeerKey};
+use bytes::Bytes;
 
 const THROUGHPUT_HISTORY: usize = 60;
 
@@ -101,17 +101,13 @@ impl Dashboard {
                     findings.push(lint::finding_invalid_version(frame.offset, frame.version));
                 }
                 if frame.msg_type.is_none() {
-                    findings.push(lint::finding_unknown_type(
-                        frame.offset,
-                        frame.msg_type_raw,
-                    ));
+                    findings.push(lint::finding_unknown_type(frame.offset, frame.msg_type_raw));
                 }
 
                 if let Some(ref pk) = peer_key {
                     *self.peer_msg_counts.entry(pk.clone()).or_insert(0) += 1;
                     if !findings.is_empty() {
-                        *self.peer_warnings.entry(pk.clone()).or_insert(0) +=
-                            findings.len() as u64;
+                        *self.peer_warnings.entry(pk.clone()).or_insert(0) += findings.len() as u64;
                     }
                 }
 
@@ -129,10 +125,12 @@ impl Dashboard {
                                 | Some(s @ crate::rpki::Status::InvalidWrongAsn)
                                 | Some(s @ crate::rpki::Status::InvalidTooLong) => s,
                                 Some(crate::rpki::Status::NotFound) => {
-                                    if matches!(status, crate::rpki::Status::Invalid
-                                        | crate::rpki::Status::InvalidWrongAsn
-                                        | crate::rpki::Status::InvalidTooLong)
-                                    {
+                                    if matches!(
+                                        status,
+                                        crate::rpki::Status::Invalid
+                                            | crate::rpki::Status::InvalidWrongAsn
+                                            | crate::rpki::Status::InvalidTooLong
+                                    ) {
                                         status
                                     } else {
                                         crate::rpki::Status::NotFound
@@ -142,8 +140,11 @@ impl Dashboard {
                             });
                             // Store detail for the first invalid prefix
                             if pc.rpki_detail.is_none()
-                                && matches!(status, crate::rpki::Status::InvalidWrongAsn
-                                    | crate::rpki::Status::InvalidTooLong)
+                                && matches!(
+                                    status,
+                                    crate::rpki::Status::InvalidWrongAsn
+                                        | crate::rpki::Status::InvalidTooLong
+                                )
                             {
                                 pc.rpki_detail = Some(detail);
                             }
@@ -158,8 +159,7 @@ impl Dashboard {
                         if *origin > 0 {
                             self.prefix_origins.insert(p.clone(), *origin);
                         }
-                        self.prefix_last_path
-                            .insert(p.clone(), pc.as_path.clone());
+                        self.prefix_last_path.insert(p.clone(), pc.as_path.clone());
                     }
                     for (p, origin) in &pc.withdrawn {
                         *self.churn_counts.entry(p.clone()).or_insert(0) += 1;
@@ -210,7 +210,8 @@ impl Dashboard {
                         }
                     }
                 }
-                self.rolling.set_metadata(self.metadata.clone().unwrap_or_default());
+                self.rolling
+                    .set_metadata(self.metadata.clone().unwrap_or_default());
 
                 self.rolling
                     .push(frame.msg_type_raw, false, findings, peer_key);
@@ -391,10 +392,12 @@ pub(crate) fn run_dashboard(
                                 | Some(s @ crate::rpki::Status::InvalidWrongAsn)
                                 | Some(s @ crate::rpki::Status::InvalidTooLong) => s,
                                 Some(crate::rpki::Status::NotFound) => {
-                                    if matches!(status, crate::rpki::Status::Invalid
-                                        | crate::rpki::Status::InvalidWrongAsn
-                                        | crate::rpki::Status::InvalidTooLong)
-                                    {
+                                    if matches!(
+                                        status,
+                                        crate::rpki::Status::Invalid
+                                            | crate::rpki::Status::InvalidWrongAsn
+                                            | crate::rpki::Status::InvalidTooLong
+                                    ) {
                                         status
                                     } else {
                                         crate::rpki::Status::NotFound
@@ -403,8 +406,11 @@ pub(crate) fn run_dashboard(
                                 Some(s) => s,
                             });
                             if pc.rpki_detail.is_none()
-                                && matches!(status, crate::rpki::Status::InvalidWrongAsn
-                                    | crate::rpki::Status::InvalidTooLong)
+                                && matches!(
+                                    status,
+                                    crate::rpki::Status::InvalidWrongAsn
+                                        | crate::rpki::Status::InvalidTooLong
+                                )
                             {
                                 pc.rpki_detail = Some(detail);
                             }
@@ -482,7 +488,8 @@ fn as_name_seed() -> &'static HashMap<u32, String> {
 fn whois_lookup(asn: u32) -> Result<String, std::io::Error> {
     use std::io::{Read, Write};
     use std::net::ToSocketAddrs;
-    let addr = ("whois.radb.net", 43).to_socket_addrs()
+    let addr = ("whois.radb.net", 43)
+        .to_socket_addrs()
         .ok()
         .and_then(|mut a| a.next());
     let addr = match addr {
@@ -497,7 +504,7 @@ fn whois_lookup(asn: u32) -> Result<String, std::io::Error> {
     for line in response.lines() {
         let lower = line.to_lowercase();
         if lower.starts_with("descr:") || lower.starts_with("org-name:") {
-            let name = line.splitn(2, ':').nth(1).unwrap_or("").trim();
+            let name = line.split_once(':').map(|x| x.1).unwrap_or("").trim();
             if !name.is_empty() && name.len() < 50 {
                 return Ok(name.to_string());
             }
@@ -533,10 +540,16 @@ pub(crate) fn as_name_resolve(asn: u32) -> String {
     }
     if let Some(name) = as_name_seed().get(&asn) {
         let name = name.clone();
-        global_name_cache().lock().unwrap().insert(asn, name.clone());
+        global_name_cache()
+            .lock()
+            .unwrap()
+            .insert(asn, name.clone());
         return name;
     }
-    global_name_cache().lock().unwrap().insert(asn, String::new());
+    global_name_cache()
+        .lock()
+        .unwrap()
+        .insert(asn, String::new());
     global_pending().lock().unwrap().push(asn);
     format!("AS{asn}")
 }
@@ -598,14 +611,14 @@ pub(crate) fn load_as_name_cache() {
     if let Ok(data) = std::fs::read(&path) {
         let mut pos = 0;
         while pos + 5 <= data.len() {
-            let asn = u32::from_be_bytes([data[pos], data[pos+1], data[pos+2], data[pos+3]]);
-            let name_len = data[pos+4] as usize;
+            let asn = u32::from_be_bytes([data[pos], data[pos + 1], data[pos + 2], data[pos + 3]]);
+            let name_len = data[pos + 4] as usize;
             pos += 5;
-            if pos + name_len > data.len() { break; }
+            if pos + name_len > data.len() {
+                break;
+            }
             if let Ok(name) = std::str::from_utf8(&data[pos..pos + name_len]) {
-                if !cache.contains_key(&asn) {
-                    cache.insert(asn, name.to_string());
-                }
+                cache.entry(asn).or_insert_with(|| name.to_string());
             }
             pos += name_len;
         }
@@ -630,11 +643,7 @@ pub(crate) fn as_name(asn_str: &str) -> String {
     as_name_resolve(asn)
 }
 
-
-fn topic_browser(
-    terminal: &mut DefaultTerminal,
-    topics: &[String],
-) -> Result<Option<String>> {
+fn topic_browser(terminal: &mut DefaultTerminal, topics: &[String]) -> Result<Option<String>> {
     crate::browser::topic_browser(terminal, topics)
 }
 
@@ -709,11 +718,8 @@ fn render(frame: &mut Frame, dash: &Dashboard, connected: bool) {
     render_header(frame, vchunks[0], dash, connected);
 
     // Body: message log (65%) + route origins (35%)
-    let body = Layout::horizontal([
-        Constraint::Percentage(65),
-        Constraint::Percentage(35),
-    ])
-    .split(vchunks[1]);
+    let body = Layout::horizontal([Constraint::Percentage(65), Constraint::Percentage(35)])
+        .split(vchunks[1]);
     render_message_log(frame, body[0], dash);
     render_origins(frame, body[1], dash);
 
@@ -737,7 +743,10 @@ fn render_status_bar(frame: &mut Frame, area: Rect, dash: &Dashboard) {
 
     let findings = if buckets.parse_errors > 0 || malformed > 0 {
         Span::styled(
-            format!(" ERR:{} WARN:{} MAL:{}", buckets.parse_errors, buckets.stream_order_warnings, malformed),
+            format!(
+                " ERR:{} WARN:{} MAL:{}",
+                buckets.parse_errors, buckets.stream_order_warnings, malformed
+            ),
             Color::Red,
         )
     } else if buckets.stream_order_warnings > 0 {
@@ -793,9 +802,7 @@ fn render_header(frame: &mut Frame, area: Rect, dash: &Dashboard, connected: boo
         format!(" BMPWatch — {meta_str}{} ", dash.topic)
     };
 
-    let style = if dash.paused {
-        Color::Yellow
-    } else if !connected {
+    let style = if dash.paused || !connected {
         Color::Yellow
     } else {
         Color::Reset
@@ -969,16 +976,18 @@ fn render_message_log(frame: &mut Frame, area: Rect, dash: &Dashboard) {
         lines.iter().collect()
     };
 
-    let ticker = Paragraph::new(Text::from(visible.iter().map(|l| (*l).clone()).collect::<Vec<Line>>()))
-        .block(Block::bordered().title("Live").borders(Borders::ALL));
+    let ticker = Paragraph::new(Text::from(
+        visible.iter().map(|l| (*l).clone()).collect::<Vec<Line>>(),
+    ))
+    .block(Block::bordered().title("Live").borders(Borders::ALL));
     frame.render_widget(ticker, area);
 }
 
 struct PrefixChange {
-    announced: Vec<(String, u32)>,   // (prefix, origin_asn)
+    announced: Vec<(String, u32)>, // (prefix, origin_asn)
     withdrawn: Vec<(String, u32)>,
-    as_path: Vec<u32>,               // full AS path
-    communities: Vec<String>,        // BGP communities as "ASN:VALUE" strings
+    as_path: Vec<u32>,        // full AS path
+    communities: Vec<String>, // BGP communities as "ASN:VALUE" strings
     rpki: Option<crate::rpki::Status>,
     rpki_detail: Option<crate::rpki::RPKIDetail>,
 }
@@ -1042,7 +1051,11 @@ fn extract_prefixes(full_data: &[u8]) -> Option<PrefixChange> {
                                     for c in comms {
                                         match c {
                                             bgpkit_parser::models::Community::Custom(asn, val) => {
-                                                communities.push(format!("{}:{}", asn.to_u32(), val));
+                                                communities.push(format!(
+                                                    "{}:{}",
+                                                    asn.to_u32(),
+                                                    val
+                                                ));
                                             }
                                             bgpkit_parser::models::Community::NoExport => {
                                                 communities.push("NO_EXPORT".into());
@@ -1095,7 +1108,11 @@ fn render_origins(frame: &mut Frame, area: Rect, dash: &Dashboard) {
     if dash.prefix_origins.is_empty() {
         let placeholder = Paragraph::new(" waiting for AS path data...")
             .dark_gray()
-            .block(Block::bordered().title("Prefix Flaps").borders(Borders::ALL));
+            .block(
+                Block::bordered()
+                    .title("Prefix Flaps")
+                    .borders(Borders::ALL),
+            );
         frame.render_widget(placeholder, area);
         return;
     }
@@ -1181,7 +1198,7 @@ fn render_origins(frame: &mut Frame, area: Rect, dash: &Dashboard) {
             let rest = pfxs.len() - max_show;
             let rest_churn: u64 = pfxs[max_show..].iter().map(|(_, c)| c).sum();
             for (i, (p, c)) in pfxs.iter().take(max_show).enumerate() {
-                let connector = if i == 0 { "──┐" } else if i == max_show - 1 { "──┤" } else { "──┤" };
+                let connector = if i == 0 { "──┐" } else { "──┤" };
                 let line = if i == max_show / 2 {
                     Line::from(vec![
                         Span::raw(format!("  {:<24} ", p)),
@@ -1199,9 +1216,8 @@ fn render_origins(frame: &mut Frame, area: Rect, dash: &Dashboard) {
             }
             lines.push(Line::from(vec![
                 Span::raw(format!("  {:<24} ", "")),
-                Span::raw(format!("──┘ ")),
-                Span::from(format!("... +{rest} more prefixes (+{rest_churn} churn)"))
-                    .dark_gray(),
+                Span::raw("──┘ ".to_string()),
+                Span::from(format!("... +{rest} more prefixes (+{rest_churn} churn)")).dark_gray(),
             ]));
         }
         lines.push(Line::from(""));
@@ -1210,8 +1226,11 @@ fn render_origins(frame: &mut Frame, area: Rect, dash: &Dashboard) {
         }
     }
 
-    let panel = Paragraph::new(Text::from(lines))
-        .block(Block::bordered().title("Prefix Flaps").borders(Borders::ALL));
+    let panel = Paragraph::new(Text::from(lines)).block(
+        Block::bordered()
+            .title("Prefix Flaps")
+            .borders(Borders::ALL),
+    );
     frame.render_widget(panel, area);
 }
 
@@ -1284,8 +1303,8 @@ fn msg_type_color(t: u8) -> Color {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
 
     // -----------------------------------------------------------------------
     // strip_known_prefix
@@ -1325,9 +1344,8 @@ mod tests {
         // The BGP payload inside the fixture is intentionally minimal and
         // may not parse as a valid UPDATE; the important thing is that
         // extract_prefixes never panics.
-        let frame = crate::raw_bmp::fixtures::make_route_monitoring_frame(
-            13335, [10, 0, 0, 1], 1000, 0,
-        );
+        let frame =
+            crate::raw_bmp::fixtures::make_route_monitoring_frame(13335, [10, 0, 0, 1], 1000, 0);
         // Should return Some or None but never panic
         let _result = extract_prefixes(&frame);
     }
@@ -1364,10 +1382,8 @@ mod tests {
         // AS_PATH: AS_SEQUENCE [6447, 13335]
         // flags=0x40 type=2, length=10, AS_SEQUENCE(2), count=2
         attrs.extend_from_slice(&[
-            0x40, 0x02, 0x0A,
-            0x02, 0x02,
-            0x00, 0x00, 0x19, 0x2F,  // 6447
-            0x00, 0x00, 0x34, 0x17,  // 13335
+            0x40, 0x02, 0x0A, 0x02, 0x02, 0x00, 0x00, 0x19, 0x2F, // 6447
+            0x00, 0x00, 0x34, 0x17, // 13335
         ]);
 
         // NEXT_HOP: 10.0.0.1
@@ -1426,7 +1442,10 @@ mod tests {
         // Verify that a WHOIS lookup was queued
         {
             let pending = global_pending().lock().unwrap();
-            assert!(pending.contains(&999_999), "AS999999 should be queued for WHOIS");
+            assert!(
+                pending.contains(&999_999),
+                "AS999999 should be queued for WHOIS"
+            );
         }
         // Clean up: remove from pending and cache
         {

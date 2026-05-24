@@ -41,7 +41,7 @@ BMPWatch scans binary BMP input and produces:
 
 The recommended workflow from zero to verified results:
 
-1. **Verify Kafka reachability** (one-time):
+1. **Verify Kafka reachability** (one-time, optional — uses external tools `nc` and `kcat`):
    ```sh
    nc -vz stream.routeviews.org 9092
    kcat -b stream.routeviews.org:9092 -L
@@ -347,7 +347,7 @@ BMPWatch checks for:
 | `invalid_bmp_version`              | ERR      | BMP version is not 3                                |
 | `truncated_frame`                  | ERR      | Frame header declares length beyond available data  |
 | `unknown_bmp_type`                 | WARN     | BMP message type outside 0–6                        |
-| `parse_error`                      | ERR      | BGPKIT Parser cannot parse the message              |
+| `parse_error`                      | ERR      | BGPKIT Parser could not parse the message            |
 | `route_monitoring_before_peer_up`  | WARN     | RM message before any Peer Up for that peer         |
 | `duplicate_peer_up`                | WARN     | Peer Up for a peer that is already active           |
 | `peer_down_without_peer_up`        | WARN     | Peer Down for a peer that was not active            |
@@ -378,6 +378,12 @@ inner RFC 7854 frame.
 | `.bmpd` | BMPWatch's local capture container format. `BMPDOPENBMP1\n` magic + `u32` BE length-prefixed records. |
 | `OBMP` | OpenBMP upstream wrapper inside each RouteViews Kafka `*.bmp_raw` payload. Stripped automatically before BMP frame parsing. |
 | Inner frame | The RFC 7854 BMP message (common header + per-peer header + body). This is what BMPWatch's parser operates on. |
+
+## Privacy
+
+BMP captures contain live BGP routing data. This data can reveal network
+relationships, upstream providers, and routing policies. Do not commit
+private BMP captures to public repositories.
 
 ## Limitations
 

@@ -31,7 +31,7 @@ fn resolve_format(file: &Path, format: InputFormat) -> InputFormat {
     name = "bmpwatch",
     version,
     about = "BMP stream monitoring and diagnostic tool",
-    subcommand_negates_reqs = true,
+    subcommand_negates_reqs = true
 )]
 pub struct Cli {
     /// Path to a .bmpd or .rawbmp capture file (replay mode).

@@ -7,11 +7,11 @@ use crate::event::{emit_jsonl, JsonlEvent};
 use crate::input::{self, InputFormat};
 use crate::lint;
 use crate::obmp_reader::{ContainerStats, ObmpReader};
-use crate::rolling::RollingSummary;
 use crate::raw_bmp::{
     BmpMessageType, PerPeerHeader, RawBmpFrame, RawBmpIterator, BMP_EXPECTED_VERSION,
     BMP_PER_PEER_HEADER_SIZE,
 };
+use crate::rolling::RollingSummary;
 use crate::state::{DoctorState, Finding, PeerKey, Severity};
 
 pub struct Doctor {
@@ -387,8 +387,7 @@ pub(crate) fn watch(
 
                 let mut frame_findings: Vec<Finding> = Vec::new();
                 if frame.version != BMP_EXPECTED_VERSION {
-                    frame_findings
-                        .push(lint::finding_invalid_version(frame.offset, frame.version));
+                    frame_findings.push(lint::finding_invalid_version(frame.offset, frame.version));
                 }
                 if frame.msg_type.is_none() {
                     frame_findings

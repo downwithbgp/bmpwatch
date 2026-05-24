@@ -59,6 +59,9 @@ fn get_recents() -> Vec<String> {
     recent_cache().lock().unwrap().clone()
 }
 
+// RouteViews collector display labels derived from the public RouteViews
+// Looking Glass collector list (https://www.routeviews.org/lg/). Topic names
+// remain authoritative; these labels are descriptive UI hints only.
 fn collector_label(name: &str) -> &str {
     match name {
         "amsix.ams" => "Amsterdam, Netherlands (AMS-IX)",
@@ -135,7 +138,9 @@ pub(crate) fn topic_browser(
     collectors.sort_by(|a, b| {
         let a_undef = a.0.contains("UNDEFINED");
         let b_undef = b.0.contains("UNDEFINED");
-        a_undef.cmp(&b_undef).then_with(|| b.1.len().cmp(&a.1.len()))
+        a_undef
+            .cmp(&b_undef)
+            .then_with(|| b.1.len().cmp(&a.1.len()))
     });
 
     // Index parsed topics by full name for recent lookup
@@ -143,8 +148,15 @@ pub(crate) fn topic_browser(
         parsed.iter().map(|pt| (pt.full.as_str(), pt)).collect();
 
     enum Row {
-        Header { collector: String, count: usize },
-        Stream { topic: String, asn: String, name: String },
+        Header {
+            collector: String,
+            count: usize,
+        },
+        Stream {
+            topic: String,
+            asn: String,
+            name: String,
+        },
         Empty,
     }
 
@@ -234,9 +246,18 @@ pub(crate) fn topic_browser(
 
             // ── Title ──
             let subtitle = if filter.is_empty() {
-                format!("{} collectors  ·  {} streams", collector_count, parsed.len())
+                format!(
+                    "{} collectors  ·  {} streams",
+                    collector_count,
+                    parsed.len()
+                )
             } else {
-                format!("{} results", rows.iter().filter(|r| matches!(r, Row::Stream { .. })).count())
+                format!(
+                    "{} results",
+                    rows.iter()
+                        .filter(|r| matches!(r, Row::Stream { .. }))
+                        .count()
+                )
             };
             let title = Paragraph::new(vec![
                 Line::from(" BMPWatch ").bold().centered(),
@@ -268,9 +289,7 @@ pub(crate) fn topic_browser(
             for (i, row) in rows.iter().enumerate() {
                 match row {
                     Row::Header { collector, count } => {
-                        let is_recent = collector == "Recently Connected";
-                        let indent = if is_recent { "" } else { "" };
-                        let text = format!(" {indent}{collector}  ({count})");
+                        let text = format!(" {collector}  ({count})");
                         let line = if i == selected {
                             Line::from(text).cyan().bold()
                         } else {
@@ -298,7 +317,9 @@ pub(crate) fn topic_browser(
                                 },
                                 Span::raw(" "),
                                 Span::raw(topic.as_str()),
-                            ]).on_white().black()
+                            ])
+                            .on_white()
+                            .black()
                         } else {
                             Line::from(vec![
                                 Span::raw("   "),
@@ -316,34 +337,29 @@ pub(crate) fn topic_browser(
                         lines.push(line);
                     }
                     Row::Empty => {
-                        lines.push(Line::from(vec![
-                            Span::raw(""),
-                        ]));
+                        lines.push(Line::from(vec![Span::raw("")]));
                     }
                 }
             }
 
             f.render_widget(
-                Paragraph::new(Text::from(lines))
-                    .block(Block::bordered().borders(Borders::ALL)),
+                Paragraph::new(Text::from(lines)).block(Block::bordered().borders(Borders::ALL)),
                 chunks[2],
             );
 
             // ── Footer ──
             f.render_widget(
-                Paragraph::new(vec![
-                    Line::from(vec![
-                        Span::raw(" "),
-                        Span::styled("↑↓", Color::White).bold(),
-                        Span::raw(" navigate  "),
-                        Span::styled("type", Color::White).bold(),
-                        Span::raw(" filter  "),
-                        Span::styled("enter", Color::White).bold(),
-                        Span::raw(" connect  "),
-                        Span::styled("esc", Color::White).bold(),
-                        Span::raw(" quit"),
-                    ]),
-                ])
+                Paragraph::new(vec![Line::from(vec![
+                    Span::raw(" "),
+                    Span::styled("↑↓", Color::White).bold(),
+                    Span::raw(" navigate  "),
+                    Span::styled("type", Color::White).bold(),
+                    Span::raw(" filter  "),
+                    Span::styled("enter", Color::White).bold(),
+                    Span::raw(" connect  "),
+                    Span::styled("esc", Color::White).bold(),
+                    Span::raw(" quit"),
+                ])])
                 .block(Block::bordered().borders(Borders::ALL))
                 .centered(),
                 chunks[3],
@@ -365,11 +381,13 @@ pub(crate) fn topic_browser(
                                     return Ok(Some(topic.clone()));
                                 }
                                 _ => {
-                                    for j in selected + 1..rows.len() {
-                                        if matches!(&rows[j], Row::Stream { topic, .. } if !topic.is_empty()) {
-                                            selected = j;
-                                            break;
-                                        }
+                                    if let Some(pos) = rows
+                                        .iter()
+                                        .enumerate()
+                                        .skip(selected + 1)
+                                        .position(|(_, r)| matches!(r, Row::Stream { topic, .. } if !topic.is_empty()))
+                                    {
+                                        selected = selected + 1 + pos;
                                     }
                                 }
                             }
@@ -384,14 +402,10 @@ pub(crate) fn topic_browser(
                         selected = 0;
                     }
                     KeyCode::Up => {
-                        if selected > 0 {
-                            selected -= 1;
-                        }
+                        selected = selected.saturating_sub(1);
                     }
-                    KeyCode::Down => {
-                        if selected + 1 < rows.len() {
-                            selected += 1;
-                        }
+                    KeyCode::Down if selected + 1 < rows.len() => {
+                        selected += 1;
                     }
                     _ => {}
                 }
