@@ -1,18 +1,20 @@
 # BMPWatch
 
 BMPWatch is a diagnostic and learning tool for BGP Monitoring Protocol
-captures. It validates RFC 7854 BMP framing, unwraps OpenBMP `OBMP` payloads
-from RouteViews Kafka captures, and summarizes peers and findings. It is
-useful for parser development, lab testing, capture sanity checks, and
-pre-ingest validation.
+streams. It validates RFC 7854 BMP framing, unwraps OpenBMP `OBMP` payloads,
+and provides a live TUI dashboard with RPKI origin validation. It is useful
+for network operators, students, parser development, lab testing, capture
+sanity checks, and BMP literacy.
 
 ### Scope
 
-BMPWatch is **not** an observability platform. It is not a replacement for
-OpenBMP, BGPStream, RouteViews, pmacct, or full routing analytics. There is
-no deep BGP UPDATE semantic validation yet, and no native PCAP/TCP
-reassembly yet. The focus is capture inspection, framing validation, and
-BMP literacy.
+BMPWatch is **not** an observability platform or a replacement for existing
+routing analytics tools. It does not perform deep BGP UPDATE semantic
+validation or native PCAP/TCP reassembly. The focus is BMP stream inspection,
+framing validation, and an interactive learning dashboard.
+
+This is an **experimental v0.1 release**. It is not production monitoring.
+It is good for learning, exploration, demos, and capture sanity checks.
 
 ## Supported inputs
 
@@ -20,7 +22,7 @@ BMP literacy.
 |-------|--------|-----|
 | `.rawbmp` | Raw RFC 7854 BMP frames | `--format auto` (default) or `--format raw-bmp` |
 | `.bmpd` | BMPWatch local capture container | `--format auto` (default) or `--format bmpd` |
-| RouteViews Kafka | Live `*.bmp_raw` topics | `record_openbmp_kafka` saves as `.bmpd` |
+| Public Kafka (e.g. RouteViews) | Live `*.bmp_raw` topics | `record_openbmp_kafka` saves as `.bmpd` |
 | OpenBMP `OBMP` wrapper | Upstream wrapper inside Kafka payloads | Stripped automatically by `.bmpd` parser |
 | BGPReader / MRT / PCAP | N/A | Comparison or external extraction only |
 
@@ -32,22 +34,43 @@ BMP literacy.
 
 BMPWatch scans binary BMP input and produces:
 
-- **dashboard** — live TUI for RouteViews streams with RPKI validation (the default mode)
+- **dashboard** — live TUI for public BMP streams with RPKI validation (the default mode)
 - **inspect** — human-readable summary of file contents, message counts, peer state
 - **lint** — machine-oriented finding output with severity levels and exit codes
 - **dump --jsonl** — one JSON object per message for debugging and automation
 
-## Happy path (RouteViews live data)
+## Quick start
 
-The recommended workflow from zero to verified results:
+### Offline smoke test (no network required)
 
-1. **Verify Kafka reachability** (one-time, optional — uses external tools `nc` and `kcat`):
-   ```sh
-   nc -vz stream.routeviews.org 9092
-   kcat -b stream.routeviews.org:9092 -L
-   ```
+```sh
+# Unit test
+cargo test obmp_reader::tests::test_committed_fixture_two_openbmp_records
 
-2. **Record a `.bmpd` capture**:
+# Inspect a committed fixture
+cargo run --bin bmpwatch -- \
+  inspect tests/fixtures/openbmp-two-records.bmpd --summary-json
+```
+
+Expected: `malformed_messages=0`, `total_messages=2`, `container_records=2`.
+
+### Live dashboard
+
+The default mode — opens the TUI stream browser. No arguments needed:
+
+```sh
+cargo run --bin bmpwatch
+```
+
+With topic flags:
+
+```sh
+cargo run --bin bmpwatch -- --collector chicago --asn 13335
+```
+
+### Record and inspect a live capture (network required)
+
+1. **Record a `.bmpd` capture** from a public Kafka source:
    ```sh
    cargo run --bin record_openbmp_kafka -- \
      --topic-regex '^routeviews.*\.bmp_raw$' \
@@ -55,43 +78,18 @@ The recommended workflow from zero to verified results:
      --max-messages 100
    ```
 
-3. **Inspect** (format auto-detected):
+2. **Inspect** (format auto-detected):
    ```sh
    cargo run --bin bmpwatch -- \
      inspect samples/capture.bmpd --summary-json
    ```
 
-4. **Understand the layers** (see [Terminology](#terminology)):
+3. **Understand the layers** (see [Terminology](#terminology)):
    - `.bmpd` = BMPWatch capture container (`BMPDOPENBMP1\n`)
    - `OBMP` = upstream OpenBMP wrapper inside Kafka payloads
    - Inner frame = RFC 7854 BMP message
 
-5. **Watch a live stream** (TUI dashboard):
-   ```sh
-   cargo run --bin bmpwatch -- --collector chicago --asn 13335
-   ```
-
-### Known-good smoke test
-
-The committed fixture `tests/fixtures/openbmp-two-records.bmpd` provides
-a deterministic offline validation (no network needed). It contains two
-synthetic OpenBMP-wrapped records (Peer Up AS65000 + Route Monitoring) in
-the BMPWatch `.bmpd` container. Safe to commit: synthetic private ASN,
-351 bytes, no live data.
-
-```sh
-# Unit test
-cargo test obmp_reader::tests::test_committed_fixture_two_openbmp_records
-
-# Inspect
-cargo run --bin bmpwatch -- \
-  inspect tests/fixtures/openbmp-two-records.bmpd --summary-json
-```
-
-Expected: `malformed_messages=0`, `total_messages=2`, `container_records=2`,
-`openbmp_wrapped_payloads=2`, metadata present.
-
-### Choose a RouteViews feed
+### Choose a live feed
 
 Before recording, discover available feeds from the broker. Commands below
 assume `cargo install --path .` has been run; use `cargo run --bin` if
@@ -116,9 +114,14 @@ or router group name). `--asn` filters topics ending with `.<ASN>.bmp_raw`.
 Both apply after regex matching and before the `--topic-limit` safety guard,
 which refuses subscriptions matching more than 20 topics by default.
 
-### RouteViews smoke test (live capture, network required)
+> **v0.1 source support**: the built-in Kafka source targets RouteViews'
+> public broker at `stream.routeviews.org:9092`. Future versions may add
+> additional live sources. The `.bmpd` container format and `.rawbmp` file
+> input are source-agnostic.
 
-The 2-step workflow to verify end-to-end health against real RouteViews data:
+### Live capture smoke test (network required)
+
+The 2-step workflow to verify end-to-end health against a live public BMP source:
 
 ```sh
 # Step 1: capture 100 messages
@@ -317,10 +320,11 @@ periodic JSON summary lines to stdout.
 bmpwatch [--broker <host>] [--topic <exact>] [--collector <frag>] [--asn <n>]
 ```
 
-The default mode — run `bmpwatch` with no arguments to open the live TUI. If no
-`--topic` is given, fetches available topics from the Kafka broker and shows a
-search-powered stream browser. Type to filter across ASN, name, collector, or
-topic. Arrow keys navigate, Enter connects.
+The default mode — run `bmpwatch` with no arguments to open the live TUI.
+Connects to a public BMP Kafka broker and shows a search-powered stream
+browser. Type to filter across ASN, name, collector, or topic. Arrow keys
+navigate, Enter connects. Supports the `--broker` flag for future source
+adapters.
 
 In the dashboard:
 - **Live message log** — scrolling view of BMP messages with timestamps, prefix
@@ -389,8 +393,8 @@ private BMP captures to public repositories.
 
 BMPWatch evaluates observed ordering within the input file. If a file starts
 mid-session, warnings like `route_monitoring_before_peer_up` may indicate an
-incomplete capture rather than a broken BMP feed. Warnings from live RouteViews
-captures are expected — they reflect real-world stream ordering, not parser
+incomplete capture rather than a broken BMP feed. Warnings from live captures
+are expected — they reflect real-world stream ordering, not parser
 failures.
 
 Frame-level validation checks the BMP common header (version, length, type) but
@@ -411,7 +415,7 @@ for the MVP.
 
 ## Sources & capture
 
-- [Data sources reference](docs/sources.md) — RouteViews Kafka (primary), CAIDA (historical)
+- [Data sources reference](docs/sources.md) — public BMP Kafka sources, file inputs
 - [OpenBMP Kafka capture guide](docs/openbmp-kafka-capture.md) — connectivity testing with `nc`/`kcat`
 - [Future issues](docs/future-issues.md) — planned features and their scope
 - [Real-sample validation](docs/real-sample-validation.md) — verified capture + parse results

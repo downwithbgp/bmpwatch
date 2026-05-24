@@ -26,7 +26,7 @@ cargo install --path .
 
 ## Architecture
 
-This is a diagnostic tool for BGP Monitoring Protocol (RFC 7854) captures. Two binaries from one crate: `bmpwatch` (main CLI) and `record_openbmp_kafka` (RouteViews Kafka recorder).
+BMP stream viewer and diagnostic tool for BGP Monitoring Protocol (RFC 7854). Two binaries from one crate: `bmpwatch` (main CLI) and `record_openbmp_kafka` (Kafka recorder for public BMP feeds).
 
 ### Input pipeline
 
@@ -75,7 +75,7 @@ File → format detection (input.rs) → Iterator (RawBmpIterator or ObmpReader)
 | `browser.rs` | Hierarchical topic browser (regions → collectors → streams) for dashboard |
 | `rpki.rs` | Minimal RTR client (RFC 8210), VRP cache, RPKI prefix validation |
 | `dashboard.rs` | Live TUI dashboard: message log, Prefix Flaps, RPKI, WHOIS, AS name cache |
-| `bin/record_openbmp_kafka.rs` | Separate binary: Kafka consumer for RouteViews, writes `.bmpd` via ObmpWriter |
+| `bin/record_openbmp_kafka.rs` | Separate binary: Kafka consumer for public BMP feeds, writes `.bmpd` via ObmpWriter |
 
 ### Lint rules (8)
 

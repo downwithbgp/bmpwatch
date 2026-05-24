@@ -59,9 +59,10 @@ fn get_recents() -> Vec<String> {
     recent_cache().lock().unwrap().clone()
 }
 
-// RouteViews collector display labels derived from the public RouteViews
-// Looking Glass collector list (https://www.routeviews.org/lg/). Topic names
+// Collector display labels derived from the public RouteViews Looking
+// Glass collector list (https://www.routeviews.org/lg/). Topic names
 // remain authoritative; these labels are descriptive UI hints only.
+// BMPWatch is not affiliated with RouteViews.
 fn collector_label(name: &str) -> &str {
     match name {
         "amsix.ams" => "Amsterdam, Netherlands (AMS-IX)",

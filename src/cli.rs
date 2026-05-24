@@ -30,7 +30,7 @@ fn resolve_format(file: &Path, format: InputFormat) -> InputFormat {
 #[command(
     name = "bmpwatch",
     version,
-    about = "BMP stream monitoring and diagnostic tool",
+    about = "Live and recorded BMP stream viewer and diagnostic tool",
     subcommand_negates_reqs = true
 )]
 pub struct Cli {
@@ -115,7 +115,7 @@ pub enum Command {
         #[arg(long, default_value = "auto")]
         format: InputFormat,
     },
-    /// Live TUI dashboard for a RouteViews BMP stream (the default)
+    /// Live TUI dashboard for a public BMP stream (the default)
     Dashboard {
         /// Kafka broker address
         #[arg(long, default_value = "stream.routeviews.org:9092")]

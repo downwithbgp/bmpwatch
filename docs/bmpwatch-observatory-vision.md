@@ -88,5 +88,5 @@ Deliberately small:
 1. Stabilize CLI JSON outputs (done — 100 tests, clean tree)
 2. Add live `watch` / stream summary mode to CLI (future)
 3. First web prototype can consume a curated `.bmpd` replay
-4. Connect to RouteViews live Kafka
+4. Connect to public BMP Kafka sources (first: RouteViews)
 5. Add source selector UI

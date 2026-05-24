@@ -2,7 +2,7 @@
 name = "bmpwatch"
 version = "0.1.0"
 edition = "2021"
-description = "BMP stream monitoring and diagnostic tool"
+description = "Live and recorded BGP Monitoring Protocol stream viewer and diagnostic tool"
 license = "MIT"
 repository = "https://github.com/downwithbgp/bmpwatch"
 
