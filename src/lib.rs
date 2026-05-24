@@ -1,3 +1,4 @@
+pub mod browser;
 pub mod cli;
 pub mod dashboard;
 pub mod doctor;
@@ -11,4 +12,5 @@ pub mod obmp_writer;
 pub mod raw_bmp;
 pub mod report;
 pub mod rolling;
+pub mod rpki;
 pub mod state;
