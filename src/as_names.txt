@@ -1,0 +1,383 @@
+0|Default/Reserved
+293|ESnet
+714|Apple
+852|TELUS
+1153|US Air Force
+1239|Sprint
+1267|Wind Tre
+1764|Next Layer
+1835|Forskningsnettet
+1853|ACOnet
+1905|CENIC
+2119|Telenor
+2152|CENIC
+2497|IIJ
+2514|NTT PC
+2516|KDDI
+2603|NORDUnet
+2614|RoEduNet
+2686|AT&T EMEA
+2708|AT&T
+2856|British Telecom
+2860|Novis
+2906|Netflix
+2914|NTT
+3209|Vodafone DE
+3215|Orange FR
+3216|Beeline RU
+3243|MEO PT
+3257|GTT
+3269|Telecom Italia
+3292|TDC DK
+3303|Swisscom
+3320|Deutsche Telekom
+3333|RIPE NCC
+3352|Telefonica ES
+3356|Lumen/L3
+3491|PCCW
+3549|Lumen/GLBC
+3582|Univ of Oregon
+3602|Rogers CA
+3684|Bell Canada
+3741|Dimension Data
+3786|LGDacom
+4134|China Telecom
+4181|TDS Telecom
+4230|Embratel BR
+4538|China Education
+4608|APNIC
+4637|Telstra
+4657|StarHub SG
+4755|Tata Comm IN
+4766|KT KR
+4775|Globe Telecom PH
+4788|TM Net MY
+4809|China Telecom
+4837|China Unicom
+5065|Bunny Telecom
+5089|Virgin Media UK
+5378|Vodafone UK
+5400|British Telecom
+5413|Daisy UK
+5430|Freenet DE
+5511|Orange FR
+5564|Vocus AU
+5607|Sky UK
+5769|Videotron CA
+6128|Altice US
+6185|Apple
+6325|Illinois CenturyNet
+6327|Shaw CA
+6447|RouteViews/UO
+6453|Tata Communications
+6461|Zayo
+6539|Bell Canada
+6663|Turk Telekom EU
+6667|EUnet FI
+6720|Magenta AT
+6730|Sunrise CH
+6762|Telecom Italia Sparkle
+6774|Belgacom BE
+6775|Telefonica DE
+6805|Telefonica DE
+6830|Liberty Global
+6871|Plusnet UK
+6939|Hurricane Electric
+7018|AT&T
+7029|Windstream US
+7342|VeriSign
+7473|Singtel SG
+7511|SyncTV JP
+7545|TPG AU
+7552|Viettel VN
+7575|AARNet AU
+7660|APAN JP
+7679|QTnet JP
+7713|Telkom Indonesia
+7922|Comcast
+7954|AS-INTELCOM
+8038|Electricity FRA
+8068|Microsoft
+8075|Microsoft
+8151|Uninet MX
+8167|Brasil Telecom
+8197|Vimpelcom RU
+8220|COLT
+8301|GIB-Solutions CH
+8352|MTS RU
+8369|Vimpelcom RU
+8400|Telekom Srbija
+8447|A1 Telekom AT
+8452|TE Data EG
+8529|Omantel OM
+8560|IONOS DE
+8612|Tiscali IT
+8683|TF-NET FR
+8708|RCS & RDS RO
+8714|LINX
+8764|Telia Lietuva
+8767|M-net DE
+8781|Ooredoo QA
+8881|Versatel DE
+8928|Interoute UK
+8966|Etisalat UAE
+8987|Amazon Web Services
+9002|RETN
+9009|M247
+9050|Telekom RO
+9121|Turk Telekom
+9145|EWE TEL DE
+9158|Telenor SE
+9249|Telecom Fiji
+9294|GNET
+9304|HGC HK
+9498|Airtel IN
+9505|Chunghwa TW
+9605|DoCoMo JP
+9829|BSNL IN
+9873|Lao Telecom LA
+9887|Vodafone CK
+9930|TIME MY
+10029|Aircel IN
+11164|Internet2
+12322|Free FR
+12389|Rostelecom RU
+12399|init7 CH
+12479|Orange ES
+12480|Seeweb IT
+12552|IP-Only SE
+12637|Seeweb IT
+12731|IPHH DE
+12859|BIT NL
+12956|Telefonica ES
+1299|Arelion/Telia
+13030|Init7 CH
+13101|TNG DE
+13237|LambdaNet DE
+13335|Cloudflare
+13445|Webzilla NL
+13786|Seabras
+14061|DigitalOcean
+14537|Continent 8
+14618|Amazon AWS
+14630|Invesco US
+14749|Link Technologies
+14840|Copel Telecom
+14907|Wikipedia
+15003|Nobis Technology
+15133|Edgecast
+15169|Google
+15412|FLAG Telecom
+15435|DELTA Fiber NL
+15557|LDCOM FR
+15695|Expereo
+15743|Telekom HU
+15802|du UAE
+15943|wilhelm.tel DE
+16082|Spitfire UK
+16276|OVH FR
+16298|Lubbers Box DE
+16509|Amazon
+16552|Tiggee US
+16625|Akamai
+16637|MTN ZA
+16735|Algar Telecom BR
+17072|Totalplay MX
+174|Cogent
+17451|Biznet ID
+17476|Bunny Telecom
+17579|SK Telecom KR
+17676|SoftBank JP
+17821|China Unicom
+18013|ASLINE HK
+18106|Viewqwest SG
+18203|Currenex US
+18233|Smart Broadband PH
+18566|Covad US
+18881|Algar BR
+19151|WV Fiber
+19653|CTI Networks
+19679|Dropbox
+198610|Beget RU
+199524|G-Core Labs
+20080|FIU US
+200590|Beget RU
+20115|Charter US
+202958|Megogo UA
+20473|Vultr
+20552|HT-Hrvatske HR
+20712|Andrews & Arnold UK
+20804|Telenor
+208808|Datacamp
+20940|Akamai
+21232|Genossenschft CH
+21309|Acanto IT
+21321|Areti RU
+21412|UAB LI
+21497|Ukrtelecom UA
+21859|Zenlayer
+22284|TV AZTECA
+22356|Megatelecom BR
+22363|PhoenixNAP US
+22562|Kevag DE
+22773|Cox Communications
+22822|Limelight
+22912|Enzu US
+23105|Fiberhub US
+23106|Edge Telecom BR
+23304|Datocity US
+23367|Adaptive Data
+23456|3BB TH
+23673|Cogetel KH
+23764|CTGNet CN
+23810|MCIX
+24115|Equinix
+24516|Virgin AU
+24940|Hetzner DE
+25091|IP-Max CH
+25137|Neterra BG
+25220|GleSYS SE
+25369|Bandwidth
+25577|C4L UK
+25885|Enovate US
+26203|Northcentral
+263444|Net Turbo BR
+263668|Net Turbo BR
+264022|Net Turbo BR
+264223|Net Turbo BR
+264409|Net Turbo BR
+264899|Net Turbo BR
+264984|Net Turbo BR
+265525|IP Solutions CA
+265566|Net Turbo BR
+26615|TIM BR
+26744|AltusHost EU
+267451|Net Turbo BR
+267953|Net Turbo BR
+268314|Net Turbo BR
+268625|Net Turbo BR
+269518|Net Turbo BR
+269688|Net Turbo BR
+270160|Net Turbo BR
+270180|Net Turbo BR
+270483|Net Turbo BR
+270843|Net Turbo BR
+271253|Net Turbo BR
+272405|Net Turbo BR
+27257|Webair US
+27589|MOJOHOST US
+27647|NeoTelecoms FR
+27947|Telconet EC
+28186|Telmex AR
+28283|NipCable BR
+28329|Megatelecom BR
+28370|NipCable BR
+28458|Zenlayer
+28657|NipCable BR
+28669|COPEL Telecom BR
+28725|CETIN CZ
+28787|Packet Clearing
+28876|SUEC JA
+28917|Fiord RU
+29049|Delta Telecom AZ
+29314|Vectra PL
+29452|Secura Hosting UK
+29518|Lefdal Mine NO
+29606|Borwood UK
+29632|NetAssist UA
+29668|iCastCenter CA
+29791|CoreSite US
+29802|Hivelocity US
+29838|AMS-IX
+30012|Taiwan Mobile
+30103|Zoom Video
+30407|Velociter US
+30610|Digital Fortress
+30860|Virtual Systems UA
+31019|KPN NL
+31103|Keyweb DE
+31122|Digiweb IE
+31142|Sibenik HR
+31200|NT Group RU
+31246|SiteTech RO
+31472|VoiceHost UK
+31500|GlobalNet UA
+31621|Aruba IT
+31782|PLZ NC
+32098|Transtelco US
+32354|Unwired US
+32590|Valve
+32708|LoadEdge
+32748|Steadfast US
+32787|Akamai/Prolexic
+32934|Meta
+33182|DIMENOC US
+33353|Sony Interactive
+33438|StackPath US
+33597|Atlantic Metro US
+33755|Datacamp
+33891|Core-Backbone DE
+34019|Hivane FR
+34549|Meerfarbig DE
+34553|NetProtect RO
+34701|Seeweb IT
+34854|Stellford UK
+35000|Prometey RU
+35168|Beget RU
+35251|Ozone BG
+35320|Eurotranstelecom UA
+35536|WatchTowr SG
+35598|Beget RU
+35625|Eurafibre FR
+36351|SoftLayer/IBM
+36459|GitHub
+36692|Cisco/OpenDNS
+36994|Vodacom ZA
+37100|SEACOM MU
+37179|Alink ZA
+37282|Njablenet ZA
+37336|Zimbabwe Internet
+37468|Angola Cables AO
+37634|SEACOM MU
+37671|CipherWave ZA
+38008|Aperture Science
+38182|Extreme Broadband
+38661|NTT America
+38909|Riseup Networks
+39120|Convergenze IT
+39351|ESAB SE
+395570|i3Dnet NL
+396982|Google Cloud
+397273|Cloudflare
+398465|Rackdog US
+400317|Taiwan Mobile
+41691|Beget RU
+43298|Beget RU
+45102|Alibaba
+45629|JasTel TH
+4637|Telstra
+46450|Pilot Fiber US
+46489|Twitch
+49544|i3Dnet
+49666|Telecom Italia Sparkle
+52320|Sonda BR
+53237|Megatelecom BR
+53828|Nitel US
+55821|Riseup Networks
+57363|Beget RU
+58453|CMI CN
+61609|NipCable BR
+61832|Megatelecom BR
+62553|Datacamp
+62567|Datacamp
+62955|eBay
+63927|Riseup Networks
+63949|Akamai/Linode
+64096|Bug Tussel US
+136255|MyanmarNet
+136867|Smart Broadband PH
+137409|Smart Broadband PH
+137951|Smart Broadband PH
+197207|Iran Telekom
+202984|Megogo UA
+205103|Beget RU
