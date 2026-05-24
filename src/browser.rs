@@ -178,7 +178,7 @@ pub(crate) fn topic_browser(
                 format!("{} results", rows.iter().filter(|r| matches!(r, Row::Stream { .. })).count())
             };
             let title = Paragraph::new(vec![
-                Line::from(" BMPDoctor ").bold().centered(),
+                Line::from(" BMPWatch ").bold().centered(),
                 Line::from(Span::styled(subtitle, Color::DarkGray)).centered(),
             ])
             .block(Block::bordered().borders(Borders::ALL));

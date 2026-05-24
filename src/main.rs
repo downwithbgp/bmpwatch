@@ -1,3 +1,3 @@
 fn main() {
-    bmpdoctor::cli::run();
+    bmpwatch::cli::run();
 }

@@ -1,12 +1,12 @@
 # OpenBMP Kafka Capture
 
 How to verify reachability and test capture from an OpenBMP Kafka broker
-before integrating into BMPDoctor.
+before integrating into BMPWatch.
 
 ## Preferred broker: RouteViews
 
 `stream.routeviews.org:9092` is the verified working broker for
-BMPDoctor integration. See
+BMPWatch integration. See
 [RouteViews Kafka verification](routeviews-kafka-verification.md)
 for the full test log.
 
@@ -145,7 +145,7 @@ cargo run --bin record_openbmp_kafka -- \
 
 The `.bmpd` file uses the `BMPDOPENBMP1\n` magic header followed by
 repeated `u32` BE length + payload frames. Format is auto-detected by
-BMPDoctor; use `inspect`, `lint`, or `dump` directly.
+BMPWatch; use `inspect`, `lint`, or `dump` directly.
 
 **Prerequisite:** librdkafka must be installed:
 ```sh
@@ -153,11 +153,11 @@ brew install librdkafka          # macOS
 sudo apt-get install librdkafka-dev  # Debian/Ubuntu
 ```
 
-Then inspect with BMPDoctor (auto-detected, no `--format` flag needed):
+Then inspect with BMPWatch (auto-detected, no `--format` flag needed):
 
 ```sh
-bmpdoctor inspect samples/nwax-sample.bmpd --summary-json
-bmpdoctor dump samples/nwax-sample.bmpd --jsonl | head -5
+bmpwatch inspect samples/nwax-sample.bmpd --summary-json
+bmpwatch dump samples/nwax-sample.bmpd --jsonl | head -5
 ```
 
 ## Notes

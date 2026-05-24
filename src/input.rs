@@ -83,7 +83,7 @@ pub fn file_size_and_format(path: &Path, fmt: InputFormat) -> Result<(u64, Strin
             Some("bmpr") => "BMP replay format".to_string(),
             _ => "raw BMP frames".to_string(),
         },
-        InputFormat::Bmpd => "BMPDoctor container".to_string(),
+        InputFormat::Bmpd => "BMPWatch container".to_string(),
     };
 
     Ok((size, format_str))

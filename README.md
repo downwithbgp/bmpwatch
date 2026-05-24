@@ -1,6 +1,6 @@
-# BMPDoctor
+# BMPWatch
 
-BMPDoctor is a diagnostic and learning tool for BGP Monitoring Protocol
+BMPWatch is a diagnostic and learning tool for BGP Monitoring Protocol
 captures. It validates RFC 7854 BMP framing, unwraps OpenBMP `OBMP` payloads
 from RouteViews Kafka captures, and summarizes peers and findings. It is
 useful for parser development, lab testing, capture sanity checks, and
@@ -8,7 +8,7 @@ pre-ingest validation.
 
 ### Scope
 
-BMPDoctor is **not** an observability platform. It is not a replacement for
+BMPWatch is **not** an observability platform. It is not a replacement for
 OpenBMP, BGPStream, RouteViews, pmacct, or full routing analytics. There is
 no deep BGP UPDATE semantic validation yet, and no native PCAP/TCP
 reassembly yet. The focus is capture inspection, framing validation, and
@@ -19,18 +19,18 @@ BMP literacy.
 | Input | Format | How |
 |-------|--------|-----|
 | `.rawbmp` | Raw RFC 7854 BMP frames | `--format auto` (default) or `--format raw-bmp` |
-| `.bmpd` | BMPDoctor local capture container | `--format auto` (default) or `--format bmpd` |
+| `.bmpd` | BMPWatch local capture container | `--format auto` (default) or `--format bmpd` |
 | RouteViews Kafka | Live `*.bmp_raw` topics | `record_openbmp_kafka` saves as `.bmpd` |
 | OpenBMP `OBMP` wrapper | Upstream wrapper inside Kafka payloads | Stripped automatically by `.bmpd` parser |
 | BGPReader / MRT / PCAP | N/A | Comparison or external extraction only |
 
-> `.bmpd` is BMPDoctor's local capture container. It is not an OpenBMP
+> `.bmpd` is BMPWatch's local capture container. It is not an OpenBMP
 > standard. Its records may contain raw BMP frames or upstream OpenBMP
 > `OBMP`-wrapped payloads.
 
 ## Purpose
 
-BMPDoctor scans binary BMP input and produces:
+BMPWatch scans binary BMP input and produces:
 
 - **inspect** — human-readable summary of file contents, message counts, peer state
 - **lint** — machine-oriented finding output with severity levels and exit codes
@@ -56,18 +56,18 @@ The recommended workflow from zero to verified results:
 
 3. **Inspect** (format auto-detected):
    ```sh
-   cargo run --bin bmpdoctor -- \
+   cargo run --bin bmpwatch -- \
      inspect samples/capture.bmpd --summary-json
    ```
 
 4. **Understand the layers** (see [Terminology](#terminology)):
-   - `.bmpd` = BMPDoctor capture container (`BMPDOPENBMP1\n`)
+   - `.bmpd` = BMPWatch capture container (`BMPDOPENBMP1\n`)
    - `OBMP` = upstream OpenBMP wrapper inside Kafka payloads
    - Inner frame = RFC 7854 BMP message
 
 5. **Watch a live stream** (TUI dashboard):
    ```sh
-   cargo run --bin bmpdoctor -- dashboard --collector chicago --asn 13335
+   cargo run --bin bmpwatch -- dashboard --collector chicago --asn 13335
    ```
 
 ### Known-good smoke test
@@ -75,7 +75,7 @@ The recommended workflow from zero to verified results:
 The committed fixture `tests/fixtures/openbmp-two-records.bmpd` provides
 a deterministic offline validation (no network needed). It contains two
 synthetic OpenBMP-wrapped records (Peer Up AS65000 + Route Monitoring) in
-the BMPDoctor `.bmpd` container. Safe to commit: synthetic private ASN,
+the BMPWatch `.bmpd` container. Safe to commit: synthetic private ASN,
 351 bytes, no live data.
 
 ```sh
@@ -83,7 +83,7 @@ the BMPDoctor `.bmpd` container. Safe to commit: synthetic private ASN,
 cargo test obmp_reader::tests::test_committed_fixture_two_openbmp_records
 
 # Inspect
-cargo run --bin bmpdoctor -- \
+cargo run --bin bmpwatch -- \
   inspect tests/fixtures/openbmp-two-records.bmpd --summary-json
 ```
 
@@ -125,7 +125,7 @@ cargo run --bin record_openbmp_kafka -- \
   --out samples/smoke.bmpd --max-messages 100 --min-messages 1
 
 # Step 2: inspect, check for malformed
-cargo run --bin bmpdoctor -- \
+cargo run --bin bmpwatch -- \
   inspect samples/smoke.bmpd --summary-json
 ```
 
@@ -178,7 +178,7 @@ forced (useful for debugging or format-level misuse testing).
 ### inspect
 
 ```sh
-bmpdoctor inspect path/to/bmp-data.rawbmp
+bmpwatch inspect path/to/bmp-data.rawbmp
 ```
 
 Outputs file metadata, message type counts, per-peer statistics, active peer count,
@@ -196,7 +196,7 @@ a `container` section distinguishes the capture wrapper from the payload types:
 ```json
 {
   "file": "samples/routeviews-broad-100.bmpd",
-  "format": "BMPDoctor container",
+  "format": "BMPWatch container",
   "size_bytes": 27630,
   "total_messages": 100,
   "malformed_messages": 0,
@@ -275,7 +275,7 @@ OpenBMP metadata:
 ### lint
 
 ```sh
-bmpdoctor lint path/to/bmp-data.rawbmp
+bmpwatch lint path/to/bmp-data.rawbmp
 ```
 
 Emits one finding per line with severity, rule name, offset, and peer context. Exit codes:
@@ -289,7 +289,7 @@ Emits one finding per line with severity, rule name, offset, and peer context. E
 ### dump
 
 ```sh
-bmpdoctor dump path/to/bmp-data.rawbmp --jsonl
+bmpwatch dump path/to/bmp-data.rawbmp --jsonl
 ```
 
 Emits one JSON object per observed BMP message including offset, type, peer identity,
@@ -300,7 +300,7 @@ carries that information.
 ### watch
 
 ```sh
-bmpdoctor watch <file> --window-messages <n> --interval-ms <n> [--format auto|raw-bmp|bmpd]
+bmpwatch watch <file> --window-messages <n> --interval-ms <n> [--format auto|raw-bmp|bmpd]
 ```
 
 Replays a `.bmpd` or `.rawbmp` capture file as a rolling window stream, emitting
@@ -314,7 +314,7 @@ analysis of recorded captures.
 ### dashboard
 
 ```sh
-bmpdoctor dashboard [--broker <host>] [--topic <exact>] [--collector <frag>] [--asn <n>]
+bmpwatch dashboard [--broker <host>] [--topic <exact>] [--collector <frag>] [--asn <n>]
 ```
 
 Opens an interactive TUI for live RouteViews BMP streams. If no `--topic` is given,
@@ -327,9 +327,9 @@ In the dashboard:
   and compact AS paths (deduplicated, truncated, origin AS color-coded by RPKI)
 - **Prefix Flaps** — prefixes grouped by origin ASN, sorted by churn frequency,
   with AS names resolved via bundled seed data, live WHOIS lookups, and
-  session-persistent cache (`~/.cache/bmpdoctor/as_names_cache.bin`)
+  session-persistent cache (`~/.cache/bmpwatch/as_names_cache.bin`)
 - **RPKI validation** — downloads ROAs from Cloudflare RTR server on startup
-  (~430K VRPs, cached 6 hours to `~/.cache/bmpdoctor/rpki_cache.bin`). Invalid
+  (~430K VRPs, cached 6 hours to `~/.cache/bmpwatch/rpki_cache.bin`). Invalid
   prefixes show the expected ASN ("should be AS64496") or max prefix length
 - **Status bar** — RPKI counts (VAL/INV/NF), cumulative messages, rate,
   findings status, and keybindings
@@ -339,7 +339,7 @@ Keys: `q`/`Esc` quit, `b` back to stream browser, `p` pause/resume.
 
 ## Detected issues
 
-BMPDoctor checks for:
+BMPWatch checks for:
 
 | Rule                               | Severity | Description                                         |
 |------------------------------------|----------|-----------------------------------------------------|
@@ -354,33 +354,33 @@ BMPDoctor checks for:
 
 ## Input model
 
-How raw BMP frames, BMPDoctor containers, upstream wrappers, and external
+How raw BMP frames, BMPWatch containers, upstream wrappers, and external
 data sources relate to each other.
 
 | Layer | Format | Characteristic |
 |-------|--------|----------------|
 | Raw BMP frame | `.rawbmp` | Concatenated RFC 7854 BMP messages. First byte `0x03`. Direct TCP byte stream capture. |
-| BMPDoctor container | `.bmpd` | Local capture wrapper: `BMPDOPENBMP1\n` magic + u32 BE length-prefixed records. Not an OpenBMP standard. |
+| BMPWatch container | `.bmpd` | Local capture wrapper: `BMPDOPENBMP1\n` magic + u32 BE length-prefixed records. Not an OpenBMP standard. |
 | Upstream wrapper | `OBMP` | OpenBMP header inside RouteViews Kafka `*.bmp_raw` payloads. Stripped automatically when reading `.bmpd` records. |
 | RouteViews Kafka | N/A | `record_openbmp_kafka` saves payloads into `.bmpd`. Payloads are typically `OBMP`-wrapped. |
 | MRT / BGPReader | N/A | Not BMP. BGPReader output is decoded BGP events, not raw BMP frames. Comparison-only; no direct parsing. |
 | PCAP | N/A | BMP over TCP requires stream reassembly. External-tool workflow documented; native support deferred. |
 
 Each `.bmpd` record contains one raw BMP frame or one `OBMP`-wrapped raw
-BMP frame. BMPDoctor's pipeline unwraps `OBMP` (if present) and parses the
+BMP frame. BMPWatch's pipeline unwraps `OBMP` (if present) and parses the
 inner RFC 7854 frame.
 
 ## Terminology
 
 | Term | Meaning |
 |------|---------|
-| `.bmpd` | BMPDoctor's local capture container format. `BMPDOPENBMP1\n` magic + `u32` BE length-prefixed records. |
+| `.bmpd` | BMPWatch's local capture container format. `BMPDOPENBMP1\n` magic + `u32` BE length-prefixed records. |
 | `OBMP` | OpenBMP upstream wrapper inside each RouteViews Kafka `*.bmp_raw` payload. Stripped automatically before BMP frame parsing. |
-| Inner frame | The RFC 7854 BMP message (common header + per-peer header + body). This is what BMPDoctor's parser operates on. |
+| Inner frame | The RFC 7854 BMP message (common header + per-peer header + body). This is what BMPWatch's parser operates on. |
 
 ## Limitations
 
-BMPDoctor evaluates observed ordering within the input file. If a file starts
+BMPWatch evaluates observed ordering within the input file. If a file starts
 mid-session, warnings like `route_monitoring_before_peer_up` may indicate an
 incomplete capture rather than a broken BMP feed. Warnings from live RouteViews
 captures are expected — they reflect real-world stream ordering, not parser
@@ -392,13 +392,13 @@ Initiation and Termination message information TLVs (sysDescr, sysName,
 termination reason) are decoded per RFC 7854 / IANA BMP Parameters; unknown TLVs
 are displayed safely by type number. Peer Down reason codes are decoded from a
 separate RFC 7854 / IANA registry. Basic Stats Report type/value entries are
-decoded for diagnostics; BMPDoctor is not a time-series analytics tool or
+decoded for diagnostics; BMPWatch is not a time-series analytics tool or
 Prometheus exporter.
 
 Core inspection supports `.rawbmp` and `.bmpd` formats. Other formats
 (PCAP, MRT/BGPReader, `.bmpr`, compressed `.bz2`/`.gz`) are not native
 inputs. RouteViews Kafka is supported through the separate
-`record_openbmp_kafka` binary; native Kafka input inside core `bmpdoctor`
+`record_openbmp_kafka` binary; native Kafka input inside core `bmpwatch`
 is out of scope. TCP listener mode and streaming inputs are out of scope
 for the MVP.
 
@@ -413,7 +413,7 @@ for the MVP.
 
 Historical tags (`v0.1.*`) are checkpoints, not polished releases.
 
-### A. Near-term (good next BMPDoctor work)
+### A. Near-term (good next BMPWatch work)
 
 - Better RFC 7854 message summaries and TLV display
 - More synthetic fixtures for edge-case coverage
@@ -426,10 +426,10 @@ Historical tags (`v0.1.*`) are checkpoints, not polished releases.
 
 - PCAP/PCAPNG via external extraction first; native support deferred
   (see [PCAP support note](docs/pcap-support.md))
-- BMPDoctor Observatory: public live learning UI for selected
+- BMPWatch Observatory: public live learning UI for selected
   RouteViews / OpenBMP-derived telemetry streams
-  (see [vision doc](docs/bmpdoctor-observatory-vision.md))
-- `bmpdoctor watch`: replay/file-based rolling window summaries
+  (see [vision doc](docs/bmpwatch-observatory-vision.md))
+- `bmpwatch watch`: replay/file-based rolling window summaries
   as a stepping stone to live Observatory
   (see [replay/watch design](docs/replay-watch-design.md))
 - Standalone `OBMP` payload file support if real samples justify it
@@ -443,14 +443,14 @@ Historical tags (`v0.1.*`) are checkpoints, not polished releases.
 - Deep BGP UPDATE semantic validation
 - Full observability platform / storage backend
 - Prometheus metrics / Parquet export
-- Native Kafka input in core `bmpdoctor`
+- Native Kafka input in core `bmpwatch`
 - TCP listener mode
 - RFC 8671 / 9069 / 9736 interpretation until base RFC 7854 behavior is mature
 
 ### Implemented and verified
 
 - `record_openbmp_kafka.rs` — RouteViews Kafka recorder (100 msgs, 4s)
-- `--format bmpd` — BMPDoctor container with OpenBMP unwrap (100 msgs,
+- `--format bmpd` — BMPWatch container with OpenBMP unwrap (100 msgs,
   18 peers, 0 malformed)
 - `--format auto` — content-based format detection
 - 8 lint rules, findings buckets, peer inventory, Initiation/Termination

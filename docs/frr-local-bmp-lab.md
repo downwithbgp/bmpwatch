@@ -1,7 +1,7 @@
 # FRR Local BMP Lab
 
 FRR local BGP lab verified; FRR BMP output not verified. Use RouteViews
-Kafka captures and synthetic fixtures as primary BMPDoctor validation
+Kafka captures and synthetic fixtures as primary BMPWatch validation
 sources. This lab is preserved for future FRR BMP retesting.
 
 ## Quick start
@@ -11,7 +11,7 @@ cd labs/frr-bmp
 docker compose up -d
 # Wait 30–60 seconds for BGP session establishment
 ls -lh ../../samples/frr-smoke.rawbmp
-cargo run --bin bmpdoctor -- \
+cargo run --bin bmpwatch -- \
   inspect ../../samples/frr-smoke.rawbmp --summary-json
 ```
 
@@ -98,7 +98,7 @@ sleep 30
 ls -lh ../../samples/frr-smoke.rawbmp
 
 # 4. Inspect
-cargo run --bin bmpdoctor -- \
+cargo run --bin bmpwatch -- \
   inspect ../../samples/frr-smoke.rawbmp --summary-json
 
 # 5. Stop

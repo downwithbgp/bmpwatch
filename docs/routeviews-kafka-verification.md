@@ -55,12 +55,12 @@ Metadata for all topics (from broker -1: stream.routeviews.org:9092/bootstrap):
 
 - `stream.routeviews.org:9092` is reachable and serves live BMP data via
   Kafka topics matching `^route-?views\..*\.bmp_raw$`.
-- This is now the **preferred external real-data source** for BMPDoctor's
+- This is now the **preferred external real-data source** for BMPWatch's
   next integration milestone.
 - Each topic corresponds to a BMP peer session from a RouteViews collector.
 - Messages are raw BMP frames (common header + payload).
 
-## Impact on BMPDoctor
+## Impact on BMPWatch
 
 - `record_openbmp_kafka.rs` is **implemented and verified** with the broad
   regex `^routeviews.*\.bmp_raw$`. Successful capture: 100 messages,
@@ -69,7 +69,7 @@ Metadata for all topics (from broker -1: stream.routeviews.org:9092/bootstrap):
 - `--format bmpd` (`.bmpd`) parser is **implemented and verified**.
   Captured `.bmpd` files parse correctly: 100 Route Monitoring messages,
   18 peers, 29 BGP elements. RouteViews Kafka `*.bmp_raw` payloads are
-  OpenBMP `OBMP`-wrapped, not raw RFC 7854. BMPDoctor's OpenBMP unwrap
+  OpenBMP `OBMP`-wrapped, not raw RFC 7854. BMPWatch's OpenBMP unwrap
   uses `bgpkit_parser::parse_openbmp_header` to strip the wrapper,
   then passes the inner RFC 7854 BMP frame to our existing parser.
 - Our `.bmpd` is a local capture container (`BMPDOPENBMP1\n` magic +

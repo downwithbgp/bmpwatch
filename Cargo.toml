@@ -1,13 +1,13 @@
 [package]
-name = "bmpdoctor"
+name = "bmpwatch"
 version = "0.1.0"
 edition = "2021"
-description = "File-first diagnostic tool for BGP Monitoring Protocol data"
+description = "BMP stream monitoring and diagnostic tool"
 license = "MIT"
-repository = "https://github.com/downwithbgp/bmpdoctor"
+repository = "https://github.com/downwithbgp/bmpwatch"
 
 [[bin]]
-name = "bmpdoctor"
+name = "bmpwatch"
 path = "src/main.rs"
 
 [dependencies]

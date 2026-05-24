@@ -1,6 +1,6 @@
 # Protocol References
 
-BMPDoctor is a diagnostic/linting tool for BGP Monitoring Protocol data. This
+BMPWatch is a diagnostic/linting tool for BGP Monitoring Protocol data. This
 document lists the normative and informative references that inform its
 implementation.
 
@@ -15,13 +15,13 @@ implementation.
 
 | Reference | Title | Relevance |
 |-----------|-------|-----------|
-| [RFC 8671](https://www.rfc-editor.org/rfc/rfc8671) | Adj-RIB-Out Support in BMP | Defines peer flag bit 1 (L = post-policy flag) for Adj-RIB-Out route monitoring. BMPDoctor does not yet interpret Adj-RIB-Out vs Adj-RIB-In. |
-| [RFC 9069](https://www.rfc-editor.org/rfc/rfc9069) | Loc-RIB Support in BMP | Defines Route Monitoring message differentiation for Loc-RIB exports. BMPDoctor's `duplicate_peer_up` rule does not yet distinguish Loc-RIB sessions from Adj-RIB sessions. |
-| [RFC 9736](https://www.rfc-editor.org/rfc/rfc9736) | BMP Peer Up TLV Update | Updates Peer Up message TLVs for BGP role and mode negotiation. BMPDoctor does not parse Peer Up TLVs beyond the OPEN message in v0.1. |
+| [RFC 8671](https://www.rfc-editor.org/rfc/rfc8671) | Adj-RIB-Out Support in BMP | Defines peer flag bit 1 (L = post-policy flag) for Adj-RIB-Out route monitoring. BMPWatch does not yet interpret Adj-RIB-Out vs Adj-RIB-In. |
+| [RFC 9069](https://www.rfc-editor.org/rfc/rfc9069) | Loc-RIB Support in BMP | Defines Route Monitoring message differentiation for Loc-RIB exports. BMPWatch's `duplicate_peer_up` rule does not yet distinguish Loc-RIB sessions from Adj-RIB sessions. |
+| [RFC 9736](https://www.rfc-editor.org/rfc/rfc9736) | BMP Peer Up TLV Update | Updates Peer Up message TLVs for BGP role and mode negotiation. BMPWatch does not parse Peer Up TLVs beyond the OPEN message in v0.1. |
 
 ## Implementation scope (v0.1)
 
-BMPDoctor v0.1 implements and validates **only the RFC 7854 base framing and
+BMPWatch v0.1 implements and validates **only the RFC 7854 base framing and
 message classification**:
 
 - 6-byte common header (version, length, type) — RFC 7854 §3.1

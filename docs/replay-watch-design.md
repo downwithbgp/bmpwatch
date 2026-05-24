@@ -7,7 +7,7 @@ summaries.
 ## Command sketch
 
 ```sh
-bmpdoctor watch samples/capture.bmpd \
+bmpwatch watch samples/capture.bmpd \
   --window-messages 100 \
   --interval 1s
 ```

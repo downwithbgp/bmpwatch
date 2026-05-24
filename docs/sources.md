@@ -1,6 +1,6 @@
 # BMP Data Sources
 
-This document catalogs known sources of raw BMP data that BMPDoctor targets.
+This document catalogs known sources of raw BMP data that BMPWatch targets.
 These are not built into the core CLI; they are experimental references for
 capture, relay, or integration work.
 
@@ -26,13 +26,13 @@ dependency.
 
 BMP speakers like FRR and GoBGP can write raw BMP frame files to disk. These
 provide real BGP data for integration testing. The `.rawbmp` extension
-distinguishes raw concatenated BMP frames from BMPDoctor container
+distinguishes raw concatenated BMP frames from BMPWatch container
 captures.
 
 ### Tier 3: RouteViews Kafka `.bmpd` — active next milestone
 
 `stream.routeviews.org:9092` is the verified working OpenBMP Kafka broker
-for BMPDoctor integration. It serves live BMP data from RouteViews
+for BMPWatch integration. It serves live BMP data from RouteViews
 collectors via topics matching `^route-?views\..*\.bmp_raw$`.
 
 Each topic corresponds to a BMP peer session. Observed topics include
@@ -42,7 +42,7 @@ Each topic corresponds to a BMP peer session. Observed topics include
 **Warning:** Topic naming is not perfectly uniform. Both `routeviews.`
 and `route-views.` prefixes exist. Consumers must handle both variants.
 
-This is now the preferred external real-data source for BMPDoctor.
+This is now the preferred external real-data source for BMPWatch.
 See [RouteViews Kafka verification](routeviews-kafka-verification.md)
 for the full test log and
 [OpenBMP Kafka capture guide](openbmp-kafka-capture.md) for consumer
@@ -65,11 +65,11 @@ RouteViews publishes MRT RIB dumps (every 2 hours) and MRT update dumps
 accessed via BGPStream, not direct collector connections.
 
 `bgpreader -p routeviews-stream` produces decoded BGP event streams. Useful
-for comparing BMPDoctor output against known-good BGP data, but NOT a raw
+for comparing BMPWatch output against known-good BGP data, but NOT a raw
 BMP input source. No integration planned.
 
-See [RouteViews and BMPDoctor](routeviews.md) for details on archive data,
-real-time data, and BMPDoctor implications.
+See [RouteViews and BMPWatch](routeviews.md) for details on archive data,
+real-time data, and BMPWatch implications.
 
 ---
 
@@ -81,7 +81,7 @@ network. See [CAIDA Kafka verification](caida-kafka-verification.md) for
 the full test log.
 
 The information below is preserved for reference but this broker is not
-the preferred real-data path for BMPDoctor.
+the preferred real-data path for BMPWatch.
 
 - **Host:** `bmp.bgpstream.caida.org`
 - **Port:** `9092`
@@ -126,7 +126,7 @@ broker is confirmed.
 - [BGPStream V2 docs - realtime OpenBMP Kafka](https://bgpstream.caida.org/docs/api/bgpstreamv2)
 - [OpenBMP Kafka message format](https://www.openbmp.org/#!docs/message_bus.md)
 
-## BMPDoctor container files (.bmpd)
+## BMPWatch container files (.bmpd)
 
 OpenBMP can write BMP data to disk with a length-delimited wrapper:
 
@@ -137,7 +137,7 @@ Payload:    raw BMP frame    (Length bytes)
 ```
 
 Each record is a single BMP frame prefixed by the magic header and length.
-BMPDoctor does not yet support this format; see `docs/future-issues.md`.
+BMPWatch does not yet support this format; see `docs/future-issues.md`.
 
 ## Raw BMP frame files (.rawbmp)
 
@@ -146,5 +146,5 @@ Concatenated BMP frames with no wrapper:
 [Common Header (6)] [Payload] [Common Header (6)] [Payload] ...
 ```
 
-This is the primary format BMPDoctor targets in the MVP. Files use the
+This is the primary format BMPWatch targets in the MVP. Files use the
 `.rawbmp` extension by convention when captured from a local BMP speaker.

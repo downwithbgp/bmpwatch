@@ -5,7 +5,7 @@ Design research note. Not implemented.
 ## Use case
 
 A user captures a BMP TCP session between a router and a collector using
-`tcpdump` or Wireshark and wants to inspect the BMP messages with BMPDoctor.
+`tcpdump` or Wireshark and wants to inspect the BMP messages with BMPWatch.
 The capture is a `.pcap` or `.pcapng` file containing TCP segments, not a
 clean byte stream.
 
@@ -33,7 +33,7 @@ BMP runs over TCP. Extracting BMP frames from a packet capture requires:
 ### A. External-tool workflow (low effort)
 
 Use existing tools to extract TCP payloads, then feed the resulting byte
-stream to BMPDoctor:
+stream to BMPWatch:
 
 ```sh
 # Extract TCP payload from a known BMP flow (collector port 1790)
@@ -45,15 +45,15 @@ tcpflow -r capture.pcap -o output_dir
 cat output_dir/*.bmp-collector-ip* > reassembled.rawbmp
 
 # Then inspect
-bmpdoctor inspect reassembled.rawbmp
+bmpwatch inspect reassembled.rawbmp
 ```
 
-This is the recommended near-term workflow. It keeps BMPDoctor focused on
+This is the recommended near-term workflow. It keeps BMPWatch focused on
 BMP byte streams and avoids TCP reassembly complexity.
 
 **Status:** Documented, not verified against real BMP PCAP captures.
 
-### B. Native PCAP support in BMPDoctor (medium effort)
+### B. Native PCAP support in BMPWatch (medium effort)
 
 Add `--format pcap` that:
 - Parses PCAP/PCAPNG container
@@ -69,7 +69,7 @@ lifetime.
 ### C. Reassembly-only tool (low-medium effort)
 
 A separate tool that reads PCAP, reassembles TCP streams, and writes
-`.rawbmp` files. BMPDoctor then inspects those files normally. This
+`.rawbmp` files. BMPWatch then inspects those files normally. This
 avoids coupling PCAP parsing to the diagnostic pipeline.
 
 ## Risks
@@ -78,7 +78,7 @@ avoids coupling PCAP parsing to the diagnostic pipeline.
   Getting it right is hard and easy to regress.
 - Ambiguous flows (multiple BMP sessions in one capture) require user input.
 - PCAPNG adds complexity beyond simple PCAP (multiple interfaces, metadata).
-- Scope creep: BMPDoctor is a BMP diagnostic tool, not a network protocol
+- Scope creep: BMPWatch is a BMP diagnostic tool, not a network protocol
   analyzer.
 
 ## Recommendation

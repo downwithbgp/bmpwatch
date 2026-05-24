@@ -122,7 +122,7 @@ pub fn render_inspect(state: &DoctorState, truncated: bool, max_peers: usize) {
         )
     };
 
-    println!("=== BMPDoctor Inspect ===");
+    println!("=== BMPWatch Inspect ===");
     println!(
         "Health: {health_label} — {health_detail}, {} peer{}",
         state.peers.len(),

@@ -95,7 +95,7 @@ No Peer Up message included — avoids synthetic BGP OPEN parse warnings.
 
 ## Malformed fixtures
 
-These are intentionally invalid samples that validate BMPDoctor's error
+These are intentionally invalid samples that validate BMPWatch's error
 handling. All produce findings or errors; none should panic.
 
 | File | Format | Fault | Expected behavior |
@@ -107,20 +107,20 @@ handling. All produce findings or errors; none should panic.
 | `malformed/truncated-record-length.bmpd` | `.bmpd` | Partial length prefix | Iterator yields error frame |
 
 ```sh
-cargo run --bin bmpdoctor -- \
+cargo run --bin bmpwatch -- \
   lint tests/fixtures/malformed/bad-version.rawbmp
-cargo run --bin bmpdoctor -- \
+cargo run --bin bmpwatch -- \
   inspect tests/fixtures/malformed/truncated-common-header.rawbmp --summary-json
 ```
 
 ```sh
-cargo run --bin bmpdoctor -- \
+cargo run --bin bmpwatch -- \
   inspect tests/fixtures/stats-report.rawbmp --summary-json
 # Expected: total_messages=1, malformed_messages=0,
 #   Stats Report info: Adj-RIBs-In=42, Loc-RIB=10
 
 ```sh
-cargo run --bin bmpdoctor -- \
+cargo run --bin bmpwatch -- \
   inspect tests/fixtures/peer-up-down.rawbmp --summary-json
 # Expected: total_messages=2, malformed_messages=0,
 #   peers_observed=1, active_peers=0, stream_order_warnings=0,
@@ -131,25 +131,25 @@ cargo run --bin bmpdoctor -- \
 
 ## Manual validation
 
-All fixtures can be inspected offline with `bmpdoctor`. These are
+All fixtures can be inspected offline with `bmpwatch`. These are
 deterministic checks — no network required.
 
 ```sh
 # OpenBMP-wrapped in .bmpd container
-cargo run --bin bmpdoctor -- \
+cargo run --bin bmpwatch -- \
   inspect tests/fixtures/openbmp-two-records.bmpd --summary-json
 # Expected: total_messages=2, malformed_messages=0,
 #   container_records=2, openbmp_wrapped_payloads=2, metadata present
 
 # Raw BMP in .bmpd container
-cargo run --bin bmpdoctor -- \
+cargo run --bin bmpwatch -- \
   inspect tests/fixtures/init-term-tlvs.bmpd --summary-json
 # Expected: total_messages=2, malformed_messages=0,
 #   Initiation info: sysDescr/bmp-speaker,
 #   Termination info: Reason Administratively closed (code 2)
 
 # Raw BMP frames (no container)
-cargo run --bin bmpdoctor -- \
+cargo run --bin bmpwatch -- \
   inspect tests/fixtures/init-term-tlvs.rawbmp --summary-json
 # Expected: total_messages=2, malformed_messages=0,
 #   format auto-detected as raw-bmp,

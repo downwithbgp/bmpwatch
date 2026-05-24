@@ -257,7 +257,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "bmpdoctor"
+name = "bmpwatch"
 version = "0.1.0"
 dependencies = [
  "anyhow",

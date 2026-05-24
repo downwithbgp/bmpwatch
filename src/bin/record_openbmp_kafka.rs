@@ -8,8 +8,8 @@ use clap::Parser;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::Message;
 
-use bmpdoctor::kafka;
-use bmpdoctor::obmp_writer::ObmpWriter;
+use bmpwatch::kafka;
+use bmpwatch::obmp_writer::ObmpWriter;
 
 const DEFAULT_TOPIC_LIMIT: usize = 20;
 
@@ -181,7 +181,7 @@ fn run_record(cli: &Cli, topics: Vec<String>) -> Result<()> {
     .context("Failed to set Ctrl-C handler")?;
 
     let consumer: BaseConsumer =
-        kafka::create_consumer(&cli.broker, "bmpdoctor-recorder", cli.from_end)?;
+        kafka::create_consumer(&cli.broker, "bmpwatch-recorder", cli.from_end)?;
 
     let topic_strs: Vec<&str> = topics.iter().map(|s| s.as_str()).collect();
     consumer

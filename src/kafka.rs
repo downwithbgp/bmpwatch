@@ -9,7 +9,7 @@ use rdkafka::consumer::Consumer;
 pub fn fetch_topics(broker: &str, pattern: &str) -> Result<Vec<String>> {
     let consumer: BaseConsumer = ClientConfig::new()
         .set("bootstrap.servers", broker)
-        .set("group.id", "bmpdoctor-recorder-metadata")
+        .set("group.id", "bmpwatch-recorder-metadata")
         .create()
         .context("Failed to create metadata consumer")?;
 

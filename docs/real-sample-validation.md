@@ -20,14 +20,14 @@ cargo run --bin record_openbmp_kafka -- \
 ## Inspection
 
 ```sh
-cargo run --bin bmpdoctor -- \
+cargo run --bin bmpwatch -- \
   inspect samples/routeviews-broad-100.bmpd --summary-json
 ```
 
 ```json
 {
   "file": "samples/routeviews-broad-100.bmpd",
-  "format": "BMPDoctor container",
+  "format": "BMPWatch container",
   "size_bytes": 27630,
   "total_messages": 100,
   "malformed_messages": 0,
@@ -132,7 +132,7 @@ also increment `inner_bmp_parse_errors`, and vice versa.
 
 ## Status
 
-BMPDoctor's end-to-end pipeline is verified against live RouteViews data:
+BMPWatch's end-to-end pipeline is verified against live RouteViews data:
 Kafka capture → `.bmpd` container → OpenBMP unwrap → BMP frame parse →
 peer tracking → BGP element counting. Zero malformed messages in a 100-
 message sample demonstrates production-readiness for the implemented formats.

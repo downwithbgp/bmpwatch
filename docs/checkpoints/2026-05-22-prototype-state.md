@@ -31,7 +31,7 @@
 
 - No deep BGP UPDATE semantic validation
 - No native PCAP/TCP reassembly
-- `.bmpd` is BMPDoctor local container, not an OpenBMP standard
+- `.bmpd` is BMPWatch local container, not an OpenBMP standard
 - FRR BMP output blocked on tested images (8.4_git, 10.6.1_git)
 - Synthetic Peer Up fixtures may have bgpkit-parser parse_error from minimal embedded BGP OPEN
 

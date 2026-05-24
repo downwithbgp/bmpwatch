@@ -27,10 +27,32 @@ fn resolve_format(file: &Path, format: InputFormat) -> InputFormat {
 }
 
 #[derive(Parser)]
-#[command(name = "bmpdoctor", version, about = "BMP file diagnostic tool")]
+#[command(
+    name = "bmpwatch",
+    version,
+    about = "BMP stream monitoring and diagnostic tool",
+    subcommand_negates_reqs = true,
+)]
 pub struct Cli {
+    /// Path to a .bmpd or .rawbmp capture file (replay mode).
+    /// If omitted, opens the live Kafka dashboard.
+    #[arg()]
+    pub file: Option<PathBuf>,
+
+    /// Rolling window size for replay mode (default 10)
+    #[arg(long, default_value_t = 10)]
+    window_messages: usize,
+
+    /// Summary emission interval in milliseconds for replay mode (default 1000)
+    #[arg(long, default_value_t = 1000)]
+    interval_ms: u64,
+
+    /// Input format for replay mode: auto, raw-bmp, or bmpd
+    #[arg(long, default_value = "auto")]
+    format: InputFormat,
+
     #[command(subcommand)]
-    pub command: Command,
+    pub command: Option<Command>,
 }
 
 #[derive(Subcommand)]
@@ -77,21 +99,7 @@ pub enum Command {
         #[arg(long, default_value = "auto")]
         format: InputFormat,
     },
-    /// Replay a capture file as a rolling window stream
-    Watch {
-        /// Path to BMP file
-        file: PathBuf,
-        /// Rolling window size in messages (default 10)
-        #[arg(long, default_value_t = 10)]
-        window_messages: usize,
-        /// Summary emission interval in milliseconds (default 1000)
-        #[arg(long, default_value_t = 1000)]
-        interval_ms: u64,
-        /// Input format: auto, raw-bmp, or bmpd
-        #[arg(long, default_value = "auto")]
-        format: InputFormat,
-    },
-    /// Live TUI dashboard for a RouteViews BMP stream
+    /// Live TUI dashboard for a RouteViews BMP stream (the default)
     Dashboard {
         /// Kafka broker address
         #[arg(long, default_value = "stream.routeviews.org:9092")]
@@ -114,7 +122,29 @@ pub enum Command {
 pub fn run() {
     let cli = Cli::parse();
 
-    match cli.command {
+    // No subcommand: file → replay mode, no file → dashboard
+    if cli.command.is_none() {
+        if let Some(ref file) = cli.file {
+            let fmt = resolve_format(file, cli.format);
+            if let Err(e) = doctor::watch(file, cli.window_messages, cli.interval_ms, fmt) {
+                eprintln!("Error in replay mode: {e}");
+                process::exit(1);
+            }
+            return;
+        } else {
+            // Default: live dashboard
+            if let Err(e) = dashboard::run_dashboard(
+                "stream.routeviews.org:9092",
+                None, None, None, 100,
+            ) {
+                eprintln!("Dashboard error: {e}");
+                process::exit(1);
+            }
+            return;
+        }
+    }
+
+    match cli.command.unwrap() {
         Command::Inspect {
             file,
             max_findings,
@@ -163,18 +193,6 @@ pub fn run() {
                 doctor.state.findings_dropped,
             );
             process::exit(max_exit_code(&doctor.state.findings));
-        }
-        Command::Watch {
-            file,
-            window_messages,
-            interval_ms,
-            format,
-        } => {
-            let fmt = resolve_format(&file, format);
-            if let Err(e) = doctor::watch(&file, window_messages, interval_ms, fmt) {
-                eprintln!("Error in watch mode: {e}");
-                process::exit(1);
-            }
         }
         Command::Dashboard {
             broker,

@@ -1,6 +1,6 @@
-# BMPDoctor Observatory — Vision
+# BMPWatch Observatory — Vision
 
-BMPDoctor Observatory is a proposed future public learning and diagnostic
+BMPWatch Observatory is a proposed future public learning and diagnostic
 web UI for watching selected real-time BMP/BGP telemetry streams and
 understanding what is happening. It does not exist yet.
 
@@ -14,14 +14,14 @@ understanding what is happening. It does not exist yet.
 
 ## Stream / source model
 
-BMPDoctor's native area is raw BMP and OpenBMP streams. The Observatory
+BMPWatch's native area is raw BMP and OpenBMP streams. The Observatory
 may also display companion BGP event streams for comparison and teaching,
 clearly labeled as such.
 
 | Source class | Examples | Format | Role |
 |-------------|----------|--------|------|
-| Raw BMP / OpenBMP | RouteViews Kafka `*.bmp_raw` topics | BMPDoctor `.bmpd` / `OBMP` unwrap | Primary input |
-| Synthetic / curated replay | `.bmpd` files with known scenarios | BMPDoctor `.bmpd` | Teaching and demos |
+| Raw BMP / OpenBMP | RouteViews Kafka `*.bmp_raw` topics | BMPWatch `.bmpd` / `OBMP` unwrap | Primary input |
+| Synthetic / curated replay | `.bmpd` files with known scenarios | BMPWatch `.bmpd` | Teaching and demos |
 | BGP event streams | BGPStream `routeviews-stream`, RIPE RIS Live | Decoded BGP events, not BMP | Comparison / teaching view |
 
 The distinction between raw BMP and decoded BGP event streams is
@@ -62,7 +62,7 @@ Deliberately small:
 - One live ingest process using existing recorder/parser logic
 - Rolling in-memory window only (no full archive)
 - SSE or WebSocket to browser
-- JSON summaries reused from BMPDoctor CLI
+- JSON summaries reused from BMPWatch CLI
 - Curated list of allowed public sources
 - No arbitrary user uploads in MVP
 

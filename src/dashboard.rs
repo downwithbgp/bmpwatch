@@ -309,7 +309,7 @@ pub(crate) fn run_dashboard(
     loop {
         // Phase 2: Connect and prime
         eprintln!("connecting to {current_topic}");
-        let consumer = kafka::create_consumer(broker, "bmpdoctor-dashboard", true)?;
+        let consumer = kafka::create_consumer(broker, "bmpwatch-dashboard", true)?;
         consumer
             .subscribe(&[&current_topic])
             .map_err(|e| anyhow::anyhow!("Failed to subscribe to topic '{current_topic}': {e}"))?;
@@ -563,7 +563,7 @@ fn as_name_cache_path() -> std::path::PathBuf {
     } else {
         std::path::PathBuf::from(".")
     };
-    base.join("bmpdoctor").join("as_names_cache.bin")
+    base.join("bmpwatch").join("as_names_cache.bin")
 }
 
 fn save_as_name_cache() {
@@ -783,11 +783,11 @@ fn render_header(frame: &mut Frame, area: Rect, dash: &Dashboard, connected: boo
     };
 
     let title = if !connected {
-        format!(" BMPDoctor — {meta_str}Connecting... ")
+        format!(" BMPWatch — {meta_str}Connecting... ")
     } else if dash.paused {
-        format!(" BMPDoctor — {meta_str}⏸ PAUSED — press p to resume ")
+        format!(" BMPWatch — {meta_str}⏸ PAUSED — press p to resume ")
     } else {
-        format!(" BMPDoctor — {meta_str}{} ", dash.topic)
+        format!(" BMPWatch — {meta_str}{} ", dash.topic)
     };
 
     let style = if dash.paused {

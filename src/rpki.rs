@@ -466,7 +466,7 @@ fn rpki_cache_path() -> PathBuf {
     } else {
         PathBuf::from(".")
     };
-    base.join("bmpdoctor").join("rpki_cache.bin")
+    base.join("bmpwatch").join("rpki_cache.bin")
 }
 
 fn parse_ipv4_prefix(s: &str) -> Option<(u32, u8)> {

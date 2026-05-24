@@ -42,14 +42,14 @@ bmp.bgpstream.caida.org has address 192.172.226.44
   BMP feeds, BGPStream V2 docs) appears to be either offline, firewalled, or
   restricted to authorized networks.
 
-## Impact on BMPDoctor
+## Impact on BMPWatch
 
 - `examples/record_openbmp_kafka.rs` is **blocked** until a reachable OpenBMP
   Kafka broker is confirmed.
 - `--format bmpd` (`.bmpd` file support) was blocked until RouteViews
   Kafka was verified reachable; now implemented and verified against live data.
   it depends on having real OpenBMP-wrapped payloads for testing.
-- CAIDA/OpenBMP Kafka is **not** the preferred real-data path for BMPDoctor.
+- CAIDA/OpenBMP Kafka is **not** the preferred real-data path for BMPWatch.
   Local FRR/GoBMP `.rawbmp` captures are the recommended integration test source.
 - Public RouteViews real-time access works through `bgpreader -p routeviews-stream`,
   but that produces decoded event records, not raw BMP frames.
