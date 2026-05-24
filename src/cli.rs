@@ -3,10 +3,13 @@ use std::process;
 
 use clap::{Parser, Subcommand};
 
+use crate::dashboard;
 use crate::doctor::Doctor;
 use crate::event::max_exit_code;
 use crate::input::{detect_format, InputFormat};
 use crate::report;
+
+use crate::doctor;
 
 const DEFAULT_MAX_FINDINGS: usize = 1000;
 
@@ -74,6 +77,38 @@ pub enum Command {
         #[arg(long, default_value = "auto")]
         format: InputFormat,
     },
+    /// Replay a capture file as a rolling window stream
+    Watch {
+        /// Path to BMP file
+        file: PathBuf,
+        /// Rolling window size in messages (default 10)
+        #[arg(long, default_value_t = 10)]
+        window_messages: usize,
+        /// Summary emission interval in milliseconds (default 1000)
+        #[arg(long, default_value_t = 1000)]
+        interval_ms: u64,
+        /// Input format: auto, raw-bmp, or bmpd
+        #[arg(long, default_value = "auto")]
+        format: InputFormat,
+    },
+    /// Live TUI dashboard for a RouteViews BMP stream
+    Dashboard {
+        /// Kafka broker address
+        #[arg(long, default_value = "stream.routeviews.org:9092")]
+        broker: String,
+        /// Exact Kafka topic name (skip topic browser)
+        #[arg(long)]
+        topic: Option<String>,
+        /// Pre-filter topics by collector/router fragment
+        #[arg(long)]
+        collector: Option<String>,
+        /// Pre-filter topics by ASN
+        #[arg(long)]
+        asn: Option<String>,
+        /// Rolling window size in messages
+        #[arg(long, default_value_t = 100)]
+        window_messages: usize,
+    },
 }
 
 pub fn run() {
@@ -128,6 +163,36 @@ pub fn run() {
                 doctor.state.findings_dropped,
             );
             process::exit(max_exit_code(&doctor.state.findings));
+        }
+        Command::Watch {
+            file,
+            window_messages,
+            interval_ms,
+            format,
+        } => {
+            let fmt = resolve_format(&file, format);
+            if let Err(e) = doctor::watch(&file, window_messages, interval_ms, fmt) {
+                eprintln!("Error in watch mode: {e}");
+                process::exit(1);
+            }
+        }
+        Command::Dashboard {
+            broker,
+            topic,
+            collector,
+            asn,
+            window_messages,
+        } => {
+            if let Err(e) = dashboard::run_dashboard(
+                &broker,
+                topic.as_deref(),
+                collector.as_deref(),
+                asn.as_deref(),
+                window_messages,
+            ) {
+                eprintln!("Dashboard error: {e}");
+                process::exit(1);
+            }
         }
         Command::Dump {
             file,

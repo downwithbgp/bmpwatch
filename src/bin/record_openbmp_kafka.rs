@@ -5,10 +5,10 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::Message;
 
+use bmpdoctor::kafka;
 use bmpdoctor::obmp_writer::ObmpWriter;
 
 const DEFAULT_TOPIC_LIMIT: usize = 20;
@@ -86,43 +86,6 @@ struct Cli {
     min_messages: u64,
 }
 
-fn fetch_topics(broker: &str, pattern: &str) -> Result<Vec<String>> {
-    let consumer: BaseConsumer = ClientConfig::new()
-        .set("bootstrap.servers", broker)
-        .set("group.id", "bmpdoctor-recorder-metadata")
-        .create()
-        .context("Failed to create metadata consumer")?;
-
-    let metadata = consumer
-        .fetch_metadata(None, Duration::from_secs(10))
-        .context("Failed to fetch topic metadata")?;
-
-    let regex =
-        regex::Regex::new(pattern).with_context(|| format!("Invalid topic regex: {pattern}"))?;
-
-    let mut matched: Vec<String> = metadata
-        .topics()
-        .iter()
-        .map(|t| t.name().to_string())
-        .filter(|name| regex.is_match(name))
-        .collect();
-    matched.sort();
-    Ok(matched)
-}
-
-fn apply_filters(topics: Vec<String>, collector: Option<&str>, asn: Option<&str>) -> Vec<String> {
-    let mut v = topics;
-    if let Some(frag) = collector {
-        let lower = frag.to_lowercase();
-        v.retain(|t| t.to_lowercase().contains(&lower));
-    }
-    if let Some(asn_val) = asn {
-        let suffix = format!(".{asn_val}.bmp_raw");
-        v.retain(|t| t.ends_with(&suffix));
-    }
-    v
-}
-
 /// Check whether the minimum message threshold is met.
 /// Returns Ok(()) if it is, or a descriptive error string if not.
 fn check_min_messages(got: u64, required: u64) -> Result<(), String> {
@@ -149,9 +112,9 @@ fn main() -> Result<()> {
         }
         run_record(&cli, vec![exact.clone()])
     } else {
-        let matched = fetch_topics(&cli.broker, &cli.topic_regex)?;
+        let matched = kafka::fetch_topics(&cli.broker, &cli.topic_regex)?;
 
-        let filtered = apply_filters(matched, cli.collector.as_deref(), cli.asn.as_deref());
+        let filtered = kafka::apply_filters(matched, cli.collector.as_deref(), cli.asn.as_deref());
 
         if filtered.is_empty() {
             let hint = if cli.collector.is_some() || cli.asn.is_some() {
@@ -217,16 +180,8 @@ fn run_record(cli: &Cli, topics: Vec<String>) -> Result<()> {
     })
     .context("Failed to set Ctrl-C handler")?;
 
-    let offset_reset = if cli.from_end { "latest" } else { "earliest" };
-
-    let consumer: BaseConsumer = ClientConfig::new()
-        .set("bootstrap.servers", &cli.broker)
-        .set("group.id", "bmpdoctor-recorder")
-        .set("enable.auto.commit", "false")
-        .set("auto.offset.reset", offset_reset)
-        .set("session.timeout.ms", "10000")
-        .create()
-        .context("Failed to create Kafka consumer")?;
+    let consumer: BaseConsumer =
+        kafka::create_consumer(&cli.broker, "bmpdoctor-recorder", cli.from_end)?;
 
     let topic_strs: Vec<&str> = topics.iter().map(|s| s.as_str()).collect();
     consumer
@@ -307,7 +262,7 @@ mod tests {
             "routeviews.linx.8714.bmp_raw".into(),
             "routeviews.sg.64050.bmp_raw".into(),
         ];
-        let filtered = apply_filters(topics, Some("chicago"), None);
+        let filtered = kafka::apply_filters(topics, Some("chicago"), None);
         assert_eq!(filtered.len(), 1);
         assert!(filtered[0].contains("chicago"));
     }
@@ -318,7 +273,7 @@ mod tests {
             "routeviews.LINX.8714.bmp_raw".into(),
             "routeviews.sg.64050.bmp_raw".into(),
         ];
-        let filtered = apply_filters(topics, Some("linx"), None);
+        let filtered = kafka::apply_filters(topics, Some("linx"), None);
         assert_eq!(filtered.len(), 1);
         assert!(filtered[0].contains("LINX"));
     }
@@ -330,7 +285,7 @@ mod tests {
             "routeviews.linx.8714.bmp_raw".into(),
             "routeviews.sg.64050.bmp_raw".into(),
         ];
-        let filtered = apply_filters(topics, None, Some("8714"));
+        let filtered = kafka::apply_filters(topics, None, Some("8714"));
         assert_eq!(filtered.len(), 1);
         assert!(filtered[0].ends_with(".8714.bmp_raw"));
     }
@@ -342,7 +297,7 @@ mod tests {
             "routeviews.chicago.13335.bmp_raw".into(),
             "routeviews.linx.13335.bmp_raw".into(),
         ];
-        let filtered = apply_filters(topics, Some("chicago"), Some("13335"));
+        let filtered = kafka::apply_filters(topics, Some("chicago"), Some("13335"));
         assert_eq!(filtered.len(), 1);
         assert!(filtered[0].contains("chicago"));
         assert!(filtered[0].ends_with(".13335.bmp_raw"));
@@ -351,14 +306,14 @@ mod tests {
     #[test]
     fn test_filter_no_matches() {
         let topics = vec!["routeviews.chicago.65000.bmp_raw".into()];
-        let filtered = apply_filters(topics, Some("nonexistent"), None);
+        let filtered = kafka::apply_filters(topics, Some("nonexistent"), None);
         assert!(filtered.is_empty());
     }
 
     #[test]
     fn test_filter_no_filters_returns_all() {
         let topics = vec!["routeviews.a.bmp_raw".into(), "routeviews.b.bmp_raw".into()];
-        let filtered = apply_filters(topics.clone(), None, None);
+        let filtered = kafka::apply_filters(topics.clone(), None, None);
         assert_eq!(filtered, topics);
     }
 

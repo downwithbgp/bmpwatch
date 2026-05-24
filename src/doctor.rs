@@ -7,6 +7,7 @@ use crate::event::{emit_jsonl, JsonlEvent};
 use crate::input::{self, InputFormat};
 use crate::lint;
 use crate::obmp_reader::{ContainerStats, ObmpReader};
+use crate::rolling::RollingSummary;
 use crate::raw_bmp::{
     BmpMessageType, PerPeerHeader, RawBmpFrame, RawBmpIterator, BMP_EXPECTED_VERSION,
     BMP_PER_PEER_HEADER_SIZE,
@@ -23,13 +24,13 @@ pub struct Doctor {
 
 const DEFAULT_MAX_FINDINGS: usize = 1000;
 
-enum FrameSource {
+pub(crate) enum FrameSource {
     RawBmp(RawBmpIterator),
     Obmp(ObmpReader),
 }
 
 impl FrameSource {
-    fn container_stats(&self) -> Option<&ContainerStats> {
+    pub(crate) fn container_stats(&self) -> Option<&ContainerStats> {
         match self {
             FrameSource::Obmp(reader) => Some(&reader.stats),
             FrameSource::RawBmp(_) => None,
@@ -314,7 +315,7 @@ impl Doctor {
     }
 }
 
-fn peer_key_from_pph(pph: &PerPeerHeader) -> PeerKey {
+pub(crate) fn peer_key_from_pph(pph: &PerPeerHeader) -> PeerKey {
     let ip = pph.peer_ip();
     PeerKey {
         peer_asn: Some(pph.peer_asn),
@@ -356,6 +357,72 @@ fn count_bgp_elems_in_update(bgp_msg: bgpkit_parser::models::BgpMessage) -> u64 
 
 fn is_timestamp_before(a: (u32, u32), b: (u32, u32)) -> bool {
     a.0 < b.0 || (a.0 == b.0 && a.1 < b.1)
+}
+
+/// Replay a capture file as a rolling window stream.
+///
+/// Iterates frames, feeds them into a `RollingSummary`, and periodically
+/// emits JSON summary lines at `interval_ms` boundaries. After the file is
+/// exhausted, a final summary is emitted if any frames were seen.
+pub(crate) fn watch(
+    file_path: &Path,
+    window_messages: usize,
+    interval_ms: u64,
+    format: InputFormat,
+) -> Result<(), DoctorError> {
+    let mut iter: FrameSource = match format {
+        InputFormat::RawBmp => FrameSource::RawBmp(RawBmpIterator::open(file_path)?),
+        InputFormat::Bmpd => FrameSource::Obmp(ObmpReader::open(file_path)?),
+        InputFormat::Auto => unreachable!("Auto should be resolved before watch"),
+    };
+
+    let mut rolling_summary = RollingSummary::new(window_messages);
+    let start = std::time::Instant::now();
+    let mut last_emission = std::time::Instant::now();
+
+    for frame_result in &mut iter {
+        match frame_result {
+            Ok(frame) => {
+                let peer_key = frame.per_peer_header.as_ref().map(peer_key_from_pph);
+
+                let mut frame_findings: Vec<Finding> = Vec::new();
+                if frame.version != BMP_EXPECTED_VERSION {
+                    frame_findings
+                        .push(lint::finding_invalid_version(frame.offset, frame.version));
+                }
+                if frame.msg_type.is_none() {
+                    frame_findings
+                        .push(lint::finding_unknown_type(frame.offset, frame.msg_type_raw));
+                }
+
+                rolling_summary.push(frame.msg_type_raw, false, frame_findings, peer_key);
+            }
+            Err(DoctorError::Frame(_)) => {
+                rolling_summary.push(0, true, vec![], None);
+            }
+            Err(e) => return Err(e),
+        }
+
+        if last_emission.elapsed().as_millis() as u64 >= interval_ms {
+            let elapsed_ms = start.elapsed().as_millis() as u64;
+            rolling_summary.emit_json(elapsed_ms);
+            last_emission = std::time::Instant::now();
+        }
+    }
+
+    // Copy OpenBMP metadata from container stats before final emission
+    if let Some(stats) = iter.container_stats() {
+        if let Some(ref meta) = stats.openbmp_metadata {
+            rolling_summary.set_metadata(meta.clone());
+        }
+    }
+
+    if rolling_summary.total_seen() > 0 {
+        let elapsed_ms = start.elapsed().as_millis() as u64;
+        rolling_summary.emit_json(elapsed_ms);
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

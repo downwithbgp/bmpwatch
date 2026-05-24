@@ -102,10 +102,10 @@ fn try_unwrap_openbmp(payload: &[u8]) -> Result<UnwrapResult, String> {
 }
 
 /// Result of parsing a `.bmpd` record payload.
-struct RecordResult {
-    frame: Result<RawBmpFrame, DoctorError>,
-    kind: PayloadKind,
-    metadata: Option<OpenBmpMetadata>,
+pub(crate) struct RecordResult {
+    pub(crate) frame: Result<RawBmpFrame, DoctorError>,
+    pub(crate) kind: PayloadKind,
+    pub(crate) metadata: Option<OpenBmpMetadata>,
 }
 
 /// Parse a record payload that may be raw BMP or OpenBMP-wrapped.
@@ -113,7 +113,7 @@ struct RecordResult {
 /// Returns the parsed frame (or error), the payload kind for container stats,
 /// and OpenBMP metadata if the payload was OpenBMP-wrapped and unwrapped
 /// successfully.
-fn parse_record_payload(payload: &[u8], frame_offset: u64, frame_index: u64) -> RecordResult {
+pub(crate) fn parse_record_payload(payload: &[u8], frame_offset: u64, frame_index: u64) -> RecordResult {
     if payload.is_empty() {
         return RecordResult {
             frame: Err(DoctorError::Frame(format!(

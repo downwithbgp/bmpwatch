@@ -1,8 +1,10 @@
 pub mod cli;
+pub mod dashboard;
 pub mod doctor;
 pub mod error;
 pub mod event;
 pub mod input;
+pub mod kafka;
 pub mod lint;
 pub mod obmp_reader;
 pub mod obmp_writer;
