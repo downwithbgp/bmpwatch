@@ -20,16 +20,18 @@ pub(crate) struct ParsedTopic {
 pub(crate) fn parse_topic(t: &str) -> Option<ParsedTopic> {
     let body = t.strip_prefix("routeviews.")?;
     let body = body.strip_suffix(".bmp_raw")?;
-    let mut parts: Vec<&str> = body.splitn(2, '.').collect();
-    if parts.len() < 2 {
-        return Some(ParsedTopic {
-            collector: parts[0].to_string(),
-            asn_str: "-".to_string(),
-            full: t.to_string(),
-        });
-    }
-    let asn_str = parts.pop().unwrap().to_string();
-    let collector = parts.join(".");
+    // Split from the right: last segment is ASN, everything before is collector
+    let (collector, asn_str) = match body.rsplit_once('.') {
+        Some((col, asn)) => (col.to_string(), asn.to_string()),
+        None => {
+            // No dots — edge case: routeviews.<collector>.bmp_raw
+            return Some(ParsedTopic {
+                collector: body.to_string(),
+                asn_str: "-".to_string(),
+                full: t.to_string(),
+            });
+        }
+    };
     if collector.is_empty() {
         return None;
     }
