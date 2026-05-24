@@ -19,6 +19,7 @@ use crate::obmp_reader::parse_record_payload;
 use crate::raw_bmp::BMP_EXPECTED_VERSION;
 use bytes::Bytes;
 use crate::rolling::RollingSummary;
+use crate::rpki::RPKICache;
 use crate::state::{Finding, PeerKey};
 
 const THROUGHPUT_HISTORY: usize = 60;
@@ -52,6 +53,7 @@ pub(crate) struct Dashboard {
     prefix_last_path: HashMap<String, Vec<u32>>,
     as_adjacency: HashMap<(u32, u32), u64>,
     as_frequency: HashMap<u32, u64>,
+    rpki: Option<RPKICache>,
 }
 
 impl Dashboard {
@@ -76,6 +78,7 @@ impl Dashboard {
             prefix_last_path: HashMap::new(),
             as_adjacency: HashMap::new(),
             as_frequency: HashMap::new(),
+            rpki: None,
         }
     }
 
@@ -111,7 +114,41 @@ impl Dashboard {
                 }
 
                 // Push into scrolling message log
-                let prefixes = extract_prefixes(&frame.full_data);
+                let mut prefixes = extract_prefixes(&frame.full_data);
+                // RPKI validation
+                if let Some(ref mut pc) = prefixes {
+                    let mut worst = None;
+                    for (p, origin) in &pc.announced {
+                        if let Some(ref mut rpki) = self.rpki {
+                            let (status, detail) = rpki.validate(p, *origin);
+                            worst = Some(match worst {
+                                None => status,
+                                Some(s @ crate::rpki::Status::Invalid)
+                                | Some(s @ crate::rpki::Status::InvalidWrongAsn)
+                                | Some(s @ crate::rpki::Status::InvalidTooLong) => s,
+                                Some(crate::rpki::Status::NotFound) => {
+                                    if matches!(status, crate::rpki::Status::Invalid
+                                        | crate::rpki::Status::InvalidWrongAsn
+                                        | crate::rpki::Status::InvalidTooLong)
+                                    {
+                                        status
+                                    } else {
+                                        crate::rpki::Status::NotFound
+                                    }
+                                }
+                                Some(s) => s,
+                            });
+                            // Store detail for the first invalid prefix
+                            if pc.rpki_detail.is_none()
+                                && matches!(status, crate::rpki::Status::InvalidWrongAsn
+                                    | crate::rpki::Status::InvalidTooLong)
+                            {
+                                pc.rpki_detail = Some(detail);
+                            }
+                        }
+                    }
+                    pc.rpki = worst;
+                }
                 // Track churn, origins, and AS relationships
                 if let Some(ref pc) = prefixes {
                     for (p, origin) in &pc.announced {
@@ -332,6 +369,52 @@ pub(crate) fn run_dashboard(
             dash.rolling.total_seen()
         );
 
+        // Load persisted caches
+        load_as_name_cache();
+
+        // Download RPKI ROAs for prefix validation
+        eprintln!("  downloading RPKI cache...");
+        match RPKICache::load_or_download("rtr.rpki.cloudflare.com", 8282) {
+            Ok(mut cache) => {
+                // Re-validate messages already in the log (from priming)
+                for msg in &mut dash.message_log {
+                    if let Some(ref mut pc) = msg.prefixes {
+                        let mut worst = None;
+                        for (p, origin) in &pc.announced {
+                            let (status, detail) = cache.validate(p, *origin);
+                            worst = Some(match worst {
+                                None => status,
+                                Some(s @ crate::rpki::Status::Invalid)
+                                | Some(s @ crate::rpki::Status::InvalidWrongAsn)
+                                | Some(s @ crate::rpki::Status::InvalidTooLong) => s,
+                                Some(crate::rpki::Status::NotFound) => {
+                                    if matches!(status, crate::rpki::Status::Invalid
+                                        | crate::rpki::Status::InvalidWrongAsn
+                                        | crate::rpki::Status::InvalidTooLong)
+                                    {
+                                        status
+                                    } else {
+                                        crate::rpki::Status::NotFound
+                                    }
+                                }
+                                Some(s) => s,
+                            });
+                            if pc.rpki_detail.is_none()
+                                && matches!(status, crate::rpki::Status::InvalidWrongAsn
+                                    | crate::rpki::Status::InvalidTooLong)
+                            {
+                                pc.rpki_detail = Some(detail);
+                            }
+                        }
+                        pc.rpki = worst;
+                    }
+                }
+                eprintln!("  RPKI: {} VRPs loaded", cache.vrp_count());
+                dash.rpki = Some(cache);
+            }
+            Err(e) => eprintln!("  RPKI: download failed ({e}), continuing without validation"),
+        }
+
         // Phase 3: TUI dashboard
         let mut terminal = ratatui::init();
         let result = run_loop(&mut terminal, &consumer, &mut dash);
@@ -435,7 +518,7 @@ fn global_pending() -> &'static Mutex<Vec<u32>> {
 
 /// Resolve an ASN to a name. Checks global cache → seed data → queues WHOIS.
 /// Never blocks. Returns "ASxxxxx" for unknowns until resolved.
-fn as_name_resolve(asn: u32) -> String {
+pub(crate) fn as_name_resolve(asn: u32) -> String {
     {
         let cache = global_name_cache().lock().unwrap();
         if let Some(name) = cache.get(&asn) {
@@ -456,7 +539,7 @@ fn as_name_resolve(asn: u32) -> String {
 }
 
 /// Process one pending WHOIS lookup. Call from any event loop.
-fn process_one_whois() {
+pub(crate) fn process_one_whois() {
     let asn = match global_pending().lock().unwrap().pop() {
         Some(a) => a,
         None => return,
@@ -464,6 +547,7 @@ fn process_one_whois() {
     match whois_lookup(asn) {
         Ok(name) if !name.is_empty() => {
             global_name_cache().lock().unwrap().insert(asn, name);
+            save_as_name_cache();
         }
         _ => {
             global_name_cache().lock().unwrap().remove(&asn);
@@ -471,8 +555,71 @@ fn process_one_whois() {
     }
 }
 
+fn as_name_cache_path() -> std::path::PathBuf {
+    let base = if let Ok(dir) = std::env::var("XDG_CACHE_HOME") {
+        std::path::PathBuf::from(dir)
+    } else if let Ok(home) = std::env::var("HOME") {
+        std::path::PathBuf::from(home).join(".cache")
+    } else {
+        std::path::PathBuf::from(".")
+    };
+    base.join("bmpdoctor").join("as_names_cache.bin")
+}
+
+fn save_as_name_cache() {
+    let cache = global_name_cache().lock().unwrap();
+    let mut buf: Vec<u8> = Vec::new();
+    for (asn, name) in cache.iter() {
+        if name.is_empty() {
+            continue;
+        }
+        let name_bytes = name.as_bytes();
+        if name_bytes.len() > 200 {
+            continue;
+        }
+        buf.extend_from_slice(&asn.to_be_bytes());
+        buf.push(name_bytes.len() as u8);
+        buf.extend_from_slice(name_bytes);
+    }
+    let path = as_name_cache_path();
+    let _ = std::fs::create_dir_all(path.parent().unwrap());
+    let _ = std::fs::write(&path, &buf);
+}
+
+/// Load persisted AS name cache into the global cache.
+pub(crate) fn load_as_name_cache() {
+    let path = as_name_cache_path();
+    let mut cache = global_name_cache().lock().unwrap();
+
+    // Load persisted file if present
+    if let Ok(data) = std::fs::read(&path) {
+        let mut pos = 0;
+        while pos + 5 <= data.len() {
+            let asn = u32::from_be_bytes([data[pos], data[pos+1], data[pos+2], data[pos+3]]);
+            let name_len = data[pos+4] as usize;
+            pos += 5;
+            if pos + name_len > data.len() { break; }
+            if let Ok(name) = std::str::from_utf8(&data[pos..pos + name_len]) {
+                if !cache.contains_key(&asn) {
+                    cache.insert(asn, name.to_string());
+                }
+            }
+            pos += name_len;
+        }
+    }
+
+    // Seed with bundled data if not already cached
+    for (asn, name) in as_name_seed().iter() {
+        cache.entry(*asn).or_insert_with(|| name.clone());
+    }
+
+    if !cache.is_empty() {
+        eprintln!("  AS names: {} entries cached", cache.len());
+    }
+}
+
 /// Stream browser name lookup — uses the global cache + seed data.
-fn as_name(asn_str: &str) -> String {
+pub(crate) fn as_name(asn_str: &str) -> String {
     let asn: u32 = match asn_str.parse() {
         Ok(a) => a,
         Err(_) => return String::new(),
@@ -481,468 +628,11 @@ fn as_name(asn_str: &str) -> String {
 }
 
 
-struct ParsedTopic {
-    collector: String,
-    asn_str: String,
-    full: String,
-}
-
-fn parse_topic(t: &str) -> Option<ParsedTopic> {
-    // Expected format: routeviews.<collector>.<ASN>.bmp_raw
-    let body = t.strip_prefix("routeviews.")?;
-    let body = body.strip_suffix(".bmp_raw")?;
-    let mut parts: Vec<&str> = body.splitn(2, '.').collect();
-    if parts.len() < 2 {
-        // edge case: routeviews.<collector>.bmp_raw (no ASN)
-        return Some(ParsedTopic {
-            collector: parts[0].to_string(),
-            asn_str: "-".to_string(),
-            full: t.to_string(),
-        });
-    }
-    let asn_str = parts.pop().unwrap().to_string();
-    let collector = parts.join(".");
-    if collector.is_empty() {
-        return None;
-    }
-    Some(ParsedTopic {
-        collector,
-        asn_str,
-        full: t.to_string(),
-    })
-}
-
-fn collector_region(collector: &str) -> &str {
-    let c = collector.to_lowercase();
-    match c.as_str() {
-        // North America
-        "chicago" | "nwax" | "ny" | "pit" | "sfmix" | "phoix" | "telxatl"
-        | "interlan" | "isc" | "pacwave" | "fortaleza" | "pitmx"
-        | "route-views" | "route-views2" | "route-views4" | "route-views6" => "North America",
-        // Europe
-        "linx" | "amsix" | "decix" | "flix" | "netnod" | "spb" | "namex"
-        | "cix" | "siex" | "gorex" | "frr" | "wide"
-        | "route-views3" | "route-views5" => "Europe",
-        // Asia Pacific
-        "sg" | "hkix" | "kixp" | "kinx" | "bknix" | "iix" | "eqix"
-        | "mwix" | "bdix" | "getafix" | "sydney" | "perth"
-        | "route-views7" | "route-views8" => "Asia Pacific",
-        // Latin America
-        "chile" | "crix" | "ix-br" | "ix-br2" | "rio" | "saopaulo2"
-        | "soxrs" | "peru" | "locix" | "ixpn" => "Latin America",
-        // Africa / Middle East
-        "jhb" | "napafrica" | "iraq-ixp" | "gixa" | "uaeix" => "Africa / Middle East",
-        _ => "Other",
-    }
-}
-
-struct RegionInfo {
-    name: &'static str,
-    stream_count: usize,
-}
-
 fn topic_browser(
     terminal: &mut DefaultTerminal,
     topics: &[String],
 ) -> Result<Option<String>> {
-    // Parse topics and group by region
-    let parsed: Vec<ParsedTopic> = topics.iter().filter_map(|t| parse_topic(t)).collect();
-
-    let mut region_map: std::collections::BTreeMap<&str, Vec<&ParsedTopic>> =
-        std::collections::BTreeMap::new();
-    for pt in &parsed {
-        region_map
-            .entry(collector_region(&pt.collector))
-            .or_default()
-            .push(pt);
-    }
-
-    // Sort regions: known regions first, "Other" last
-    let region_order: [&str; 6] = [
-        "North America",
-        "Europe",
-        "Asia Pacific",
-        "Latin America",
-        "Africa / Middle East",
-        "Other",
-    ];
-    let regions: Vec<RegionInfo> = region_order
-        .iter()
-        .filter_map(|name| region_map.get(name).map(|v| RegionInfo {
-            name: *name,
-            stream_count: v.len(),
-        }))
-        .collect();
-
-    // ---------- Screen 1: Region browser ----------
-    let mut filter = String::new();
-    let mut selected: usize = 0;
-
-    let chosen_region: &str = loop {
-        let filtered_regions: Vec<&RegionInfo> = if filter.is_empty() {
-            regions.iter().collect()
-        } else {
-            let lower = filter.to_lowercase();
-            regions
-                .iter()
-                .filter(|r| r.name.to_lowercase().contains(&lower))
-                .collect()
-        };
-
-        if !filtered_regions.is_empty() && selected >= filtered_regions.len() {
-            selected = filtered_regions.len() - 1;
-        }
-
-        terminal.draw(|f| {
-            let area = f.area();
-            let chunks = Layout::vertical([
-                Constraint::Length(1),
-                Constraint::Length(1),
-                Constraint::Min(0),
-                Constraint::Length(1),
-            ])
-            .split(area);
-
-            let title = Paragraph::new(" BMPDoctor — Regions ")
-                .bold()
-                .block(Block::bordered().borders(Borders::ALL))
-                .centered();
-            f.render_widget(title, chunks[0]);
-
-            let filter_line = format!(" Filter: {filter}");
-            f.render_widget(
-                Paragraph::new(filter_line).block(Block::bordered().borders(Borders::ALL)),
-                chunks[1],
-            );
-
-            let mut lines: Vec<Line> = Vec::new();
-            for (i, r) in filtered_regions.iter().enumerate() {
-                let line = if i == selected {
-                    Line::from(format!(
-                        " > {:<25} {:>5} streams",
-                        r.name, r.stream_count
-                    ))
-                    .on_white()
-                    .black()
-                } else {
-                    Line::from(format!(
-                        "   {:<25} {:>5} streams",
-                        r.name, r.stream_count
-                    ))
-                };
-                lines.push(line);
-            }
-            if lines.is_empty() {
-                lines.push(Line::from(" (no matches)").dark_gray());
-            }
-
-            f.render_widget(
-                Paragraph::new(Text::from(lines))
-                    .block(Block::bordered().borders(Borders::ALL)),
-                chunks[2],
-            );
-
-            let footer = Paragraph::new(
-                " [↑↓] navigate  [type] filter  [enter] select  [esc] quit ",
-            )
-            .block(Block::bordered().borders(Borders::ALL))
-            .centered();
-            f.render_widget(footer, chunks[3]);
-        })?;
-
-        if event::poll(Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind != KeyEventKind::Press {
-                    continue;
-                }
-                match key.code {
-                    KeyCode::Esc | KeyCode::Char('q') => return Ok(None),
-                    KeyCode::Enter => {
-                        if let Some(r) = filtered_regions.get(selected) {
-                            break r.name;
-                        }
-                    }
-                    KeyCode::Char(c) => {
-                        filter.push(c);
-                        selected = 0;
-                    }
-                    KeyCode::Backspace => {
-                        filter.pop();
-                        selected = 0;
-                    }
-                    KeyCode::Up => {
-                        if selected > 0 {
-                            selected -= 1;
-                        }
-                    }
-                    KeyCode::Down => {
-                        if selected + 1 < filtered_regions.len() {
-                            selected += 1;
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-        process_one_whois();
-    };
-
-    // ---------- Screen 2: Collector browser ----------
-    let region_topics: Vec<&ParsedTopic> = region_map
-        .get(chosen_region)
-        .map(|v| v.as_slice())
-        .unwrap_or(&[])
-        .to_vec();
-
-    let mut collector_groups: std::collections::BTreeMap<&str, Vec<&ParsedTopic>> =
-        std::collections::BTreeMap::new();
-    for pt in &region_topics {
-        collector_groups
-            .entry(pt.collector.as_str())
-            .or_default()
-            .push(pt);
-    }
-    let mut collectors: Vec<(&str, usize)> = collector_groups
-        .iter()
-        .map(|(name, streams)| (*name, streams.len()))
-        .collect();
-    collectors.sort_by(|a, b| b.1.cmp(&a.1));
-
-    filter.clear();
-    selected = 0;
-
-    let chosen_collector: String = loop {
-        let filtered: Vec<&(&str, usize)> = if filter.is_empty() {
-            collectors.iter().collect()
-        } else {
-            let lower = filter.to_lowercase();
-            collectors
-                .iter()
-                .filter(|(name, _)| name.to_lowercase().contains(&lower))
-                .collect()
-        };
-        if !filtered.is_empty() && selected >= filtered.len() {
-            selected = filtered.len() - 1;
-        }
-
-        terminal.draw(|f| {
-            let area = f.area();
-            let chunks = Layout::vertical([
-                Constraint::Length(1),
-                Constraint::Length(1),
-                Constraint::Min(0),
-                Constraint::Length(1),
-            ])
-            .split(area);
-
-            let title = Paragraph::new(format!(" BMPDoctor — {chosen_region} — Collectors "))
-                .bold()
-                .block(Block::bordered().borders(Borders::ALL))
-                .centered();
-            f.render_widget(title, chunks[0]);
-
-            let filter_line = format!(" Filter: {filter}");
-            f.render_widget(
-                Paragraph::new(filter_line).block(Block::bordered().borders(Borders::ALL)),
-                chunks[1],
-            );
-
-            let mut lines: Vec<Line> = Vec::new();
-            for (i, (name, count)) in filtered.iter().enumerate() {
-                let line = if i == selected {
-                    Line::from(format!(" > {name:<30} {count:>5} streams"))
-                        .on_white()
-                        .black()
-                } else {
-                    Line::from(format!("   {name:<30} {count:>5} streams"))
-                };
-                lines.push(line);
-            }
-            if lines.is_empty() {
-                lines.push(Line::from(" (no matches)").dark_gray());
-            }
-
-            f.render_widget(
-                Paragraph::new(Text::from(lines))
-                    .block(Block::bordered().borders(Borders::ALL)),
-                chunks[2],
-            );
-
-            let footer = Paragraph::new(
-                " [↑↓] navigate  [type] filter  [enter] select  [esc] back ",
-            )
-            .block(Block::bordered().borders(Borders::ALL))
-            .centered();
-            f.render_widget(footer, chunks[3]);
-        })?;
-
-        if event::poll(Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind != KeyEventKind::Press {
-                    continue;
-                }
-                match key.code {
-                    KeyCode::Esc => {
-                        // Back to regions
-                        return topic_browser(terminal, topics);
-                    }
-                    KeyCode::Char('q') => return Ok(None),
-                    KeyCode::Enter => {
-                        if let Some((name, _)) = filtered.get(selected) {
-                            break name.to_string();
-                        }
-                    }
-                    KeyCode::Char(c) => {
-                        filter.push(c);
-                        selected = 0;
-                    }
-                    KeyCode::Backspace => {
-                        filter.pop();
-                        selected = 0;
-                    }
-                    KeyCode::Up => {
-                        if selected > 0 {
-                            selected -= 1;
-                        }
-                    }
-                    KeyCode::Down => {
-                        if selected + 1 < filtered.len() {
-                            selected += 1;
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-        process_one_whois();
-    };
-
-    // ---------- Screen 3: Stream browser for chosen collector ----------
-    let collector_streams: Vec<&&ParsedTopic> = region_topics
-        .iter()
-        .filter(|pt| pt.collector == chosen_collector)
-        .collect();
-
-    filter.clear();
-    selected = 0;
-
-    loop {
-        let filtered: Vec<&&&ParsedTopic> = if filter.is_empty() {
-            collector_streams.iter().collect()
-        } else {
-            let lower = filter.to_lowercase();
-            collector_streams
-                .iter()
-                .filter(|pt| {
-                    pt.asn_str.contains(&lower) || pt.full.to_lowercase().contains(&lower)
-                })
-                .collect()
-        };
-        if !filtered.is_empty() && selected >= filtered.len() {
-            selected = filtered.len() - 1;
-        }
-
-        terminal.draw(|f| {
-            let area = f.area();
-            let chunks = Layout::vertical([
-                Constraint::Length(1),
-                Constraint::Length(1),
-                Constraint::Min(0),
-                Constraint::Length(1),
-            ])
-            .split(area);
-
-            let title = Paragraph::new(format!(
-                " BMPDoctor — {chosen_region} — {chosen_collector} "
-            ))
-            .bold()
-            .block(Block::bordered().borders(Borders::ALL))
-            .centered();
-            f.render_widget(title, chunks[0]);
-
-            let filter_line = format!(" Filter: {filter}");
-            f.render_widget(
-                Paragraph::new(filter_line).block(Block::bordered().borders(Borders::ALL)),
-                chunks[1],
-            );
-
-            let mut lines: Vec<Line> = Vec::new();
-            for (i, pt) in filtered.iter().enumerate() {
-                let name = as_name(&pt.asn_str);
-                let line = if i == selected {
-                    Line::from(format!(
-                        " > AS{:<8} {:<24} {}",
-                        pt.asn_str, name, pt.full
-                    ))
-                    .on_white()
-                    .black()
-                } else {
-                    Line::from(format!(
-                        "   AS{:<8} {:<24} {}",
-                        pt.asn_str, name, pt.full
-                    ))
-                };
-                lines.push(line);
-            }
-            if lines.is_empty() {
-                lines.push(Line::from(" (no matches)").dark_gray());
-            }
-
-            f.render_widget(
-                Paragraph::new(Text::from(lines))
-                    .block(Block::bordered().borders(Borders::ALL)),
-                chunks[2],
-            );
-
-            let footer = Paragraph::new(format!(
-                " [↑↓] navigate  [type] filter  [enter] connect  [esc] back  {} streams",
-                collector_streams.len()
-            ))
-            .block(Block::bordered().borders(Borders::ALL))
-            .centered();
-            f.render_widget(footer, chunks[3]);
-        })?;
-
-        if event::poll(Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind != KeyEventKind::Press {
-                    continue;
-                }
-                match key.code {
-                    KeyCode::Esc => break, // back to collector screen
-                    KeyCode::Char('q') => return Ok(None),
-                    KeyCode::Enter => {
-                        if let Some(pt) = filtered.get(selected) {
-                            return Ok(Some(pt.full.clone()));
-                        }
-                    }
-                    KeyCode::Char(c) => {
-                        filter.push(c);
-                        selected = 0;
-                    }
-                    KeyCode::Backspace => {
-                        filter.pop();
-                        selected = 0;
-                    }
-                    KeyCode::Up => {
-                        if selected > 0 {
-                            selected -= 1;
-                        }
-                    }
-                    KeyCode::Down => {
-                        if selected + 1 < filtered.len() {
-                            selected += 1;
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-        process_one_whois();
-    }
-
-    // Esc on stream screen: restart from Screen 1
-    topic_browser(terminal, topics)
+    crate::browser::topic_browser(terminal, topics)
 }
 
 fn run_loop(
@@ -1009,19 +699,29 @@ fn render(frame: &mut Frame, dash: &Dashboard, connected: bool) {
     let vchunks = Layout::vertical([
         Constraint::Length(3),
         Constraint::Min(0),
-        Constraint::Length(2),
+        Constraint::Length(3),
     ])
     .split(area);
 
     render_header(frame, vchunks[0], dash, connected);
 
-    // Body: message log (60%) + route origins (40%)
+    // Body: message log (65%) + route origins (35%)
     let body = Layout::horizontal([
-        Constraint::Percentage(60),
-        Constraint::Percentage(40),
+        Constraint::Percentage(65),
+        Constraint::Percentage(35),
     ])
     .split(vchunks[1]);
-    render_message_log(frame, body[0], dash);
+    if dash.paused {
+        let paused_area = body[0];
+        let msg = Paragraph::new(" ⏸  PAUSED — press p to resume ")
+            .yellow()
+            .bold()
+            .centered()
+            .block(Block::bordered().title("Live").borders(Borders::ALL));
+        frame.render_widget(msg, paused_area);
+    } else {
+        render_message_log(frame, body[0], dash);
+    }
     render_origins(frame, body[1], dash);
 
     render_status_bar(frame, vchunks[2], dash);
@@ -1031,15 +731,16 @@ fn render_status_bar(frame: &mut Frame, area: Rect, dash: &Dashboard) {
     let buckets = dash.rolling.findings_buckets();
     let malformed = dash.rolling.malformed_messages();
 
-    let type_counts = format!(
-        "PFX:{}  UP:{}  DN:{}  INIT:{}  TERM:{}  STATS:{}",
-        dash.rolling.by_type().get(&0).copied().unwrap_or(0),
-        dash.rolling.by_type().get(&3).copied().unwrap_or(0),
-        dash.rolling.by_type().get(&2).copied().unwrap_or(0),
-        dash.rolling.by_type().get(&4).copied().unwrap_or(0),
-        dash.rolling.by_type().get(&5).copied().unwrap_or(0),
-        dash.rolling.by_type().get(&1).copied().unwrap_or(0),
-    );
+    let rpki_stats = if let Some(ref rpki) = dash.rpki {
+        format!(
+            "VAL:{} INV:{} NF:{}  ",
+            rpki.valid_count(),
+            rpki.invalid_count(),
+            rpki.not_found_count(),
+        )
+    } else {
+        String::new()
+    };
 
     let findings = if buckets.parse_errors > 0 || malformed > 0 {
         Span::styled(
@@ -1057,23 +758,20 @@ fn render_status_bar(frame: &mut Frame, area: Rect, dash: &Dashboard) {
         Span::raw(" connecting...")
     };
 
-    let peers = format!(" peers:{}", dash.rolling.peers_observed());
     let rate = format!(" {}/s", dash.current_rate());
-    let msgs = format!(" msgs:{}", dash.rolling.total_seen());
+    let msgs = format!(" msgs:{}", dash.total_messages);
     let keys = format!(
         " [q]quit [b]browse [p]{}",
         if dash.paused { "resume" } else { "pause" },
     );
 
+    let left = format!("{rpki_stats}{msgs}{rate} ");
     let padding_len = (area.width as usize)
-        .saturating_sub(type_counts.len() + peers.len() + msgs.len() + rate.len() + 20 + keys.len())
+        .saturating_sub(left.len() + 20 + keys.len())
         .max(1);
 
     let bar = Line::from(vec![
-        Span::raw(&type_counts),
-        Span::raw(&peers),
-        Span::raw(&msgs),
-        Span::raw(&rate),
+        Span::raw(&left),
         findings,
         Span::raw(" ".repeat(padding_len)),
         Span::raw(&keys),
@@ -1097,12 +795,18 @@ fn render_header(frame: &mut Frame, area: Rect, dash: &Dashboard, connected: boo
     let title = if !connected {
         format!(" BMPDoctor — {meta_str}Connecting... ")
     } else if dash.paused {
-        format!(" BMPDoctor — {meta_str}[PAUSED] ")
+        format!(" BMPDoctor — {meta_str}⏸ PAUSED — press p to resume ")
     } else {
         format!(" BMPDoctor — {meta_str}{} ", dash.topic)
     };
 
-    let style = if !connected { Color::Yellow } else { Color::Reset };
+    let style = if dash.paused {
+        Color::Yellow
+    } else if !connected {
+        Color::Yellow
+    } else {
+        Color::Reset
+    };
     let header = Paragraph::new(title)
         .bold()
         .style(style)
@@ -1136,50 +840,78 @@ fn render_message_log(frame: &mut Frame, area: Rect, dash: &Dashboard) {
 
         match &msg.prefixes {
             Some(pc) => {
-                // Strip leading collector AS (6447) and peer AS from the path —
-                // the user already knows who they're watching. Show only the
-                // transit path that actually carries the route.
-                let display_path = strip_known_prefix(&pc.as_path, dash);
-                let path_str = if display_path.len() > 1 {
-                    display_path
-                        .iter()
-                        .map(|a| a.to_string())
-                        .collect::<Vec<_>>()
-                        .join(" → ")
-                } else {
-                    String::new()
+                let rpki_str = pc.rpki.map(|s| s.as_str()).unwrap_or("--");
+                let rpki_color = match pc.rpki {
+                    Some(crate::rpki::Status::Valid) => Color::Green,
+                    Some(crate::rpki::Status::Invalid)
+                    | Some(crate::rpki::Status::InvalidWrongAsn)
+                    | Some(crate::rpki::Status::InvalidTooLong) => Color::Red,
+                    Some(crate::rpki::Status::NotFound) => Color::Gray,
+                    None => Color::Gray,
                 };
+                let rpki_hint = pc.rpki_detail.as_ref().map(|d| {
+                    let mut parts = Vec::new();
+                    if let Some(expected) = d.expected_asn {
+                        let name = as_name_resolve(expected);
+                        if name.starts_with("AS") {
+                            parts.push(format!("should be AS{expected}"));
+                        } else {
+                            parts.push(format!("should be AS{expected} {name}"));
+                        }
+                    }
+                    if let Some(max_len) = d.max_prefix_len {
+                        parts.push(format!("max /{max_len}"));
+                    }
+                    parts.join(", ")
+                });
+                let display_path = strip_known_prefix(&pc.as_path, dash);
+                let path_str = compact_path(&display_path);
                 for (p, _) in &pc.announced {
                     let mut spans = vec![
                         Span::raw(format!("{ts} ")),
+                        Span::styled(format!("{} ", rpki_str), rpki_color),
                         Span::styled(format!("{type_str:<8}"), type_color),
                         Span::raw(" +"),
                         Span::styled(p.as_str(), Color::Green),
                     ];
                     if !path_str.is_empty() {
-                        let path_label = format!("  {path_str}");
-                        spans.push(Span::from(path_label).dark_gray());
+                        if path_str.contains(" → ") {
+                            if let Some((transit, origin)) = path_str.rsplit_once(" → ") {
+                                let transit_owned = format!("  {transit} → ");
+                                let origin_owned = origin.to_string();
+                                let origin_color = match pc.rpki {
+                                    Some(crate::rpki::Status::Valid) => Color::Green,
+                                    Some(crate::rpki::Status::InvalidWrongAsn) => Color::Yellow,
+                                    _ => Color::DarkGray,
+                                };
+                                spans.push(Span::styled(transit_owned, Color::DarkGray));
+                                spans.push(Span::styled(origin_owned, origin_color));
+                            }
+                        } else {
+                            let color = match pc.rpki {
+                                Some(crate::rpki::Status::Valid) => Color::Green,
+                                Some(crate::rpki::Status::InvalidWrongAsn) => Color::Yellow,
+                                _ => Color::DarkGray,
+                            };
+                            let owned = format!("  {path_str}");
+                            spans.push(Span::styled(owned, color));
+                        }
+                    }
+                    if let Some(ref hint) = rpki_hint {
+                        spans.push(Span::from(format!("  ({hint})")).yellow());
                     }
                     lines.push(Line::from(spans));
                 }
                 for (p, _) in &pc.withdrawn {
-                    // For withdrawals, show the last-known path from the most recent announcement
                     let wd_path = dash
                         .prefix_last_path
                         .get(p)
                         .map(|path| strip_known_prefix(path, dash))
                         .unwrap_or_default();
-                    let wd_path_str = if wd_path.len() > 1 {
-                        wd_path
-                            .iter()
-                            .map(|a| a.to_string())
-                            .collect::<Vec<_>>()
-                            .join(" → ")
-                    } else {
-                        String::new()
-                    };
+                    let wd_path_str = compact_path(&wd_path);
                     let mut spans = vec![
                         Span::raw(format!("{ts} ")),
+                        Span::styled(format!("{} ", rpki_str), rpki_color),
                         Span::styled(format!("{type_str:<8}"), type_color),
                         Span::raw(" -"),
                         Span::styled(p.as_str(), Color::Red),
@@ -1229,6 +961,8 @@ struct PrefixChange {
     announced: Vec<(String, u32)>,   // (prefix, origin_asn)
     withdrawn: Vec<(String, u32)>,
     as_path: Vec<u32>,               // full AS path
+    rpki: Option<crate::rpki::Status>,
+    rpki_detail: Option<crate::rpki::RPKIDetail>,
 }
 
 /// Strip the known collector AS (6447) and the peer ASN from the displayed path.
@@ -1299,6 +1033,8 @@ fn extract_prefixes(full_data: &[u8]) -> Option<PrefixChange> {
                                 .map(|p| (p.to_string(), origin_asn))
                                 .collect(),
                             as_path,
+                            rpki: None,
+                            rpki_detail: None,
                         })
                     }
                     _ => None,
@@ -1315,7 +1051,7 @@ fn render_origins(frame: &mut Frame, area: Rect, dash: &Dashboard) {
     if dash.prefix_origins.is_empty() {
         let placeholder = Paragraph::new(" waiting for AS path data...")
             .dark_gray()
-            .block(Block::bordered().title("Prefix Origins").borders(Borders::ALL));
+            .block(Block::bordered().title("Prefix Flaps").borders(Borders::ALL));
         frame.render_widget(placeholder, area);
         return;
     }
@@ -1348,10 +1084,15 @@ fn render_origins(frame: &mut Frame, area: Rect, dash: &Dashboard) {
         }
 
         let name = as_name_resolve(*origin);
-        let origin_label = if name.is_empty() {
+        let origin_label = if name.is_empty() || name.starts_with("AS") {
             format!("AS{origin}")
         } else {
-            format!("AS{origin} {name}")
+            let truncated = if name.len() > 22 {
+                format!("{}…", &name[..21])
+            } else {
+                name
+            };
+            format!("AS{origin} {truncated}")
         };
 
         let total_churn: u64 = pfxs.iter().map(|(_, c)| c).sum();
@@ -1426,8 +1167,72 @@ fn render_origins(frame: &mut Frame, area: Rect, dash: &Dashboard) {
     }
 
     let panel = Paragraph::new(Text::from(lines))
-        .block(Block::bordered().title("Prefix Origins").borders(Borders::ALL));
+        .block(Block::bordered().title("Prefix Flaps").borders(Borders::ALL));
     frame.render_widget(panel, area);
+}
+
+/// Format an AS path compactly: deduplicate repeats, truncate long paths,
+/// bake origin name into last hop. Returns "A → B → … → Z" or similar.
+fn compact_path(path: &[u32]) -> String {
+    if path.is_empty() {
+        return String::new();
+    }
+
+    // Deduplicate consecutive repeats: [A, B, B, B, C] → [A, B×3, C]
+    let mut deduped: Vec<(u32, u32)> = Vec::new();
+    for &asn in path {
+        match deduped.last_mut() {
+            Some((last, count)) if *last == asn => *count += 1,
+            _ => deduped.push((asn, 1)),
+        }
+    }
+
+    let name_of = |asn: u32| -> String {
+        let name = as_name_resolve(asn);
+        if name.is_empty() || name.starts_with("AS") {
+            format!("AS{asn}")
+        } else {
+            let truncated = if name.len() > 22 {
+                format!("{}…", &name[..21])
+            } else {
+                name
+            };
+            format!("AS{asn} {truncated}")
+        }
+    };
+
+    if deduped.len() <= 5 {
+        deduped
+            .iter()
+            .map(|&(asn, count)| {
+                if count > 1 {
+                    format!("{}×{count}", name_of(asn))
+                } else {
+                    name_of(asn)
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" → ")
+    } else {
+        // First 2 + … + last 2
+        let mut parts: Vec<String> = Vec::new();
+        for &(asn, count) in &deduped[..2] {
+            parts.push(if count > 1 {
+                format!("{}×{count}", name_of(asn))
+            } else {
+                name_of(asn)
+            });
+        }
+        parts.push("…".into());
+        for &(asn, count) in &deduped[deduped.len() - 2..] {
+            parts.push(if count > 1 {
+                format!("{}×{count}", name_of(asn))
+            } else {
+                name_of(asn)
+            });
+        }
+        parts.join(" → ")
+    }
 }
 
 fn msg_type_label(t: u8) -> &'static str {
@@ -1626,7 +1431,7 @@ mod tests {
 
     #[test]
     fn test_parse_topic_normal() {
-        let result = parse_topic("routeviews.chicago.13335.bmp_raw");
+        let result = crate::browser::parse_topic("routeviews.chicago.13335.bmp_raw");
         assert!(result.is_some(), "expected parse success");
         let pt = result.unwrap();
         assert_eq!(pt.collector, "chicago");
@@ -1636,7 +1441,7 @@ mod tests {
 
     #[test]
     fn test_parse_topic_collector_with_dashes() {
-        let result = parse_topic("routeviews.route-views2.2152.bmp_raw");
+        let result = crate::browser::parse_topic("routeviews.route-views2.2152.bmp_raw");
         assert!(result.is_some());
         let pt = result.unwrap();
         assert_eq!(pt.collector, "route-views2");
@@ -1645,14 +1450,14 @@ mod tests {
 
     #[test]
     fn test_parse_topic_not_a_valid_topic() {
-        let result = parse_topic("not.a.valid.topic");
+        let result = crate::browser::parse_topic("not.a.valid.topic");
         assert!(result.is_none(), "expected None for non-matching topic");
     }
 
     #[test]
     fn test_parse_topic_no_asn_component() {
         // routeviews.<collector>.bmp_raw with no ASN segment
-        let result = parse_topic("routeviews.chicago.bmp_raw");
+        let result = crate::browser::parse_topic("routeviews.chicago.bmp_raw");
         assert!(result.is_some(), "edge case should still parse");
         let pt = result.unwrap();
         assert_eq!(pt.collector, "chicago");
