@@ -65,6 +65,11 @@ The recommended workflow from zero to verified results:
    - `OBMP` = upstream OpenBMP wrapper inside Kafka payloads
    - Inner frame = RFC 7854 BMP message
 
+5. **Watch a live stream** (TUI dashboard):
+   ```sh
+   cargo run --bin bmpdoctor -- dashboard --collector chicago --asn 13335
+   ```
+
 ### Known-good smoke test
 
 The committed fixture `tests/fixtures/openbmp-two-records.bmpd` provides
@@ -166,6 +171,9 @@ cargo install --path .
 Explicit `--format raw-bmp` or `--format bmpd` overrides auto-detection
 and can intentionally produce malformed/error output if the wrong format is
 forced (useful for debugging or format-level misuse testing).
+
+> The `dashboard` subcommand always connects to a live Kafka broker, not a
+> file. It does not accept `--format`.
 
 ### inspect
 
@@ -288,6 +296,40 @@ Emits one JSON object per observed BMP message including offset, type, peer iden
 timestamp, parse status, and associated findings. Per-message detail objects
 (`tlv_info`, `stats_info`, `peer_down_info`) appear only when the message type
 carries that information.
+
+### watch
+
+```sh
+bmpdoctor watch <file> --window-messages <n> --interval-ms <n> [--format auto|raw-bmp|bmpd]
+```
+
+Replays a `.bmpd` or `.rawbmp` capture file as a rolling window stream, emitting
+periodic JSON summary lines to stdout. A stepping stone for offline dashboard-style
+analysis of recorded captures.
+
+```json
+{"window_messages":10,"total_seen":2,"elapsed_ms":0,"by_type":{"PeerUpNotification":1,"RouteMonitoring":1},"peers_observed":1,...}
+```
+
+### dashboard
+
+```sh
+bmpdoctor dashboard [--broker <host>] [--topic <exact>] [--collector <frag>] [--asn <n>]
+```
+
+Opens an interactive TUI for live RouteViews BMP streams. If no `--topic` is given,
+fetches available topics from the Kafka broker and shows a hierarchical browser:
+region → collector → stream. Type to filter, arrows to navigate, Enter to select.
+
+In the dashboard:
+- **Live message log** — scrolling view of BMP messages with timestamps, prefix
+  announcements/withdrawals (green/red), and full AS paths
+- **Prefix Origins** — prefixes grouped by origin ASN, sorted by churn frequency,
+  with AS names resolved via bundled seed data and live WHOIS lookups
+- **Status bar** — message type counts, peer count, total messages, rate, findings
+  status, and keybindings
+
+Keys: `q`/`Esc` quit, `b` back to stream browser, `p` pause/resume.
 
 ## Detected issues
 
