@@ -55,10 +55,6 @@ fn add_recent(topic: &str) {
     recent.truncate(10);
 }
 
-fn get_recents() -> Vec<String> {
-    recent_cache().lock().unwrap().clone()
-}
-
 // Collector display labels derived from the public RouteViews Looking
 // Glass collector list (https://www.routeviews.org/lg/). Topic names
 // remain authoritative; these labels are descriptive UI hints only.
@@ -124,148 +120,139 @@ fn collector_label(name: &str) -> &str {
     }
 }
 
+struct CollectorInfo<'a> {
+    raw_name: String,
+    label: String,
+    stream_count: usize,
+    streams: Vec<&'a ParsedTopic>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Pane {
+    Collectors,
+    Streams,
+}
+
 pub(crate) fn topic_browser(
     terminal: &mut DefaultTerminal,
     topics: &[String],
 ) -> Result<Option<String>> {
     let parsed: Vec<ParsedTopic> = topics.iter().filter_map(|t| parse_topic(t)).collect();
 
-    // Group by collector, sorted by stream count desc
+    // Group by collector
     let mut collector_map: BTreeMap<&str, Vec<&ParsedTopic>> = BTreeMap::new();
     for pt in &parsed {
         collector_map.entry(&pt.collector).or_default().push(pt);
     }
-    let mut collectors: Vec<(&str, Vec<&ParsedTopic>)> = collector_map.into_iter().collect();
-    collectors.sort_by(|a, b| {
-        let a_undef = a.0.contains("UNDEFINED");
-        let b_undef = b.0.contains("UNDEFINED");
+    let mut all_collectors: Vec<CollectorInfo> = collector_map
+        .into_iter()
+        .map(|(name, streams)| {
+            let mut sorted = streams;
+            sorted.sort_by_key(|pt| pt.asn_str.parse::<u32>().unwrap_or(0));
+            let label = collector_label(name).to_string();
+            CollectorInfo {
+                raw_name: name.to_string(),
+                label,
+                stream_count: sorted.len(),
+                streams: sorted,
+            }
+        })
+        .collect();
+    all_collectors.sort_by(|a, b| {
+        let a_undef = a.raw_name.contains("UNDEFINED");
+        let b_undef = b.raw_name.contains("UNDEFINED");
         a_undef
             .cmp(&b_undef)
-            .then_with(|| b.1.len().cmp(&a.1.len()))
+            .then_with(|| b.stream_count.cmp(&a.stream_count))
     });
 
-    // Index parsed topics by full name for recent lookup
-    let topic_map: std::collections::HashMap<&str, &ParsedTopic> =
-        parsed.iter().map(|pt| (pt.full.as_str(), pt)).collect();
-
-    enum Row {
-        Header {
-            collector: String,
-            count: usize,
-        },
-        Stream {
-            topic: String,
-            asn: String,
-            name: String,
-        },
-        Empty,
-    }
-
     let mut filter = String::new();
-    let mut selected: usize = 0;
-    let collector_count = collectors.len();
+    let mut active_pane: Pane = Pane::Collectors;
+    let mut collector_idx: usize = 0;
+    let mut stream_idx: usize = 0;
 
     loop {
         let lower = filter.to_lowercase();
-        let recents = get_recents();
-        let mut rows: Vec<Row> = Vec::new();
+        let searching = !filter.is_empty();
 
-        // Recent section (only when not filtering)
-        if filter.is_empty() && !recents.is_empty() {
-            let recent_items: Vec<&&ParsedTopic> = recents
-                .iter()
-                .filter_map(|t| topic_map.get(t.as_str()))
-                .take(5)
-                .collect();
-            if !recent_items.is_empty() {
-                rows.push(Row::Header {
-                    collector: "Recently Connected".into(),
-                    count: recent_items.len(),
-                });
-                for pt in recent_items {
-                    rows.push(Row::Stream {
-                        topic: pt.full.clone(),
-                        asn: pt.asn_str.clone(),
-                        name: as_name(&pt.asn_str),
-                    });
+        // Filter collectors: named ones always visible when not searching,
+        // UNDEFINED only when searching. Collector label, raw name, or
+        // any of its streams must match the search.
+        let filtered_collectors: Vec<&CollectorInfo> = all_collectors
+            .iter()
+            .filter(|c| {
+                let is_undefined = c.raw_name.contains("UNDEFINED");
+                if is_undefined && !searching {
+                    return false;
                 }
-                rows.push(Row::Empty);
-            }
-        }
-
-        // All collectors. UNDEFINED_ROUTER_GROUP hidden by default;
-        // shown only when the user's search filter matches its topics.
-        for (col, streams) in &collectors {
-            // Hide unnamed collectors unless the user is searching within them
-            let is_undefined = col.contains("UNDEFINED");
-            if is_undefined && filter.is_empty() {
-                continue;
-            }
-            let matching: Vec<&&ParsedTopic> = if filter.is_empty() {
-                streams.iter().collect()
-            } else {
-                streams
-                    .iter()
-                    .filter(|pt| {
-                        pt.collector.to_lowercase().contains(&lower)
-                            || pt.asn_str.contains(&lower)
+                if !searching {
+                    return true;
+                }
+                c.label.to_lowercase().contains(&lower)
+                    || c.raw_name.to_lowercase().contains(&lower)
+                    || c.streams.iter().any(|pt| {
+                        pt.asn_str.contains(&lower)
                             || pt.full.to_lowercase().contains(&lower)
                             || as_name(&pt.asn_str).to_lowercase().contains(&lower)
                     })
-                    .collect()
+            })
+            .collect();
+
+        // Clamp indices
+        if collector_idx >= filtered_collectors.len().max(1) {
+            collector_idx = filtered_collectors.len().saturating_sub(1);
+            active_pane = Pane::Collectors;
+        }
+
+        // Streams for the currently selected collector, filtered by search
+        let selected_collector_streams: Vec<&&ParsedTopic> =
+            if let Some(ci) = filtered_collectors.get(collector_idx) {
+                if searching {
+                    ci.streams
+                        .iter()
+                        .filter(|pt| {
+                            pt.asn_str.contains(&lower)
+                                || pt.full.to_lowercase().contains(&lower)
+                                || as_name(&pt.asn_str).to_lowercase().contains(&lower)
+                                || ci.label.to_lowercase().contains(&lower)
+                        })
+                        .collect()
+                } else {
+                    ci.streams.iter().collect()
+                }
+            } else {
+                Vec::new()
             };
-            if matching.is_empty() {
-                continue;
-            }
-            let mut sorted = matching;
-            sorted.sort_by_key(|pt| pt.asn_str.parse::<u32>().unwrap_or(0));
 
-            rows.push(Row::Header {
-                collector: collector_label(col).to_string(),
-                count: sorted.len(),
-            });
-            for pt in sorted {
-                rows.push(Row::Stream {
-                    topic: pt.full.clone(),
-                    asn: pt.asn_str.clone(),
-                    name: as_name(&pt.asn_str),
-                });
-            }
+        if stream_idx >= selected_collector_streams.len().max(1) {
+            stream_idx = selected_collector_streams.len().saturating_sub(1);
         }
 
-        if rows.is_empty() {
-            rows.push(Row::Empty);
-        }
-
-        if selected >= rows.len() {
-            selected = rows.len().saturating_sub(1);
-        }
+        // Selected topic for detail area
+        let selected_topic = if filtered_collectors.is_empty() {
+            None
+        } else {
+            selected_collector_streams
+                .get(stream_idx)
+                .map(|pt| pt.full.clone())
+        };
 
         terminal.draw(|f| {
             let area = f.area();
             let chunks = Layout::vertical([
-                Constraint::Length(3),
-                Constraint::Length(3),
-                Constraint::Min(0),
-                Constraint::Length(2),
+                Constraint::Length(3), // title
+                Constraint::Length(3), // search
+                Constraint::Min(0),    // body (2 panes)
+                Constraint::Length(3), // selected detail + footer
             ])
             .split(area);
 
             // ── Title ──
-            let subtitle = if filter.is_empty() {
-                format!(
-                    "{} collectors  ·  {} streams",
-                    collector_count,
-                    parsed.len()
-                )
-            } else {
-                format!(
-                    "{} results",
-                    rows.iter()
-                        .filter(|r| matches!(r, Row::Stream { .. }))
-                        .count()
-                )
-            };
+            let subtitle = format!(
+                "{} collectors  ·  {} streams",
+                filtered_collectors.len(),
+                parsed.len()
+            );
             let title = Paragraph::new(vec![
                 Line::from(" BMPWatch ").bold().centered(),
                 Line::from(Span::styled(subtitle, Color::DarkGray)).centered(),
@@ -274,7 +261,7 @@ pub(crate) fn topic_browser(
             f.render_widget(title, chunks[0]);
 
             // ── Search ──
-            let search_content: Line = if filter.is_empty() {
+            let search_content: Line = if !searching {
                 Line::from(vec![
                     Span::raw("  "),
                     Span::styled("search", Color::DarkGray),
@@ -291,90 +278,118 @@ pub(crate) fn topic_browser(
                 chunks[1],
             );
 
-            // ── Results ──
-            let mut lines: Vec<Line> = Vec::new();
-            for (i, row) in rows.iter().enumerate() {
-                match row {
-                    Row::Header { collector, count } => {
-                        let text = format!(" {collector}  ({count})");
-                        let line = if i == selected {
-                            Line::from(text).cyan().bold()
-                        } else {
-                            Line::from(text).cyan()
-                        };
-                        lines.push(line);
-                    }
-                    Row::Stream { topic, asn, name } => {
-                        let asn_num = format!("AS{asn:<7}");
-                        let name_display = if name.len() > 22 {
-                            format!("{}…", &name[..21])
-                        } else {
-                            name.clone()
-                        };
-                        let has_name = !name.is_empty() && !name.starts_with("AS");
-                        let line = if i == selected {
-                            Line::from(vec![
-                                Span::raw("   "),
-                                Span::styled(asn_num, Color::Green),
-                                Span::raw(" "),
-                                if has_name {
-                                    Span::styled(name_display, Color::Yellow)
-                                } else {
-                                    Span::raw(format!("{:<23}", name_display))
-                                },
-                                Span::raw(" "),
-                                Span::raw(topic.as_str()),
-                            ])
-                            .on_white()
-                            .black()
-                        } else {
-                            Line::from(vec![
-                                Span::raw("   "),
-                                Span::styled(asn_num, Color::Green),
-                                Span::raw(" "),
-                                if has_name {
-                                    Span::styled(name_display, Color::Yellow)
-                                } else {
-                                    Span::raw(format!("{:<23}", name_display))
-                                },
-                                Span::raw(" "),
-                                Span::styled(topic.as_str(), Color::DarkGray),
-                            ])
-                        };
-                        lines.push(line);
-                    }
-                    Row::Empty => {
-                        lines.push(Line::from(vec![Span::raw("")]));
-                    }
-                }
-            }
+            // ── Body: two panes ──
+            let body = Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .split(chunks[2]);
 
+            // Left: Collectors
+            let mut col_lines: Vec<Line> = Vec::new();
+            for (i, c) in filtered_collectors.iter().enumerate() {
+                let label_trunc = if c.label.len() > 30 {
+                    format!("{}…", &c.label[..29])
+                } else {
+                    c.label.clone()
+                };
+                let text = format!(" {:<32} {:>4}", label_trunc, c.stream_count,);
+                let on_collectors = active_pane == Pane::Collectors && i == collector_idx;
+                let line = if on_collectors {
+                    Line::from(text).on_white().black()
+                } else {
+                    Line::from(text)
+                };
+                col_lines.push(line);
+            }
+            if col_lines.is_empty() {
+                col_lines.push(Line::from(" (no matches)").dark_gray());
+            }
             f.render_widget(
-                Paragraph::new(Text::from(lines)).block(Block::bordered().borders(Borders::ALL)),
-                chunks[2],
+                Paragraph::new(Text::from(col_lines))
+                    .block(Block::bordered().title("Collectors").borders(Borders::ALL)),
+                body[0],
             );
 
-            // ── Footer ──
-            f.render_widget(
-                Paragraph::new(vec![
+            // Right: Streams
+            let mut stream_lines: Vec<Line> = Vec::new();
+            for (i, pt) in selected_collector_streams.iter().enumerate() {
+                let asn = format!("AS{}", pt.asn_str);
+                let name = as_name(&pt.asn_str);
+                let name_display = if name.len() > 24 {
+                    format!("{}…", &name[..23])
+                } else if name.is_empty() || name.starts_with("AS") {
+                    String::new()
+                } else {
+                    name
+                };
+                let on_streams = active_pane == Pane::Streams && i == stream_idx;
+                let line = if on_streams {
                     Line::from(vec![
+                        Span::raw("  "),
+                        Span::styled(asn, Color::Green),
                         Span::raw(" "),
-                        Span::styled("↑↓", Color::White).bold(),
-                        Span::raw(" navigate  "),
-                        Span::styled("type", Color::White).bold(),
-                        Span::raw(" filter  "),
-                        Span::styled("enter", Color::White).bold(),
-                        Span::raw(" connect  "),
-                        Span::styled("esc", Color::White).bold(),
-                        Span::raw(" quit"),
-                    ]),
-                    Line::from(Span::styled(
-                        " offline: bmpwatch <capture.bmpd>",
-                        Color::DarkGray,
-                    )),
-                ])
-                .block(Block::bordered().borders(Borders::ALL))
-                .centered(),
+                        Span::styled(name_display, Color::Yellow),
+                    ])
+                    .on_white()
+                    .black()
+                } else {
+                    Line::from(vec![
+                        Span::raw("  "),
+                        Span::styled(asn, Color::Green),
+                        Span::raw(" "),
+                        if !name_display.is_empty() {
+                            Span::styled(name_display, Color::Yellow)
+                        } else {
+                            Span::raw("")
+                        },
+                    ])
+                };
+                stream_lines.push(line);
+            }
+            if stream_lines.is_empty() {
+                stream_lines.push(Line::from(" (no streams)").dark_gray());
+            }
+            let stream_title = if let Some(ci) = filtered_collectors.get(collector_idx) {
+                format!("Streams — {}", ci.label)
+            } else {
+                "Streams".into()
+            };
+            f.render_widget(
+                Paragraph::new(Text::from(stream_lines))
+                    .block(Block::bordered().title(stream_title).borders(Borders::ALL)),
+                body[1],
+            );
+
+            // ── Selected detail + footer ──
+            let detail = selected_topic.as_deref().unwrap_or("no stream selected");
+            let footer_lines = vec![
+                Line::from(vec![
+                    Span::raw(" "),
+                    Span::styled("↑↓", Color::White).bold(),
+                    Span::raw(" move  "),
+                    Span::styled("tab", Color::White).bold(),
+                    Span::raw(" pane  "),
+                    Span::styled("/", Color::White).bold(),
+                    Span::raw(" search  "),
+                    Span::styled("enter", Color::White).bold(),
+                    Span::raw(" connect  "),
+                    Span::styled("esc", Color::White).bold(),
+                    Span::raw(" quit"),
+                ]),
+                Line::from(vec![
+                    Span::raw("  "),
+                    Span::styled(
+                        detail,
+                        if selected_topic.is_some() {
+                            Color::Green
+                        } else {
+                            Color::DarkGray
+                        },
+                    ),
+                    Span::raw("  "),
+                    Span::styled("offline: bmpwatch <capture.bmpd>", Color::DarkGray),
+                ]),
+            ];
+            f.render_widget(
+                Paragraph::new(footer_lines).block(Block::bordered().borders(Borders::ALL)),
                 chunks[3],
             );
         })?;
@@ -386,40 +401,57 @@ pub(crate) fn topic_browser(
                 }
                 match key.code {
                     KeyCode::Esc | KeyCode::Char('q') => return Ok(None),
-                    KeyCode::Enter => {
-                        if let Some(row) = rows.get(selected) {
-                            match row {
-                                Row::Stream { topic, .. } if !topic.is_empty() => {
-                                    add_recent(topic);
-                                    return Ok(Some(topic.clone()));
-                                }
-                                _ => {
-                                    if let Some(pos) = rows
-                                        .iter()
-                                        .enumerate()
-                                        .skip(selected + 1)
-                                        .position(|(_, r)| matches!(r, Row::Stream { topic, .. } if !topic.is_empty()))
-                                    {
-                                        selected = selected + 1 + pos;
-                                    }
-                                }
+                    KeyCode::Tab => {
+                        active_pane = match active_pane {
+                            Pane::Collectors => Pane::Streams,
+                            Pane::Streams => Pane::Collectors,
+                        };
+                    }
+                    KeyCode::Enter => match active_pane {
+                        Pane::Collectors => {
+                            // Switch to streams for this collector
+                            active_pane = Pane::Streams;
+                            stream_idx = 0;
+                        }
+                        Pane::Streams => {
+                            if let Some(pt) = selected_collector_streams.get(stream_idx) {
+                                add_recent(&pt.full);
+                                return Ok(Some(pt.full.clone()));
                             }
                         }
-                    }
+                    },
                     KeyCode::Char(c) => {
                         filter.push(c);
-                        selected = 0;
+                        collector_idx = 0;
+                        stream_idx = 0;
+                        active_pane = Pane::Collectors;
                     }
                     KeyCode::Backspace => {
                         filter.pop();
-                        selected = 0;
+                        collector_idx = 0;
+                        stream_idx = 0;
+                        active_pane = Pane::Collectors;
                     }
-                    KeyCode::Up => {
-                        selected = selected.saturating_sub(1);
-                    }
-                    KeyCode::Down if selected + 1 < rows.len() => {
-                        selected += 1;
-                    }
+                    KeyCode::Up => match active_pane {
+                        Pane::Collectors => {
+                            collector_idx = collector_idx.saturating_sub(1);
+                        }
+                        Pane::Streams => {
+                            stream_idx = stream_idx.saturating_sub(1);
+                        }
+                    },
+                    KeyCode::Down => match active_pane {
+                        Pane::Collectors => {
+                            if collector_idx + 1 < filtered_collectors.len() {
+                                collector_idx += 1;
+                            }
+                        }
+                        Pane::Streams => {
+                            if stream_idx + 1 < selected_collector_streams.len() {
+                                stream_idx += 1;
+                            }
+                        }
+                    },
                     _ => {}
                 }
             }
