@@ -763,7 +763,8 @@ fn render_status_bar(frame: &mut Frame, area: Rect, dash: &Dashboard) {
     let rate = format!(" {}/s", dash.current_rate());
     let msgs = format!(" msgs:{}", dash.total_messages);
     let keys = format!(
-        " [q]quit [b]browse [c]comms [p]{}",
+        " [q]quit [b]browse [c]comms{} [p]{}",
+        if dash.show_communities { ":on" } else { "" },
         if dash.paused { "resume" } else { "pause" },
     );
 

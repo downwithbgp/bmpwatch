@@ -193,8 +193,14 @@ pub(crate) fn topic_browser(
             }
         }
 
-        // All collectors
+        // All collectors. UNDEFINED_ROUTER_GROUP hidden by default;
+        // shown only when the user's search filter matches its topics.
         for (col, streams) in &collectors {
+            // Hide unnamed collectors unless the user is searching within them
+            let is_undefined = col.contains("UNDEFINED");
+            if is_undefined && filter.is_empty() {
+                continue;
+            }
             let matching: Vec<&&ParsedTopic> = if filter.is_empty() {
                 streams.iter().collect()
             } else {
@@ -241,7 +247,7 @@ pub(crate) fn topic_browser(
                 Constraint::Length(3),
                 Constraint::Length(3),
                 Constraint::Min(0),
-                Constraint::Length(1),
+                Constraint::Length(2),
             ])
             .split(area);
 
@@ -350,17 +356,23 @@ pub(crate) fn topic_browser(
 
             // ── Footer ──
             f.render_widget(
-                Paragraph::new(vec![Line::from(vec![
-                    Span::raw(" "),
-                    Span::styled("↑↓", Color::White).bold(),
-                    Span::raw(" navigate  "),
-                    Span::styled("type", Color::White).bold(),
-                    Span::raw(" filter  "),
-                    Span::styled("enter", Color::White).bold(),
-                    Span::raw(" connect  "),
-                    Span::styled("esc", Color::White).bold(),
-                    Span::raw(" quit"),
-                ])])
+                Paragraph::new(vec![
+                    Line::from(vec![
+                        Span::raw(" "),
+                        Span::styled("↑↓", Color::White).bold(),
+                        Span::raw(" navigate  "),
+                        Span::styled("type", Color::White).bold(),
+                        Span::raw(" filter  "),
+                        Span::styled("enter", Color::White).bold(),
+                        Span::raw(" connect  "),
+                        Span::styled("esc", Color::White).bold(),
+                        Span::raw(" quit"),
+                    ]),
+                    Line::from(Span::styled(
+                        " offline: bmpwatch <capture.bmpd>",
+                        Color::DarkGray,
+                    )),
+                ])
                 .block(Block::bordered().borders(Borders::ALL))
                 .centered(),
                 chunks[3],
