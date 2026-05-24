@@ -51,6 +51,22 @@ pub struct Cli {
     #[arg(long, default_value = "auto")]
     format: InputFormat,
 
+    /// Kafka broker address (dashboard mode)
+    #[arg(long, default_value = "stream.routeviews.org:9092")]
+    broker: String,
+
+    /// Exact Kafka topic name — skip the stream browser
+    #[arg(long)]
+    topic: Option<String>,
+
+    /// Pre-filter topics by collector/router fragment
+    #[arg(long)]
+    collector: Option<String>,
+
+    /// Pre-filter topics by ASN
+    #[arg(long)]
+    asn: Option<String>,
+
     #[command(subcommand)]
     pub command: Option<Command>,
 }
@@ -134,8 +150,11 @@ pub fn run() {
         } else {
             // Default: live dashboard
             if let Err(e) = dashboard::run_dashboard(
-                "stream.routeviews.org:9092",
-                None, None, None, 100,
+                &cli.broker,
+                cli.topic.as_deref(),
+                cli.collector.as_deref(),
+                cli.asn.as_deref(),
+                100,
             ) {
                 eprintln!("Dashboard error: {e}");
                 process::exit(1);
