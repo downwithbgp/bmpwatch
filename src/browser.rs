@@ -1,11 +1,12 @@
 use std::collections::BTreeMap;
+use std::sync::Mutex;
 use std::time::Duration;
 
 use anyhow::Result;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::layout::{Constraint, Layout};
-use ratatui::style::Stylize;
-use ratatui::text::{Line, Text};
+use ratatui::style::{Color, Stylize};
+use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::DefaultTerminal;
 
@@ -20,11 +21,9 @@ pub(crate) struct ParsedTopic {
 pub(crate) fn parse_topic(t: &str) -> Option<ParsedTopic> {
     let body = t.strip_prefix("routeviews.")?;
     let body = body.strip_suffix(".bmp_raw")?;
-    // Split from the right: last segment is ASN, everything before is collector
     let (collector, asn_str) = match body.rsplit_once('.') {
         Some((col, asn)) => (col.to_string(), asn.to_string()),
         None => {
-            // No dots — edge case: routeviews.<collector>.bmp_raw
             return Some(ParsedTopic {
                 collector: body.to_string(),
                 asn_str: "-".to_string(),
@@ -42,6 +41,24 @@ pub(crate) fn parse_topic(t: &str) -> Option<ParsedTopic> {
     })
 }
 
+// Persist recently connected streams so they appear at the top
+fn recent_cache() -> &'static Mutex<Vec<String>> {
+    use std::sync::OnceLock;
+    static CACHE: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+fn add_recent(topic: &str) {
+    let mut recent = recent_cache().lock().unwrap();
+    recent.retain(|t| t != topic);
+    recent.insert(0, topic.to_string());
+    recent.truncate(10);
+}
+
+fn get_recents() -> Vec<String> {
+    recent_cache().lock().unwrap().clone()
+}
+
 pub(crate) fn topic_browser(
     terminal: &mut DefaultTerminal,
     topics: &[String],
@@ -57,25 +74,54 @@ pub(crate) fn topic_browser(
     collectors.sort_by(|a, b| {
         let a_undef = a.0.contains("UNDEFINED");
         let b_undef = b.0.contains("UNDEFINED");
-        a_undef.cmp(&b_undef)
-            .then_with(|| b.1.len().cmp(&a.1.len()))
+        a_undef.cmp(&b_undef).then_with(|| b.1.len().cmp(&a.1.len()))
     });
 
-    // Build flat display: collector headers + stream rows
+    // Index parsed topics by full name for recent lookup
+    let topic_map: std::collections::HashMap<&str, &ParsedTopic> =
+        parsed.iter().map(|pt| (pt.full.as_str(), pt)).collect();
+
     enum Row {
         Header { collector: String, count: usize },
         Stream { topic: String, asn: String, name: String },
+        Empty,
     }
 
     let mut filter = String::new();
     let mut selected: usize = 0;
+    let collector_count = collectors.len();
 
     loop {
         let lower = filter.to_lowercase();
+        let recents = get_recents();
         let mut rows: Vec<Row> = Vec::new();
 
+        // Recent section (only when not filtering)
+        if filter.is_empty() && !recents.is_empty() {
+            let recent_items: Vec<&&ParsedTopic> = recents
+                .iter()
+                .filter_map(|t| topic_map.get(t.as_str()))
+                .take(5)
+                .collect();
+            if !recent_items.is_empty() {
+                rows.push(Row::Header {
+                    collector: "Recently Connected".into(),
+                    count: recent_items.len(),
+                });
+                for pt in recent_items {
+                    rows.push(Row::Stream {
+                        topic: pt.full.clone(),
+                        asn: pt.asn_str.clone(),
+                        name: as_name(&pt.asn_str),
+                    });
+                }
+                rows.push(Row::Empty);
+            }
+        }
+
+        // All collectors
         for (col, streams) in &collectors {
-            let mut matching: Vec<&&ParsedTopic> = if filter.is_empty() {
+            let matching: Vec<&&ParsedTopic> = if filter.is_empty() {
                 streams.iter().collect()
             } else {
                 streams
@@ -91,15 +137,14 @@ pub(crate) fn topic_browser(
             if matching.is_empty() {
                 continue;
             }
-            matching.sort_by_key(|pt| {
-                pt.asn_str.parse::<u32>().unwrap_or(0)
-            });
+            let mut sorted = matching;
+            sorted.sort_by_key(|pt| pt.asn_str.parse::<u32>().unwrap_or(0));
 
             rows.push(Row::Header {
                 collector: col.to_string(),
-                count: matching.len(),
+                count: sorted.len(),
             });
-            for pt in matching {
+            for pt in sorted {
                 rows.push(Row::Stream {
                     topic: pt.full.clone(),
                     asn: pt.asn_str.clone(),
@@ -109,11 +154,7 @@ pub(crate) fn topic_browser(
         }
 
         if rows.is_empty() {
-            rows.push(Row::Stream {
-                topic: String::new(),
-                asn: String::new(),
-                name: String::new(),
-            });
+            rows.push(Row::Empty);
         }
 
         if selected >= rows.len() {
@@ -123,65 +164,102 @@ pub(crate) fn topic_browser(
         terminal.draw(|f| {
             let area = f.area();
             let chunks = Layout::vertical([
-                Constraint::Length(1),
+                Constraint::Length(3),
                 Constraint::Length(3),
                 Constraint::Min(0),
                 Constraint::Length(1),
             ])
             .split(area);
 
-            // Title
-            let total = parsed.len();
-            let title = Paragraph::new(format!(" BMPDoctor — {total} streams available "))
-                .bold()
-                .block(Block::bordered().borders(Borders::ALL))
-                .centered();
+            // ── Title ──
+            let subtitle = if filter.is_empty() {
+                format!("{} collectors  ·  {} streams", collector_count, parsed.len())
+            } else {
+                format!("{} results", rows.iter().filter(|r| matches!(r, Row::Stream { .. })).count())
+            };
+            let title = Paragraph::new(vec![
+                Line::from(" BMPDoctor ").bold().centered(),
+                Line::from(Span::styled(subtitle, Color::DarkGray)).centered(),
+            ])
+            .block(Block::bordered().borders(Borders::ALL));
             f.render_widget(title, chunks[0]);
 
-            // Search bar
-            let prompt: Line = if filter.is_empty() {
-                Line::from(" type to search — ASN, name, collector, or topic ").dark_gray()
+            // ── Search ──
+            let search_content: Line = if filter.is_empty() {
+                Line::from(vec![
+                    Span::raw("  "),
+                    Span::styled("search", Color::DarkGray),
+                    Span::raw("  —  type ASN, name, collector, or topic"),
+                ])
             } else {
-                Line::from(format!(" {filter}"))
+                Line::from(vec![
+                    Span::raw("  "),
+                    Span::styled(format!("search  ▏{filter}"), Color::Reset),
+                ])
             };
-            let search = Paragraph::new(prompt)
-            .block(Block::bordered().borders(Borders::ALL));
-            f.render_widget(search, chunks[1]);
+            f.render_widget(
+                Paragraph::new(search_content).block(Block::bordered().borders(Borders::ALL)),
+                chunks[1],
+            );
 
-            // Results
+            // ── Results ──
             let mut lines: Vec<Line> = Vec::new();
-            let mut i = 0;
-            for row in &rows {
+            for (i, row) in rows.iter().enumerate() {
                 match row {
                     Row::Header { collector, count } => {
-                        let text = format!("  {collector} ({count})");
+                        let is_recent = collector == "Recently Connected";
+                        let indent = if is_recent { "" } else { "" };
+                        let text = format!(" {indent}{collector}  ({count})");
                         let line = if i == selected {
-                            Line::from(text).bold()
+                            Line::from(text).cyan().bold()
                         } else {
-                            Line::from(text).dark_gray()
+                            Line::from(text).cyan()
                         };
                         lines.push(line);
                     }
                     Row::Stream { topic, asn, name } => {
-                        if topic.is_empty() {
-                            lines.push(Line::from("  no matches").dark_gray());
+                        let asn_num = format!("AS{asn:<7}");
+                        let name_display = if name.len() > 22 {
+                            format!("{}…", &name[..21])
                         } else {
-                            let display = format!(
-                                "    AS{:<8} {:<24} {}",
-                                asn,
-                                if name.len() > 24 { &name[..23] } else { name },
-                                topic,
-                            );
-                            let line = if i == selected {
-                                Line::from(display).on_white().black()
-                            } else {
-                                Line::from(display)
-                            };
-                            lines.push(line);
-                        }
+                            name.clone()
+                        };
+                        let has_name = !name.is_empty() && !name.starts_with("AS");
+                        let line = if i == selected {
+                            Line::from(vec![
+                                Span::raw("   "),
+                                Span::styled(asn_num, Color::Green),
+                                Span::raw(" "),
+                                if has_name {
+                                    Span::styled(name_display, Color::Yellow)
+                                } else {
+                                    Span::raw(format!("{:<23}", name_display))
+                                },
+                                Span::raw(" "),
+                                Span::raw(topic.as_str()),
+                            ]).on_white().black()
+                        } else {
+                            Line::from(vec![
+                                Span::raw("   "),
+                                Span::styled(asn_num, Color::Green),
+                                Span::raw(" "),
+                                if has_name {
+                                    Span::styled(name_display, Color::Yellow)
+                                } else {
+                                    Span::raw(format!("{:<23}", name_display))
+                                },
+                                Span::raw(" "),
+                                Span::styled(topic.as_str(), Color::DarkGray),
+                            ])
+                        };
+                        lines.push(line);
+                    }
+                    Row::Empty => {
+                        lines.push(Line::from(vec![
+                            Span::raw(""),
+                        ]));
                     }
                 }
-                i += 1;
             }
 
             f.render_widget(
@@ -190,15 +268,23 @@ pub(crate) fn topic_browser(
                 chunks[2],
             );
 
-            // Footer
-            let footer = format!(
-                " [↑↓] navigate  [type] search  [enter] connect  [esc] quit  {} results",
-                rows.len(),
-            );
+            // ── Footer ──
             f.render_widget(
-                Paragraph::new(footer)
-                    .block(Block::bordered().borders(Borders::ALL))
-                    .centered(),
+                Paragraph::new(vec![
+                    Line::from(vec![
+                        Span::raw(" "),
+                        Span::styled("↑↓", Color::White).bold(),
+                        Span::raw(" navigate  "),
+                        Span::styled("type", Color::White).bold(),
+                        Span::raw(" filter  "),
+                        Span::styled("enter", Color::White).bold(),
+                        Span::raw(" connect  "),
+                        Span::styled("esc", Color::White).bold(),
+                        Span::raw(" quit"),
+                    ]),
+                ])
+                .block(Block::bordered().borders(Borders::ALL))
+                .centered(),
                 chunks[3],
             );
         })?;
@@ -214,10 +300,10 @@ pub(crate) fn topic_browser(
                         if let Some(row) = rows.get(selected) {
                             match row {
                                 Row::Stream { topic, .. } if !topic.is_empty() => {
+                                    add_recent(topic);
                                     return Ok(Some(topic.clone()));
                                 }
                                 _ => {
-                                    // On a header or empty row — jump to next stream
                                     for j in selected + 1..rows.len() {
                                         if matches!(&rows[j], Row::Stream { topic, .. } if !topic.is_empty()) {
                                             selected = j;

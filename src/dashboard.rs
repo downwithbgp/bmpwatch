@@ -711,17 +711,7 @@ fn render(frame: &mut Frame, dash: &Dashboard, connected: bool) {
         Constraint::Percentage(35),
     ])
     .split(vchunks[1]);
-    if dash.paused {
-        let paused_area = body[0];
-        let msg = Paragraph::new(" ⏸  PAUSED — press p to resume ")
-            .yellow()
-            .bold()
-            .centered()
-            .block(Block::bordered().title("Live").borders(Borders::ALL));
-        frame.render_widget(msg, paused_area);
-    } else {
-        render_message_log(frame, body[0], dash);
-    }
+    render_message_log(frame, body[0], dash);
     render_origins(frame, body[1], dash);
 
     render_status_bar(frame, vchunks[2], dash);
