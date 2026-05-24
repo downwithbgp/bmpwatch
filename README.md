@@ -323,11 +323,17 @@ region → collector → stream. Type to filter, arrows to navigate, Enter to se
 
 In the dashboard:
 - **Live message log** — scrolling view of BMP messages with timestamps, prefix
-  announcements/withdrawals (green/red), and full AS paths
-- **Prefix Origins** — prefixes grouped by origin ASN, sorted by churn frequency,
-  with AS names resolved via bundled seed data and live WHOIS lookups
-- **Status bar** — message type counts, peer count, total messages, rate, findings
-  status, and keybindings
+  announcements/withdrawals (green/red), RPKI validation badges (VAL/ASN/LEN/NF),
+  and compact AS paths (deduplicated, truncated, origin AS color-coded by RPKI)
+- **Prefix Flaps** — prefixes grouped by origin ASN, sorted by churn frequency,
+  with AS names resolved via bundled seed data, live WHOIS lookups, and
+  session-persistent cache (`~/.cache/bmpdoctor/as_names_cache.bin`)
+- **RPKI validation** — downloads ROAs from Cloudflare RTR server on startup
+  (~430K VRPs, cached 6 hours to `~/.cache/bmpdoctor/rpki_cache.bin`). Invalid
+  prefixes show the expected ASN ("should be AS64496") or max prefix length
+- **Status bar** — RPKI counts (VAL/INV/NF), cumulative messages, rate,
+  findings status, and keybindings
+- Paused state shows yellow header and centered ⏸ PAUSED indicator
 
 Keys: `q`/`Esc` quit, `b` back to stream browser, `p` pause/resume.
 
