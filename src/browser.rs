@@ -59,6 +59,67 @@ fn get_recents() -> Vec<String> {
     recent_cache().lock().unwrap().clone()
 }
 
+fn collector_label(name: &str) -> &str {
+    match name {
+        "amsix.ams" => "Amsterdam, Netherlands (AMS-IX)",
+        "cix.atl" => "Atlanta, Georgia (CIX-ATL)",
+        "crix.sjo" => "San José, Costa Rica (CRIX)",
+        "decix.fra" => "Frankfurt, Germany (DE-CIX)",
+        "decix.jhb" => "Johor Bahru, Malaysia (DE-CIX)",
+        "getafix.mnl" => "Manila, Philippines (GetaFIX)",
+        "hkix.hkg" => "Hong Kong (HKIX)",
+        "iix.cgk" => "Jakarta, Indonesia (IIX)",
+        "interlan.otp" => "Bucharest, Romania (InterLAN-IX)",
+        "iraq-ixp.bgw" => "Baghdad, Iraq (IRAQ-IXP)",
+        "ix-br.gru" => "São Paulo, Brazil (IX.br)",
+        "ix-br2.gru" => "São Paulo, Brazil (IX.br 2)",
+        "ixpn.los" => "Lagos, Nigeria (IXPN)",
+        "kinx.icn" => "Seoul, Korea (KINX)",
+        "locix.fra" => "Frankfurt, Germany (LocIX)",
+        "namex.fco" => "Rome, Italy (NAMEX)",
+        "netnod.mmx" => "Malmö, Sweden (Netnod)",
+        "pacwave.lax" => "Los Angeles, California (Pacific Wave)",
+        "pit.scl" => "Santiago, Chile (PIT Chile)",
+        "pitmx.qro" => "Querétaro, Mexico (PIT Chile MX)",
+        "route-views.bdix" => "Dhaka, Bangladesh (BDIX)",
+        "route-views.bknix" => "Bangkok, Thailand (BKNIX)",
+        "route-views.chicago" => "Chicago, Illinois (Equinix CH1)",
+        "route-views.chile" => "Santiago, Chile (NIC.cl)",
+        "route-views.eqix" => "Ashburn, Virginia (Equinix)",
+        "route-views.flix" => "Miami, Florida (FL-IX)",
+        "route-views.fortaleza" => "Fortaleza, Brazil (IX.br)",
+        "route-views.gixa" => "Accra, Ghana (GIXA)",
+        "route-views.gorex" => "Guam, US Territories (GOREX)",
+        "route-views.isc" => "Palo Alto, California (PAIX)",
+        "route-views.kixp" => "Nairobi, Kenya (KIXP)",
+        "route-views.linx" => "London, United Kingdom (LINX)",
+        "route-views.mwix" => "Indianapolis, Indiana (FD-IX)",
+        "route-views.napafrica" => "Johannesburg, South Africa (NAPAfrica)",
+        "route-views.nwax" => "Portland, Oregon (NWAX)",
+        "route-views.ny" => "New York, NY (DE-CIX)",
+        "route-views.perth" => "Perth, Australia (WA-IX)",
+        "route-views.peru" => "Lima, Peru (Peru IX)",
+        "route-views.phoix" => "Quezon City, Philippines (PhOpenIX)",
+        "route-views.rio" => "Rio de Janeiro, Brazil (IX.br)",
+        "route-views.sfmix" => "San Francisco, California (SFMIX)",
+        "route-views.sg" => "Singapore (Equinix)",
+        "route-views.soxrs" => "Belgrade, Serbia (SOX)",
+        "route-views.sydney" => "Sydney, Australia (Equinix SYD1)",
+        "route-views.telxatl" => "Atlanta, Georgia (Digital Realty)",
+        "route-views.uaeix" => "Dubai, UAE (UAE-IX)",
+        "route-views.wide" => "Tokyo, Japan (DIX-IE)",
+        "route-views2" => "Multi-hop 2 (Univ of Oregon)",
+        "route-views3" => "Multi-hop 3 (Univ of Oregon)",
+        "route-views4" => "Multi-hop 4 (Univ of Oregon)",
+        "route-views5" => "Multi-hop 5 (Univ of Oregon)",
+        "route-views6" => "Multi-hop 6 (Univ of Oregon)",
+        "route-views7" => "Multi-hop 7 (Univ of Oregon)",
+        "route-views8" => "Multi-hop 8 (Univ of Oregon)",
+        "frr" => "Test collector (FRR, Univ of Oregon)",
+        _ => name,
+    }
+}
+
 pub(crate) fn topic_browser(
     terminal: &mut DefaultTerminal,
     topics: &[String],
@@ -141,7 +202,7 @@ pub(crate) fn topic_browser(
             sorted.sort_by_key(|pt| pt.asn_str.parse::<u32>().unwrap_or(0));
 
             rows.push(Row::Header {
-                collector: col.to_string(),
+                collector: collector_label(col).to_string(),
                 count: sorted.len(),
             });
             for pt in sorted {
