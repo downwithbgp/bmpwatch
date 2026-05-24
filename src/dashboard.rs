@@ -43,6 +43,7 @@ pub(crate) struct Dashboard {
     exit: bool,
     browse: bool,
     paused: bool,
+    show_communities: bool,
     peer_msg_counts: HashMap<PeerKey, u64>,
     peer_warnings: HashMap<PeerKey, u64>,
     metadata: Option<crate::obmp_reader::OpenBmpMetadata>,
@@ -68,6 +69,7 @@ impl Dashboard {
             exit: false,
             browse: false,
             paused: false,
+            show_communities: false,
             peer_msg_counts: HashMap::new(),
             peer_warnings: HashMap::new(),
             metadata: None,
@@ -245,6 +247,7 @@ fn handle_key(key: event::KeyEvent, dash: &mut Dashboard) {
             dash.exit = true;
         }
         KeyCode::Char('p') => dash.paused = !dash.paused,
+        KeyCode::Char('c') => dash.show_communities = !dash.show_communities,
         _ => {}
     }
 }
@@ -751,7 +754,7 @@ fn render_status_bar(frame: &mut Frame, area: Rect, dash: &Dashboard) {
     let rate = format!(" {}/s", dash.current_rate());
     let msgs = format!(" msgs:{}", dash.total_messages);
     let keys = format!(
-        " [q]quit [b]browse [p]{}",
+        " [q]quit [b]browse [c]comms [p]{}",
         if dash.paused { "resume" } else { "pause" },
     );
 
@@ -890,6 +893,30 @@ fn render_message_log(frame: &mut Frame, area: Rect, dash: &Dashboard) {
                     if let Some(ref hint) = rpki_hint {
                         spans.push(Span::from(format!("  ({hint})")).yellow());
                     }
+                    // Origin AS name (last hop)
+                    if let Some(origin) = display_path.last() {
+                        let name = as_name_resolve(*origin);
+                        if !name.is_empty() && !name.starts_with("AS") {
+                            let truncated = if name.len() > 22 {
+                                format!("{}…", &name[..21])
+                            } else {
+                                name
+                            };
+                            spans.push(Span::raw(" "));
+                            spans.push(Span::styled(truncated, Color::Yellow));
+                        }
+                    }
+                    // Show communities (max 3, only when toggled on)
+                    if dash.show_communities && !pc.communities.is_empty() {
+                        let shown = &pc.communities[..pc.communities.len().min(3)];
+                        let comms = shown.join(" ");
+                        let more = if pc.communities.len() > 3 {
+                            format!(" +{}", pc.communities.len() - 3)
+                        } else {
+                            String::new()
+                        };
+                        spans.push(Span::from(format!("  {comms}{more}")).dark_gray());
+                    }
                     lines.push(Line::from(spans));
                 }
                 for (p, _) in &pc.withdrawn {
@@ -951,6 +978,7 @@ struct PrefixChange {
     announced: Vec<(String, u32)>,   // (prefix, origin_asn)
     withdrawn: Vec<(String, u32)>,
     as_path: Vec<u32>,               // full AS path
+    communities: Vec<String>,        // BGP communities as "ASN:VALUE" strings
     rpki: Option<crate::rpki::Status>,
     rpki_detail: Option<crate::rpki::RPKIDetail>,
 }
@@ -990,26 +1018,51 @@ fn extract_prefixes(full_data: &[u8]) -> Option<PrefixChange> {
                     bgpkit_parser::models::BgpMessage::Update(update) => {
                         let mut as_path: Vec<u32> = Vec::new();
                         let mut origin_asn: u32 = 0;
+                        let mut communities: Vec<String> = Vec::new();
                         for attr in &update.attributes {
-                            if let bgpkit_parser::models::AttributeValue::AsPath {
-                                ref path, ..
-                            } = attr
-                            {
-                                for seg in &path.segments {
-                                    match seg {
-                                        bgpkit_parser::models::AsPathSegment::AsSequence(v)
-                                        | bgpkit_parser::models::AsPathSegment::AsSet(v) => {
-                                            for a in v {
-                                                let n = a.to_u32();
-                                                as_path.push(n);
-                                                origin_asn = n;
+                            match attr {
+                                bgpkit_parser::models::AttributeValue::AsPath {
+                                    ref path, ..
+                                } => {
+                                    for seg in &path.segments {
+                                        match seg {
+                                            bgpkit_parser::models::AsPathSegment::AsSequence(v)
+                                            | bgpkit_parser::models::AsPathSegment::AsSet(v) => {
+                                                for a in v {
+                                                    let n = a.to_u32();
+                                                    as_path.push(n);
+                                                    origin_asn = n;
+                                                }
                                             }
+                                            _ => {}
                                         }
-                                        _ => {}
                                     }
                                 }
+                                bgpkit_parser::models::AttributeValue::Communities(ref comms) => {
+                                    for c in comms {
+                                        match c {
+                                            bgpkit_parser::models::Community::Custom(asn, val) => {
+                                                communities.push(format!("{}:{}", asn.to_u32(), val));
+                                            }
+                                            bgpkit_parser::models::Community::NoExport => {
+                                                communities.push("NO_EXPORT".into());
+                                            }
+                                            bgpkit_parser::models::Community::NoAdvertise => {
+                                                communities.push("NO_ADVERTISE".into());
+                                            }
+                                            bgpkit_parser::models::Community::NoExportSubConfed => {
+                                                communities.push("NO_EXPORT_SUBCONFED".into());
+                                            }
+                                        }
+                                    }
+                                }
+                                _ => {}
                             }
                         }
+                        // Dedup and limit
+                        communities.sort();
+                        communities.dedup();
+                        communities.truncate(8);
 
                         Some(PrefixChange {
                             announced: update
@@ -1023,6 +1076,7 @@ fn extract_prefixes(full_data: &[u8]) -> Option<PrefixChange> {
                                 .map(|p| (p.to_string(), origin_asn))
                                 .collect(),
                             as_path,
+                            communities,
                             rpki: None,
                             rpki_detail: None,
                         })
@@ -1177,50 +1231,27 @@ fn compact_path(path: &[u32]) -> String {
         }
     }
 
-    let name_of = |asn: u32| -> String {
-        let name = as_name_resolve(asn);
-        if name.is_empty() || name.starts_with("AS") {
-            format!("AS{asn}")
+    let as_str = |asn: u32, count: u32| -> String {
+        if count > 1 {
+            format!("AS{asn}×{count}")
         } else {
-            let truncated = if name.len() > 22 {
-                format!("{}…", &name[..21])
-            } else {
-                name
-            };
-            format!("AS{asn} {truncated}")
+            format!("AS{asn}")
         }
     };
 
-    if deduped.len() <= 5 {
+    if deduped.len() <= 4 {
         deduped
             .iter()
-            .map(|&(asn, count)| {
-                if count > 1 {
-                    format!("{}×{count}", name_of(asn))
-                } else {
-                    name_of(asn)
-                }
-            })
+            .map(|&(asn, count)| as_str(asn, count))
             .collect::<Vec<_>>()
             .join(" → ")
     } else {
-        // First 2 + … + last 2
+        // First 1 + … + last 1
         let mut parts: Vec<String> = Vec::new();
-        for &(asn, count) in &deduped[..2] {
-            parts.push(if count > 1 {
-                format!("{}×{count}", name_of(asn))
-            } else {
-                name_of(asn)
-            });
-        }
+        parts.push(as_str(deduped[0].0, deduped[0].1));
         parts.push("…".into());
-        for &(asn, count) in &deduped[deduped.len() - 2..] {
-            parts.push(if count > 1 {
-                format!("{}×{count}", name_of(asn))
-            } else {
-                name_of(asn)
-            });
-        }
+        let last = deduped.len() - 1;
+        parts.push(as_str(deduped[last].0, deduped[last].1));
         parts.join(" → ")
     }
 }
