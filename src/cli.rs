@@ -147,6 +147,24 @@ pub enum Command {
         #[arg(long, hide = true)]
         mock_active: bool,
     },
+    /// Refresh ASN names from Team Cymru bulk WHOIS
+    RefreshAsnames {
+        /// Specific ASNs to query
+        #[arg(long)]
+        asn: Vec<u32>,
+        /// Extract ASNs from all topics on the broker
+        #[arg(long)]
+        from_topics: bool,
+        /// Kafka broker address for --from-topics
+        #[arg(long, default_value = "stream.routeviews.org:9092")]
+        broker: String,
+        /// Refresh cached entries older than 90 days
+        #[arg(long)]
+        stale: bool,
+        /// Maximum ASNs to query (default 200)
+        #[arg(long, default_value_t = 200)]
+        limit: usize,
+    },
 }
 
 pub fn run() {
@@ -275,6 +293,20 @@ pub fn run() {
                     "NOTE: findings truncated at {} ({} dropped). Use --max-findings to raise.",
                     max_findings, doctor.state.findings_dropped,
                 );
+            }
+        }
+        Command::RefreshAsnames {
+            asn,
+            from_topics,
+            broker,
+            stale,
+            limit,
+        } => {
+            if let Err(e) =
+                crate::asnames::run_refresh_asnames(asn, from_topics, &broker, stale, limit)
+            {
+                eprintln!("Error refreshing AS names: {e}");
+                process::exit(1);
             }
         }
         Command::Dump { .. } => {

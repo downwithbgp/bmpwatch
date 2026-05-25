@@ -418,49 +418,14 @@ fn as_name_seed() -> &'static HashMap<u32, String> {
     })
 }
 
-fn whois_lookup(asn: u32) -> Result<String, std::io::Error> {
-    use std::io::{Read, Write};
-    use std::net::ToSocketAddrs;
-    let addr = ("whois.radb.net", 43)
-        .to_socket_addrs()
-        .ok()
-        .and_then(|mut a| a.next());
-    let addr = match addr {
-        Some(a) => a,
-        None => return Ok(String::new()),
-    };
-    let mut conn = std::net::TcpStream::connect_timeout(&addr, Duration::from_secs(3))?;
-    conn.set_read_timeout(Some(Duration::from_secs(3)))?;
-    write!(conn, "AS{asn}\r\n")?;
-    let mut response = String::new();
-    conn.read_to_string(&mut response)?;
-    for line in response.lines() {
-        let lower = line.to_lowercase();
-        if lower.starts_with("descr:") || lower.starts_with("org-name:") {
-            let name = line.split_once(':').map(|x| x.1).unwrap_or("").trim();
-            if !name.is_empty() && name.len() < 50 {
-                return Ok(name.to_string());
-            }
-        }
-    }
-    Ok(String::new())
-}
-
-/// AS name from bundled seed data. No network, instant.
 /// Global AS name cache shared between the stream browser and dashboard.
 fn global_name_cache() -> &'static Mutex<HashMap<u32, String>> {
     static CACHE: OnceLock<Mutex<HashMap<u32, String>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-/// Pending WHOIS lookups — processed one per tick.
-fn global_pending() -> &'static Mutex<Vec<u32>> {
-    static PENDING: OnceLock<Mutex<Vec<u32>>> = OnceLock::new();
-    PENDING.get_or_init(|| Mutex::new(Vec::new()))
-}
-
-/// Resolve an ASN to a name. Checks global cache → seed data → queues WHOIS.
-/// Never blocks. Returns "ASxxxxx" for unknowns until resolved.
+/// Resolve an ASN to a name. Checks global cache → bundled seed → Team Cymru cache.
+/// Never blocks. No network I/O. Returns "ASxxxxx" for unknowns.
 pub(crate) fn as_name_resolve(asn: u32) -> String {
     {
         let cache = global_name_cache().lock().unwrap();
@@ -479,85 +444,24 @@ pub(crate) fn as_name_resolve(asn: u32) -> String {
             .insert(asn, name.clone());
         return name;
     }
+    // Check Team Cymru cache (no network — loads from disk)
+    if let Some(name) = crate::asnames::lookup_cached_name(asn) {
+        global_name_cache()
+            .lock()
+            .unwrap()
+            .insert(asn, name.clone());
+        return name;
+    }
     global_name_cache()
         .lock()
         .unwrap()
         .insert(asn, String::new());
-    global_pending().lock().unwrap().push(asn);
     format!("AS{asn}")
 }
 
-/// Process one pending WHOIS lookup. Call from any event loop.
-pub(crate) fn process_one_whois() {
-    let asn = match global_pending().lock().unwrap().pop() {
-        Some(a) => a,
-        None => return,
-    };
-    match whois_lookup(asn) {
-        Ok(name) if !name.is_empty() => {
-            global_name_cache().lock().unwrap().insert(asn, name);
-            save_as_name_cache();
-        }
-        _ => {
-            global_name_cache().lock().unwrap().remove(&asn);
-        }
-    }
-}
-
-fn as_name_cache_path() -> std::path::PathBuf {
-    let base = if let Ok(dir) = std::env::var("XDG_CACHE_HOME") {
-        std::path::PathBuf::from(dir)
-    } else if let Ok(home) = std::env::var("HOME") {
-        std::path::PathBuf::from(home).join(".cache")
-    } else {
-        std::path::PathBuf::from(".")
-    };
-    base.join("bmpwatch").join("as_names_cache.bin")
-}
-
-fn save_as_name_cache() {
-    let cache = global_name_cache().lock().unwrap();
-    let mut buf: Vec<u8> = Vec::new();
-    for (asn, name) in cache.iter() {
-        if name.is_empty() {
-            continue;
-        }
-        let name_bytes = name.as_bytes();
-        if name_bytes.len() > 200 {
-            continue;
-        }
-        buf.extend_from_slice(&asn.to_be_bytes());
-        buf.push(name_bytes.len() as u8);
-        buf.extend_from_slice(name_bytes);
-    }
-    let path = as_name_cache_path();
-    let _ = std::fs::create_dir_all(path.parent().unwrap());
-    let _ = std::fs::write(&path, &buf);
-}
-
-/// Load persisted AS name cache into the global cache.
+/// Load bundled seed data into the global AS name cache.
 pub(crate) fn load_as_name_cache() {
-    let path = as_name_cache_path();
     let mut cache = global_name_cache().lock().unwrap();
-
-    // Load persisted file if present
-    if let Ok(data) = std::fs::read(&path) {
-        let mut pos = 0;
-        while pos + 5 <= data.len() {
-            let asn = u32::from_be_bytes([data[pos], data[pos + 1], data[pos + 2], data[pos + 3]]);
-            let name_len = data[pos + 4] as usize;
-            pos += 5;
-            if pos + name_len > data.len() {
-                break;
-            }
-            if let Ok(name) = std::str::from_utf8(&data[pos..pos + name_len]) {
-                cache.entry(asn).or_insert_with(|| name.to_string());
-            }
-            pos += name_len;
-        }
-    }
-
-    // Seed with bundled data if not already cached
     for (asn, name) in as_name_seed().iter() {
         cache.entry(*asn).or_insert_with(|| name.clone());
     }
@@ -626,9 +530,6 @@ fn run_loop(
         }
 
         dash.tick();
-
-        // Process one WHOIS lookup per tick (non-blocking, outside draw)
-        process_one_whois();
     }
 
     Ok(())
@@ -1378,34 +1279,15 @@ mod tests {
     }
 
     #[test]
-    fn test_as_name_resolve_unknown_asn_queues_whois() {
-        // An ASN not in seed data should return "AS{asn}" and queue a WHOIS lookup.
-        // We clear the pending queue after to avoid side effects.
+    fn test_as_name_resolve_unknown_returns_raw_asn() {
         let name = as_name_resolve(999_999);
         assert_eq!(name, "AS999999");
-
-        // Verify that a WHOIS lookup was queued
-        {
-            let pending = global_pending().lock().unwrap();
-            assert!(
-                pending.contains(&999_999),
-                "AS999999 should be queued for WHOIS"
-            );
-        }
-        // Clean up: remove from pending and cache
-        {
-            let mut pending = global_pending().lock().unwrap();
-            pending.retain(|&x| x != 999_999);
-        }
-        {
-            let mut cache = global_name_cache().lock().unwrap();
-            cache.remove(&999_999);
-        }
+        // Clean up global cache side effect
+        global_name_cache().lock().unwrap().remove(&999_999);
     }
 
     #[test]
     fn test_as_name_resolve_global_cache_shared() {
-        // Call twice — both must return the seed value.
         assert_eq!(as_name_resolve(13335), "Cloudflare");
         assert_eq!(as_name_resolve(13335), "Cloudflare");
     }
