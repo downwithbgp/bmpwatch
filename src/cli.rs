@@ -67,6 +67,14 @@ pub struct Cli {
     #[arg(long)]
     asn: Option<String>,
 
+    /// Use mock data — no real Kafka broker needed (for testing only)
+    #[arg(long, hide = true)]
+    mock: bool,
+
+    /// Mock mode with an active stream that has at least one message
+    #[arg(long, hide = true)]
+    mock_active: bool,
+
     #[command(subcommand)]
     pub command: Option<Command>,
 }
@@ -132,6 +140,12 @@ pub enum Command {
         /// Rolling window size in messages
         #[arg(long, default_value_t = 100)]
         window_messages: usize,
+        /// Use mock data — no real Kafka broker needed (for testing only)
+        #[arg(long, hide = true)]
+        mock: bool,
+        /// Mock mode with an active stream that has at least one message
+        #[arg(long, hide = true)]
+        mock_active: bool,
     },
 }
 
@@ -155,6 +169,8 @@ pub fn run() {
                 cli.collector.as_deref(),
                 cli.asn.as_deref(),
                 100,
+                cli.mock,
+                cli.mock_active,
             ) {
                 eprintln!("Dashboard error: {e}");
                 process::exit(1);
@@ -219,6 +235,8 @@ pub fn run() {
             collector,
             asn,
             window_messages,
+            mock,
+            mock_active,
         } => {
             if let Err(e) = dashboard::run_dashboard(
                 &broker,
@@ -226,6 +244,8 @@ pub fn run() {
                 collector.as_deref(),
                 asn.as_deref(),
                 window_messages,
+                mock,
+                mock_active,
             ) {
                 eprintln!("Dashboard error: {e}");
                 process::exit(1);

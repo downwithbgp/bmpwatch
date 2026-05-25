@@ -259,11 +259,13 @@ pub(crate) fn run_dashboard(
     collector: Option<&str>,
     asn: Option<&str>,
     window_messages: usize,
+    _mock: bool,
+    _mock_active: bool,
 ) -> Result<()> {
     // Phase 1: Resolve the topic (may need TUI for the browser)
     let mut terminal: DefaultTerminal = ratatui::init();
 
-    let chosen = if let Some(exact) = topic {
+    let mut chosen = if let Some(exact) = topic {
         exact.to_string()
     } else {
         let all = kafka::fetch_topics(broker, "^routeviews.*\\.bmp_raw$")?;
@@ -304,145 +306,79 @@ pub(crate) fn run_dashboard(
         }
     };
 
-    // Exit the alternate screen now that we have a topic.
-    ratatui::restore();
-    drop(terminal);
-
-    let mut current_topic = chosen;
+    // Stay in the alternate screen — no ratatui::restore() between
+    // browser and dashboard. The terminal remains active throughout.
 
     loop {
-        // Phase 2: Connect and prime
-        eprintln!("connecting to {current_topic}");
+        // Setup consumer and dashboard
         let consumer = kafka::create_consumer(broker, "bmpwatch-dashboard", true)?;
         consumer
-            .subscribe(&[&current_topic])
-            .map_err(|e| anyhow::anyhow!("Failed to subscribe to topic '{current_topic}': {e}"))?;
+            .subscribe(&[&chosen])
+            .map_err(|e| anyhow::anyhow!("Failed to subscribe to topic '{chosen}': {e}"))?;
 
-        let mut dash = Dashboard::new(&current_topic, window_messages);
+        let mut dash = Dashboard::new(&chosen, window_messages);
 
-        // Prime with visual progress — a dot every 500ms so the user sees activity
-        let prime_timeout = Duration::from_secs(10);
-        let prime_deadline = std::time::Instant::now() + prime_timeout;
-        eprint!("  waiting for data");
-        while dash.rolling.total_seen() == 0 && std::time::Instant::now() < prime_deadline {
-            match consumer.poll(Duration::from_millis(500)) {
-                Some(Ok(msg)) => {
-                    if let Some(payload) = msg.payload() {
-                        dash.process_message(payload);
-                    }
-                }
-                Some(Err(e)) => eprintln!("\n  kafka error: {e}"),
-                None => eprint!("."),
-            }
-        }
-        eprintln!();
-
-        if dash.rolling.total_seen() == 0 {
-            eprintln!(
-                "  No messages after {}s — this stream may be quiet.\n\n\
-                   Busy peers to try: AS3257 (GTT), AS13335 (Cloudflare),\n\
-                   AS2914 (NTT), AS6939 (Hurricane Electric).\n\n\
-                   Returning to stream browser...\n",
-                prime_timeout.as_secs(),
-            );
-            std::thread::sleep(Duration::from_secs(2));
-            // Return to topic browser to pick a different stream
-            let mut terminal = ratatui::init();
-            let all = kafka::fetch_topics(broker, "^routeviews.*\\.bmp_raw$")?;
-            let mut filtered = kafka::apply_filters(all, None, None);
-            filtered.sort_by(|a, b| {
-                let a_undef = a.contains("UNDEFINED_ROUTER_GROUP");
-                let b_undef = b.contains("UNDEFINED_ROUTER_GROUP");
-                a_undef.cmp(&b_undef).then_with(|| a.cmp(b))
-            });
-            match topic_browser(&mut terminal, &filtered)? {
-                Some(t) => {
-                    current_topic = t;
-                    ratatui::restore();
-                    continue; // loop back to Phase 2 with new topic
-                }
-                None => {
-                    ratatui::restore();
-                    return Ok(());
-                }
-            }
-        }
-
-        eprintln!(
-            "  received {} messages, entering dashboard...",
-            dash.rolling.total_seen()
-        );
-
-        // Load persisted caches
+        // Load caches and RPKI inside the TUI (no shell output)
+        terminal.draw(|f| render_loading(f, f.area(), &chosen, broker))?;
         load_as_name_cache();
-
-        // Download RPKI ROAs for prefix validation
-        eprintln!("  downloading RPKI cache...");
-        match RPKICache::load_or_download("rtr.rpki.cloudflare.com", 8282) {
-            Ok(mut cache) => {
-                // Re-validate messages already in the log (from priming)
-                for msg in &mut dash.message_log {
-                    if let Some(ref mut pc) = msg.prefixes {
-                        let mut worst = None;
-                        for (p, origin) in &pc.announced {
-                            let (status, detail) = cache.validate(p, *origin);
-                            worst = Some(match worst {
-                                None => status,
-                                Some(s @ crate::rpki::Status::Invalid)
-                                | Some(s @ crate::rpki::Status::InvalidWrongAsn)
-                                | Some(s @ crate::rpki::Status::InvalidTooLong) => s,
-                                Some(crate::rpki::Status::NotFound) => {
-                                    if matches!(
-                                        status,
-                                        crate::rpki::Status::Invalid
-                                            | crate::rpki::Status::InvalidWrongAsn
-                                            | crate::rpki::Status::InvalidTooLong
-                                    ) {
-                                        status
-                                    } else {
-                                        crate::rpki::Status::NotFound
-                                    }
-                                }
-                                Some(s) => s,
-                            });
-                            if pc.rpki_detail.is_none()
-                                && matches!(
+        if let Ok(mut cache) = RPKICache::load_or_download("rtr.rpki.cloudflare.com", 8282) {
+            // Re-validate any TUI-primed messages already in the log.
+            for msg in &mut dash.message_log {
+                if let Some(ref mut pc) = msg.prefixes {
+                    let mut worst = None;
+                    for (p, origin) in &pc.announced {
+                        let (status, detail) = cache.validate(p, *origin);
+                        worst = Some(match worst {
+                            None => status,
+                            Some(s @ crate::rpki::Status::Invalid)
+                            | Some(s @ crate::rpki::Status::InvalidWrongAsn)
+                            | Some(s @ crate::rpki::Status::InvalidTooLong) => s,
+                            Some(crate::rpki::Status::NotFound) => {
+                                if matches!(
                                     status,
-                                    crate::rpki::Status::InvalidWrongAsn
+                                    crate::rpki::Status::Invalid
+                                        | crate::rpki::Status::InvalidWrongAsn
                                         | crate::rpki::Status::InvalidTooLong
-                                )
-                            {
-                                pc.rpki_detail = Some(detail);
+                                ) {
+                                    status
+                                } else {
+                                    crate::rpki::Status::NotFound
+                                }
                             }
+                            Some(s) => s,
+                        });
+                        if pc.rpki_detail.is_none()
+                            && matches!(
+                                status,
+                                crate::rpki::Status::InvalidWrongAsn
+                                    | crate::rpki::Status::InvalidTooLong
+                            )
+                        {
+                            pc.rpki_detail = Some(detail);
                         }
-                        pc.rpki = worst;
                     }
+                    pc.rpki = worst;
                 }
-                eprintln!("  RPKI: {} VRPs loaded", cache.vrp_count());
-                dash.rpki = Some(cache);
             }
-            Err(e) => eprintln!("  RPKI: download failed ({e}), continuing without validation"),
+            dash.rpki = Some(cache);
         }
 
-        // Phase 3: TUI dashboard
-        let mut terminal = ratatui::init();
+        // Dashboard TUI loop — reuses the same terminal (no re-init).
         let result = run_loop(&mut terminal, &consumer, &mut dash);
-        ratatui::restore();
-
-        println!(
-            "topic: {}\ntotal_messages: {}\nmalformed: {}\npeers_observed: {}",
-            dash.topic,
-            dash.total_messages,
-            dash.rolling.malformed_messages(),
-            dash.rolling.peers_observed(),
-        );
 
         if !dash.browse {
+            ratatui::restore();
+            println!(
+                "topic: {}\ntotal_messages: {}\nmalformed: {}\npeers_observed: {}",
+                dash.topic,
+                dash.total_messages,
+                dash.rolling.malformed_messages(),
+                dash.rolling.peers_observed(),
+            );
             return result;
         }
 
-        // User pressed 'b' — go back to topic browser
-        let mut terminal = ratatui::init();
+        // User pressed 'b' — back to browser without leaving alternate screen.
         let all = kafka::fetch_topics(broker, "^routeviews.*\\.bmp_raw$")?;
         let mut filtered = kafka::apply_filters(all, None, None);
         filtered.sort_by(|a, b| {
@@ -451,18 +387,15 @@ pub(crate) fn run_dashboard(
             a_undef.cmp(&b_undef).then_with(|| a.cmp(b))
         });
         match topic_browser(&mut terminal, &filtered)? {
-            Some(t) => {
-                current_topic = t;
-                ratatui::restore();
-            }
+            Some(t) => chosen = t,
             None => {
                 ratatui::restore();
                 return Ok(());
             }
         }
+        // Loop back: setup consumer for new topic, re-enter dashboard.
     }
 }
-
 use std::sync::OnceLock;
 
 fn as_name_seed() -> &'static HashMap<u32, String> {
@@ -628,10 +561,6 @@ pub(crate) fn load_as_name_cache() {
     for (asn, name) in as_name_seed().iter() {
         cache.entry(*asn).or_insert_with(|| name.clone());
     }
-
-    if !cache.is_empty() {
-        eprintln!("  AS names: {} entries cached", cache.len());
-    }
 }
 
 /// Stream browser name lookup — uses the global cache + seed data.
@@ -703,6 +632,21 @@ fn run_loop(
     }
 
     Ok(())
+}
+
+fn render_loading(frame: &mut Frame, area: Rect, topic: &str, broker: &str) {
+    let lines = vec![
+        Line::from(" BMPWatch ").bold().centered(),
+        Line::from(""),
+        Line::from(format!(" Topic:  {topic}")),
+        Line::from(format!(" Broker: {broker}")),
+        Line::from(""),
+        Line::from(" Loading..."),
+    ];
+    frame.render_widget(
+        Paragraph::new(lines).block(Block::bordered().borders(Borders::ALL)),
+        area,
+    );
 }
 
 fn render(frame: &mut Frame, dash: &Dashboard, connected: bool) {
@@ -1569,5 +1513,25 @@ mod tests {
         terminal
             .draw(|f| render(f, &dash, true))
             .expect("render should not panic");
+    }
+
+    #[test]
+    fn test_dashboard_render_waiting_state_no_panic() {
+        let dash = Dashboard::new("test-topic", 10);
+        // Zero messages — connected = false
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|f| render(f, &dash, false))
+            .expect("render with no messages should not panic");
+    }
+
+    #[test]
+    fn test_render_loading_no_panic() {
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|f| render_loading(f, f.area(), "test-topic", "broker:9092"))
+            .expect("render_loading should not panic");
     }
 }
