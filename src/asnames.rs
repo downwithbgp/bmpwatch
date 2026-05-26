@@ -183,7 +183,7 @@ fn run_refresh(asns: &[u32]) -> Result<()> {
                 continue;
             }
         };
-        let name = parts[4].to_string();
+        let name = crate::dashboard::normalize_cymru_name(asn, parts[4]);
         if name.is_empty() {
             skipped += 1;
             continue;

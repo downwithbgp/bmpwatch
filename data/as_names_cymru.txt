@@ -1,0 +1,789 @@
+18|US|arin|1984-07-27|University of Texas at Austin, US
+101|US|arin|1987-03-31|University of Washington, US
+174|US|arin|1996-05-16|Cogent Communications, LLC, US
+209|US|arin|1998-11-13|CenturyLink Communications, LLC, US
+260|US|arin|1989-01-04|GTT Americas, LLC, US
+286|US|ripencc|1993-09-01|GTT Communications Inc., US
+293|US|arin|1997-06-16|ESnet, US
+680|DE|ripencc|1993-09-01|Verein zur Foerderung eines Deutschen Forschungsnetzes e.V., DE
+701|US|arin|1990-08-03|Verizon Business, US
+714|US|arin||Apple Inc., US
+812|CA|arin|2002-07-24|Rogers Communications Canada Inc., CA
+852|CA|arin|1998-04-16|TELUS Communications Inc., CA
+924|US|arin|2022-06-16|Cloudie Networks LLC, US
+955|US|arin|2022-06-22|LSHIY LLC, US
+983|US|arin|2022-06-27|Akari Networks LLC, US
+999|US|arin|2024-06-11|CORIX NETWORKS, US
+1031|US|arin|2022-07-05|PEER 1031 LLC, US
+1103|NL|ripencc|1993-09-01|SURF B.V., NL
+1140|NL|ripencc|1993-09-01|Stichting Internet Domeinregistratie Nederland, NL
+1213|IE|ripencc|1992-06-17|ASIERA TECHNOLOGY SERVICES CLG, IE
+1221|AU|apnic|2000-01-31|ASN-TELSTRA - Telstra Limited, AU
+1234|EU|ripencc|1993-09-01|IDDQD-AS, EU
+1239|US|arin|1991-03-25|Cogent Communications, LLC, US
+1280|US|arin|1991-07-31|Internet Systems Consortium, Inc., US
+1299|SE|ripencc|1993-09-01|Arelion Sweden AB, SE
+1351|US|arin|1991-09-17|University of Vermont, US
+1403|CA|arin|2009-07-28|EBOX, CA
+1668|US|arin|1996-11-22|Yahoo Holdings Inc., US
+1798|US|arin|1994-04-14|State of Oregon, US
+1916|BR|lacnic|1999-11-16|Rede Nacional de Ensino e Pesquisa, BR
+2018|ZA|afrinic|2001-03-07|TENET (The UNINET Project) - TENET (The UNINET Project), ZA
+2044|US|arin|2002-08-13|Digital Fortress, US
+2119|NO|ripencc|1993-02-25|Telenor Norge AS, NO
+2152|US|arin|2024-07-08|CENIC, US
+2153|US|arin|2024-07-08|CENIC, US
+2484|FR|ripencc|1993-09-01|AFNIC (Association Francaise pour le Nommage Internet en Cooperation), FR
+2497|JP|apnic|2002-04-05|JPNIC-2Byte-ASBLOCK-AP, JP
+2500|JP|apnic|2002-04-05|JPNIC-2Byte-ASBLOCK-AP, JP
+2516|JP|apnic|2002-04-05|JPNIC-2Byte-ASBLOCK-AP, JP
+2518|JP|apnic|2002-04-05|JPNIC-2Byte-ASBLOCK-AP, JP
+2734|US|arin|2009-09-01|CoreSite, US
+2905|ZA|afrinic|1993-09-10|MTN SA - MTN SA, ZA
+2914|US|arin|1998-12-07|NTT America, Inc., US
+3130|EE|ripencc|1997-03-17|RGnet OU, EE
+3170|GB|ripencc|2012-04-26|VeloxServ Communications Ltd, GB
+3214|DE|ripencc|2015-11-16|xTom GmbH, DE
+3216|RU|ripencc|1994-04-15|PJSC _Vimpelcom_, RU
+3257|US|ripencc|1994-09-30|GTT Communications Inc., US
+3267|RU|ripencc|1994-10-28|IDDQD-AS, RU
+3277|RU|ripencc|1994-12-12|OOO _NPO FRACTEL_, RU
+3280|RO|ripencc|2015-11-12|ENGINYRING EUROPE SRL, RO
+3292|DK|ripencc|1995-01-17|TDC Holding A/S, DK
+3303|CH|ripencc|1994-10-28|Swisscom (Schweiz) AG, CH
+3320|DE|ripencc|1995-02-23|Deutsche Telekom AG, DE
+3333|NL|ripencc|1994-05-19|Reseaux IP Europeens Network Coordination Centre (RIPE NCC), NL
+3356|US|arin|2000-03-10|Level 3 Parent, LLC, US
+3399|SE|ripencc|1994-02-02|Obenet AB, SE
+3402|KY|arin|2024-12-03|Butterfly Research, KY
+3491|HK|apnic|1994-03-21|PCCW Global (HK) Ltd., HK
+3549|US|arin|2000-03-21|Level 3 Parent, LLC, US
+3561|US|arin|1998-10-07|CenturyLink Communications, LLC, US
+3582|US|arin|1994-05-11|University of Oregon, US
+3701|US|arin|1994-07-02|University of Oregon, US
+3727|US|arin|2000-01-10|Shrubbery Networks, US
+3741|ZA|afrinic|1994-08-01|Dimension Data - Dimension Data, ZA
+4128|EE|ripencc|1997-03-17|RGnet OU, EE
+4181|US|arin|1994-12-16|TDS TELECOM, US
+4436|US|arin|1995-02-17|GTT Americas, LLC, US
+4455|GB|ripencc|2014-01-27|IX Reach Ltd, GB
+4565|US|arin|1998-06-05|GTT Americas, LLC, US
+4589|EU|ripencc|1993-09-01|IDDQD-AS, EU
+4635|HK|apnic|1995-10-20|The Hong Kong Internet Exchange Limited, HK
+4637|HK|apnic|1995-10-30|Telstra International Limited, HK
+4641|HK|apnic|1995-11-24|The Hong Kong Internet Exchange Limited, HK
+4775|PH|apnic|1996-08-09|Globe Telecom (GMCR,INC), PH
+4777|JP|apnic|1996-08-09|Asia Pacific Network Information Centre, JP
+4779|PH|apnic|2003-06-11|Advanced Science and Technology Institute, PH
+4805|AU|apnic|1996-11-06|Equant Inc, AU
+4826|AU|apnic|2001-12-24|VOCUS PTY LTD, AU
+4842|CN|apnic|2019-06-14|Tianhai InfoTech, CN
+4844|SG|apnic|2001-09-25|SuperInternet Access Pte Ltd, SG
+4862|HK|apnic|1996-12-06|Equant Inc, HK
+4901|US|arin|2013-09-30|The George Washington University, US
+5056|US|arin|1995-06-05|Aureon Network Services, US
+5394|IT|ripencc|1995-08-13|Unidata - UNIDATA S.p.A., IT
+5398|IT|ripencc|1995-08-15|InternetONE - Internet one SRL, IT
+5413|GB|ripencc|1995-09-12|Wavenet-AS5413 - Wavenet Limited, GB
+5459|GB|ripencc|1996-05-29|London Internet Exchange Ltd., GB
+5511|FR|ripencc|1996-01-08|Opentransit - Orange S.A., FR
+5580|NL|ripencc|2009-04-08|GTT Communications Netherlands B.V., NL
+5583|FR|ripencc|1996-03-18|Orange S.A., FR
+5645|CA|arin|2005-03-10|TekSavvy Solutions, Inc., CA
+5650|US|arin|1995-07-25|Frontier Communications of America, Inc., US
+5769|CA|arin|1995-10-12|Videotron Ltee, CA
+6057|UY|lacnic|1995-10-26|Administracion Nacional de Telecomunicaciones, UY
+6067|EU|ripencc|1993-09-01|IDDQD-AS, EU
+6079|US|arin|2001-04-04|RCN, US
+6082|US|arin|2012-06-08|IPiFony Systems, Inc., US
+6175|US|arin||Cogent Communications, LLC, US
+6204|RO|ripencc|1970-01-01|INTERKVM HOST SRL, RO
+6325|US|arin|2001-10-31|Illinois Century Network, US
+6360|US|arin|1996-03-19|University of Hawaii, US
+6423|US|arin|1996-04-09|Digital Fortress, US
+6424|PT|ripencc|1996-04-09|EDGOO NETWORKS UNIPESSOAL LDA, PT
+6447|US|arin|1996-04-18|University of Oregon, US
+6453|US|arin|1996-04-18|TATA COMMUNICATIONS (AMERICA) INC, US
+6461|US|arin|1996-04-22|Zayo Bandwidth, US
+6539|CA|arin|2000-03-02|Bell Canada, CA
+6667|FI|ripencc|1996-06-13|Elisa Oyj, FI
+6695|DE|ripencc|1996-06-28|DE-CIX Management GmbH, DE
+6730|CH|ripencc|1996-07-30|Sunrise GmbH, CH
+6762|IT|ripencc|1996-09-12|TELECOM ITALIA SPARKLE S.p.A., IT
+6777|NL|ripencc|2005-01-12|Amsterdam Internet Exchange B.V., NL
+6830|NL|ripencc|1996-11-13|LibertyGlobal - Liberty Global Europe Holding B.V., NL
+6908|GB|ripencc|2006-01-10|Six Degrees Technology Group Limited, GB
+6939|US|arin|1996-06-28|Hurricane Electric LLC, US
+7018|US|arin|1996-07-30|AT&T Enterprises, LLC, US
+7195|CO|lacnic|1996-10-07|EDGEUNO S.A.S, CO
+7342|US|arin|1996-11-13|VeriSign Infrastructure & Operations, US
+7474|AU|apnic|1997-02-03|SingTel Optus Pty Ltd, AU
+7500|JP|apnic|1997-03-03|JPNIC-2Byte-ASBLOCK-AP, JP
+7539|TW|apnic|1997-03-22|TWNIC-TW-AS-BLOCK, TW
+7575|AU|apnic|1997-05-28|Australian Academic and Research Network (AARNet), AU
+7594|AU|apnic|2006-11-29|On Q, AU
+7597|ID|apnic|1997-07-17|Indonesia Internet Exchange, ID
+7606|AU|apnic|1997-08-19|Internet Association of Australia, AU
+7660|JP|apnic|1997-11-13|JPNIC-2Byte-ASBLOCK-AP, JP
+7713|ID|apnic|1998-01-06|telkomnet-as-ap - PT Telekomunikasi Indonesia, ID
+7719|CA|apnic|2023-04-02|ITSUDATTE, CA
+7768|TR|ripencc|1997-01-07|Nuh Ahmet Firat trading as TEKNET YAZILIM VE BILGISAYAR TEKNOLOJILERI, TR
+7781|CA|arin|1997-01-10|Accelerated Connections Inc., CA
+7795|US|arin|1997-01-15|LUMOS Networks, Inc., US
+8001|US|arin|1996-08-22|Cologix, Inc, US
+8075|US|arin|1997-03-31|Microsoft Corporation, US
+8218|FR|ripencc|2004-07-09|Zayo Infrastructure France SA, FR
+8220|GB|ripencc|1997-02-24|COLT Technology Services Group Limited, GB
+8268|DE|ripencc|2015-10-21|Dolphin IT-Systeme e.K., DE
+8289|SE|ripencc|1997-04-24|DND-Global-Peering - DND Nordic AB, SE
+8298|CH|ripencc|1997-05-06|IPng Networks GmbH, CH
+8426|GB|ripencc|1997-08-15|Claranet Limited, GB
+8455|NL|ripencc|2009-07-28|atom86 BV, NL
+8492|RU|ripencc|2005-02-17|_OBIT_ Ltd., RU
+8529|AE|ripencc|1997-11-05|Zain Omantel International FZ-LLC, AE
+8545|PL|ripencc|2002-10-11|ASN-PLIX - Equinix (Poland) Sp. z o.o., PL
+8582|NL|ripencc|1997-12-15|GTT Communications Netherlands B.V., NL
+8674|SE|ripencc|1998-02-18|Netnod AB, SE
+8714|GB|ripencc|1998-03-16|London Internet Exchange Ltd., GB
+8781|QA|ripencc|1998-05-08|Ooredoo Q.S.C., QA
+8821|CH|ripencc|1998-06-08|WWZ Telekom AG, CH
+8859|DE|ripencc|1998-06-29|OSN Online Service Nuernberg GmbH, DE
+8888|AU|ripencc|1998-07-15|xTom Pty Ltd, AU
+8928|US|ripencc|1998-08-13|GTT Communications Inc., US
+8966|AE|ripencc|1998-09-04|Etisalat-AS - EMIRATES TELECOMMUNICATIONS GROUP COMPANY (ETISALAT GROUP) PJSC, AE
+9002|GB|ripencc|2008-03-25|RETN Limited, GB
+9009|RO|ripencc|2005-06-06|M247 Europe SRL, RO
+9266|HK|apnic|1998-02-05|Fiveways International Limited, HK
+9268|AU|apnic|1998-02-06|Over the Wire Pty Ltd, AU
+9583|IN|apnic|1999-07-23|Sify Limited, IN
+9825|BD|apnic|2003-08-05|SDNP Bangladesh, BD
+9902|KH|apnic|2007-09-26|NeocomISP Limited, KH
+9927|PH|apnic|2000-03-31|PhilCom Corporation, PH
+9930|MY|apnic|2000-04-05|TT DOTCOM SDN BHD, MY
+9957|KR|apnic|2000-04-14|KRNIC-ASBLOCK-AP, KR
+10026|JP|apnic|2000-06-09|Telstra International Limited, JP
+10310|US|arin|2001-11-14|Yahoo Holdings Inc., US
+11039|US|arin|1998-03-17|The George Washington University, US
+11399|US|arin|1998-08-05|Williams College, US
+11537|US|arin|1998-09-23|Internet2, US
+11666|CA|arin|1998-11-09|Nexicom Inc., CA
+11686|US|arin|1998-11-16|Zayo Bandwidth, US
+11845|ZA|afrinic|1999-01-14|Vox Telecom Ltd - Vox Telecom Ltd, ZA
+12276|US|arin|2007-06-04|San Francisco Metropolitan Internet Exchange (SFMIX), US
+12414|NL|ripencc|1999-05-10|Solcon Internetdiensten B.V., NL
+12654|NL|ripencc|1999-09-15|Reseaux IP Europeens Network Coordination Centre (RIPE NCC), NL
+12779|IT|ripencc|1999-11-08|IT.Gate S.p.A., IT
+12859|NL|ripencc|1999-12-15|BIT BV, NL
+12874|IT|ripencc|1999-12-17|Fastweb SpA, IT
+12956|ES|ripencc|2000-01-26|IDDQD-AS, ES
+13004|RS|ripencc|2010-02-26|Serbian Open Exchange DOO, RS
+13030|CH|ripencc|2000-02-22|Init7 (Switzerland) Ltd., CH
+13058|DE|ripencc|2000-09-07|serve-u-AS - serve-u - Buchholz und Suenderhauf GbR, DE
+13150|IL|ripencc|2015-09-18|CATO NETWORKS LTD, IL
+13237|DE|ripencc|2000-05-12|euNetworks GmbH, DE
+13335|US|arin|2010-07-14|Cloudflare, Inc., US
+13618|US|arin|2023-07-10|Holy Cross Energy, US
+13681|US|arin|2015-02-11|Midwest Internet Exchange LLC, US
+13727|CA|arin|2005-09-01|NEXT DIMENSION INC, CA
+13760|US|arin|2006-02-10|Uniti Fiber Holdings Inc., US
+13786|US|arin|2018-08-24|Seabras 1 USA, LLC, US
+14026|BR|lacnic|2008-09-04|Nucleo de Inf. e Coord. do Ponto BR - NIC.BR, BR
+14041|US|arin|1999-10-07|AS-FRGP - University Corporation for Atmospheric Research, US
+14061|US|arin|2012-09-25|DigitalOcean, LLC, US
+14315|US|arin|2019-02-22|1GSERVERS, LLC, US
+14361|US|arin|1999-12-02|HopOne Internet Corporation, US
+14537|US|arin|2017-07-20|Continent 8 LLC, US
+14593|US|arin|2018-09-05|Space Exploration Technologies Corporation, US
+14608|US|arin|2000-01-11|Alaska Fiberstar, US
+14630|US|arin|2016-08-19|Invesco Group Services, Inc., US
+14840|BR|lacnic|2009-07-21|BR.Digital Telecom, BR
+14907|US|arin|2006-09-27|Wikimedia Foundation Inc., US
+15008|US|arin|2010-11-30|AISG, US
+15133|US|arin|2007-03-19|Edgecast Inc., US
+15169|US|arin|2000-03-30|Google LLC, US
+15280|US|arin|2015-07-16|Host Leasing Corporation, US
+15943|DE|ripencc|2000-11-07|wilhelm.tel GmbH, DE
+16260|GB|ripencc|2001-02-12|GTT - EMEA Ltd., GB
+16276|FR|ripencc|2001-02-15|OVH SAS, FR
+16298|NL|ripencc|2001-02-20|Lubbers Box Telematica BV, NL
+16509|US|arin|2000-05-04|Amazon.com, Inc., US
+16552|US|arin|2007-07-18|Tiggee LLC, US
+16559|US|arin|2000-05-22|RealConnect, Inc, US
+16700|US|arin|2000-05-19|CNSNext, US
+17290|US|arin|2024-09-24|Austin Hadley, Sole Proprietorship, US
+17350|US|arin|2000-08-23|Moody_s Corp., US
+17639|PH|apnic|2001-02-16|Converge ICT Solutions Inc., PH
+17660|BT|apnic|2001-08-21|Bhutan Telecom Ltd, BT
+17766|AU|apnic|2001-05-31|Nexon Asia Pacific Pty Ltd, AU
+18084|JP|apnic|2001-12-27|Telstra International Limited, JP
+18106|SG|apnic|2002-01-25|Viewqwest Pte Ltd, SG
+18565|US|arin|2000-09-12|Flexential Colorado Corp., US
+19016|CA|arin|2000-11-07|Westman Communications Group, CA
+19151|US|arin|2000-11-29|BroadbandONE, LLC, US
+19214|US|arin|2006-09-12|Centauri Communications, US
+19401|US|arin|2014-07-02|AS-SAFFRON - Saffron Solutions Inc, US
+19529|US|arin|2005-10-20|RFPT COMPANY LLC, US
+19551|US|arin|2011-01-12|Incapsula Inc, US
+19653|US|arin|2001-01-29|CTS Communications Corp, US
+19754|US|arin|2016-10-04|The Fusion Network, LLC, US
+19782|US|arin|2001-02-14|Indiana University, US
+20080|US|arin|2014-09-10|Florida International University, US
+20121|BR|lacnic|2009-04-29|Nucleo de Inf. e Coord. do Ponto BR - NIC.BR, BR
+20130|US|arin|2001-03-28|Depaul University, US
+20225|US|arin|2001-04-09|FirstLight Fiber, Inc., US
+20253|US|arin|2020-02-18|Qwilt Inc., US
+20722|RO|ripencc|2001-05-14|Allnet Cloud Srl, RO
+20771|GE|ripencc|2005-09-08|Caucasus Online Ltd., GE
+20904|FI|ripencc|2001-07-03|Netplaza-AS - Cinia Oy, FI
+20912|IT|ripencc|2001-07-05|ASN-PANSERVICE - Giuliano Claudio Peritore trading as _Panservice s.a.s. di Cuseo Fabrizio & C._, IT
+20940|NL|ripencc|2001-07-10|Akamai International B.V., NL
+20953|NL|ripencc|2001-07-11|Info.nl Holding B.V., NL
+20965|NL|ripencc|2001-07-12|GEANT Vereniging, NL
+21245|TR|ripencc|2011-03-31|Medianova - MEDIANOVA INTERNET HIZMETLERI VE TICARET ANONIM SIRKETI, TR
+21320|NL|ripencc|2001-10-31|GEANT_IAS_VRF - GEANT Vereniging, NL
+21478|NL|ripencc|2001-12-24|Plex BV, NL
+21859|US|arin|2013-04-02|Zenlayer Inc, US
+22296|US|arin|2023-05-17|Vorsk LLC, US
+22388|US|arin|2001-09-20|Indiana University, US
+22652|CA|arin|2007-09-27|Videotron Ltee, CA
+22873|CA|arin|2011-01-31|Neighbourhood Connect, CA
+23106|BR|lacnic|2002-02-14|AMERICAN TOWER DO BRASIL-COMUNICACAO MULTIMIDIA LT, BR
+23314|US|arin|2002-02-26|Summit Broadband, US
+23367|US|arin|2010-09-01|AS-ADN - Adaptive Data Networks, LLC, US
+23576|KR|apnic|2002-12-24|KRNIC-ASBLOCK-AP, KR
+23673|KH|apnic|2003-03-18|Cogetel Online, Cambodia, ISP, KH
+23688|BD|apnic|2003-03-27|Link3 Technologies Ltd., BD
+23910|CN|apnic|2003-10-14|China Next Generation Internet CERNET2, CN
+23942|PH|apnic|2018-06-19|Responsible Internet Sustainability Effort inc, PH
+24115|SG|apnic|2004-08-05|ASN-EQIX-MLPE - Equinix, SG
+24322|AU|apnic|2019-04-03|Infininet Global Pty Ltd, AU
+24441|KH|apnic|2005-05-06|CityLink Co., Ltd., KH
+24482|SG|apnic|2005-11-16|SG.GS, SG
+24516|AU|apnic|2010-03-30|Virtutel Pty Ltd, AU
+24875|NL|ripencc|2002-04-29|NovoServe B.V., NL
+24940|DE|ripencc|2002-06-03|Hetzner Online GmbH, DE
+25091|CH|ripencc|2004-10-14|IP-Max - IP-Max SA, CH
+25139|MZ|ripencc|2002-08-02|TVCABO - Comunicacoes Multimedia, Lda, MZ
+25885|US|arin|2007-11-30|OPAQ Networks, Inc., US
+26073|US|arin|2018-06-15|Cofractal, Inc., US
+26162|BR|lacnic|2009-04-29|Nucleo de Inf. e Coord. do Ponto BR - NIC.BR, BR
+26415|US|arin|2002-09-13|VeriSign Global Registry Services, US
+26744|US|arin|2007-11-08|Planters Communications, LLC, US
+27446|US|arin|2003-03-07|AS-ERCBB - ERC Broadband, US
+27678|CL|lacnic|2003-05-14|NIC Chile, CL
+27986|CL|lacnic|2008-08-01|ENTEL CHILE S.A., CL
+28173|BR|lacnic|2007-12-21|Dinamica Telecomunicacoes Ltda, BR
+28186|BR|lacnic|2008-02-26|ITS TELECOMUNICACOES LTDA, BR
+28191|BR|lacnic|2008-03-11|Jupiter Telecomunicacoes e Informatica Ltda, BR
+28213|BR|lacnic|2008-05-15|LCI Equipamentos de Informatica LTDA - LCI Telecom, BR
+28234|BR|lacnic|2008-07-22|Wireless Desenvolvimento de Sistemas Informatizada, BR
+28260|BR|lacnic|2008-10-10|ALTA REDE CORPORATE NETWORK TELECOM LTDA - EPP, BR
+28283|BR|lacnic|2007-04-25|Adylnet Telecom, BR
+28329|BR|lacnic|2007-08-01|SAMM TECNOLOGIA E TELECOMUNICACOES S.A, BR
+28352|BR|lacnic|2007-09-27|NETSPEED LTDA, BR
+28398|MX|lacnic|2015-05-07|INTERNET TELEFONIA Y TV DE MICHOACAN SA DE CV, MX
+28571|BR|lacnic|2007-12-19|UNIVERSIDADE DE SAO PAULO, BR
+28589|BR|lacnic|2004-10-11|Convex Internet Solutions, BR
+28624|BR|lacnic|2006-01-12|PROVEDORA CMA INTERNET LTDA, BR
+29075|FR|ripencc|2003-05-27|IELO-LIAZO SERVICES SAS, FR
+29357|KW|ripencc|2003-08-15|NATIONAL MOBILE TELECOMMUNICATIONS COMPANY K.S.C.P., KW
+29449|IT|ripencc|2003-09-11|ip telecom srl, IT
+29479|NO|ripencc|2009-12-18|Transdata AS, NO
+30071|US|arin|2003-07-15|TowardEX Technologies International, Inc., US
+30286|US|arin|2011-02-22|ThreatMetrix Inc., US
+30371|US|arin|2003-09-23|GTT Americas, LLC, US
+30844|GB|ripencc|2003-12-18|Liquid Telecommunications Ltd, GB
+30950|NO|ripencc|2004-01-26|Eviny-AS30950 - Eviny Fiber AS, NO
+30997|GH|afrinic|2005-03-08|Ghana Internet Exchange Association - Ghana Internet Exchange Association, GH
+31019|NL|ripencc|2011-06-01|Paulus M. Hoogsteder, NL
+31449|BE|ripencc|2004-05-21|BELCENTER SA, BE
+31500|AG|ripencc|2004-05-28|Global Network Management Inc, AG
+31898|US|arin|2011-03-21|Oracle Corporation, US
+32098|US|arin|2004-02-26|Transtelco Inc, US
+32167|US|arin|2021-06-14|LSHIY LLC, US
+32212|US|arin|2013-04-08|Sky Fiber Internet, US
+32261|US|arin|2017-11-21|SUBSPACE, US
+32299|US|arin|2010-11-04|Telx, US
+32354|US|arin|2004-04-19|Unwired, US
+32590|US|arin|2011-03-08|Valve Corporation, US
+32653|ZA|afrinic|2004-06-23|eNetworks cc - eNetworks cc, ZA
+32709|US|arin|2004-07-08|Joink, LLC, US
+32869|US|arin|2004-08-10|Silver Star Telecom, LLC, US
+32899|US|arin|2008-01-24|Bresco Broadband, US
+32934|US|arin|2004-08-24|Facebook, Inc., US
+33132|US|arin|2004-10-07|Crown Castle Fiber LLC, US
+33185|CA|arin|2020-07-01|Hive Data Center Inc., CA
+33437|US|arin|2025-12-12|ASCENT GLOBAL CORPORATE SERVICES LLC, US
+33452|US|arin|2013-10-14|RIDGE WIRELESS, US
+33823|RO|ripencc|2004-08-10|PHOENIX TELECOM & MEDIA SERVICES SRL, RO
+34177|FR|ripencc|2004-11-12|Celeste SAS, FR
+34224|BG|ripencc|2004-11-22|Neterra Ltd., BG
+34288|CH|ripencc|2004-12-08|Kantonsschule Zug, CH
+34428|IT|ripencc|2019-12-31|Giulio Lo Presti, IT
+34549|DE|ripencc|2005-02-11|meerfarbig GmbH & Co. KG, DE
+34565|BG|ripencc|2019-11-19|TurkIX Communications Ltd., BG
+34601|RO|ripencc|2019-11-13|Viewpoint Photo SRL, RO
+34681|PL|ripencc|2019-10-31|Hubert Lewandowski trading as IT-SERVICE, PL
+34927|CH|ripencc|2019-06-25|iFog-GmbH - iFog GmbH, CH
+34968|NL|ripencc|2005-05-10|iunxi - iunxi B.V., NL
+35008|US|arin|2023-06-29|Kerfuffle, LLC, US
+35313|BH|ripencc|2005-07-13|Infonas W.L.L., BH
+35753|SA|ripencc|2005-10-19|Etihad Salam Telecom CJSC, SA
+35889|US|arin|2017-12-07|University of Hawaii, US
+36236|US|arin|2005-10-26|NetActuate, Inc, US
+36351|US|arin|2005-12-12|IBM Cloud, US
+36692|US|arin|2006-03-21|Cisco OpenDNS, LLC, US
+36932|NG|afrinic|2007-01-16|Internet Exchange Point of Nigeria - Internet Exchange Point of Nigeria, NG
+36968|ZA|afrinic|2007-08-09|Electronic Communications Network (PTY) LTD - Electronic Communications Network (PTY) LTD, ZA
+37053|ZA|afrinic|2008-09-17|RSAWEB (PTY) LTD - RSAWEB (PTY) LTD, ZA
+37100|MU|afrinic|2009-05-28|SEACOM Limited - SEACOM Limited, MU
+37105|ZA|afrinic|2009-06-15|RAIN GROUP HOLDINGS (PTY) LTD - RAIN GROUP HOLDINGS (PTY) LTD, ZA
+37195|ZA|afrinic|2010-04-01|NAPAfrica - NAPAfrica, ZA
+37199|ZA|afrinic|2010-04-12|Vanilla - Vanilla, ZA
+37271|ZA|afrinic|2010-10-25|Workonline Communications(Pty) Ltd - Workonline Communications(Pty) Ltd, ZA
+37273|UG|afrinic|2010-11-04|Bandwidth and Cloud Services Group Ltd - Bandwidth and Cloud Services Group Ltd, UG
+37282|NG|afrinic|2010-11-29|Main one Cable Company Nigeria Limited - Main one Cable Company Nigeria Limited, NG
+37353|ZA|afrinic|2011-07-07|Seacom Western Cape (Pty) Ltd - Seacom Western Cape (Pty) Ltd, ZA
+37394|ZA|afrinic|2011-11-16|eNetworks cc - eNetworks cc, ZA
+37468|AO|afrinic|2012-07-02|Angola Cables - Angola Cables, AO
+37497|ZA|afrinic|2012-09-21|Network Platforms (PTY) LTD - Network Platforms (PTY) LTD, ZA
+37515|ZA|afrinic|2012-11-06|iConnectSA (Pty) Ltd - iConnectSA (Pty) Ltd, ZA
+37578|KE|afrinic|2013-03-22|Telecommunication Sevice Providers Association of Kenya - TESPOK - Telecommunication Sevice Providers Association of Kenya - TESPOK, KE
+37640|ZA|afrinic|2013-10-16|Cape Connect Internet - Cape Connect Internet, ZA
+37650|ZA|afrinic|2013-11-06|CM Value Added Services (Pty) Ltd - CM Value Added Services (Pty) Ltd, ZA
+37662|MU|afrinic|2013-11-26|West Indian Ocean Cable Company - West Indian Ocean Cable Company, MU
+37684|KE|afrinic|2013-07-18|Angani Limited - Angani Limited, KE
+37697|MZ|afrinic|2014-05-13|WEBMASTERS, LDA. - WEBMASTERS, LDA., MZ
+37704|KE|afrinic|2016-05-24|Telecommunication Sevice Providers Association of Kenya - TESPOK - Telecommunication Sevice Providers Association of Kenya - TESPOK, KE
+37721|BF|afrinic|2018-09-28|Virtual Technologies & Solutions - Virtual Technologies & Solutions, BF
+37989|SG|apnic|2006-03-24|DCS1 Pte. Ltd., SG
+38001|SG|apnic|2006-04-26|NewMedia Express Pte Ltd, SG
+38016|AU|apnic|2006-05-15|Nokia IP Networks Labs, AU
+38136|HK|apnic|2021-02-15|Akari Networks, HK
+38137|SG|apnic|2021-02-17|DE-CIX ASIA PTE LTD, SG
+38175|MY|apnic|2021-02-26|DE CIX MALAYSIA SDN. BHD., MY
+38182|MY|apnic|2006-07-25|Extreme Broadband - Total Broadband Experience, MY
+38194|MY|apnic|2021-03-18|DE-CIX Kuala Lumpur Route Servers, MY
+38195|AU|apnic|2006-08-09|Superloop, AU
+38466|MY|apnic|2007-02-27|U Mobile Sdn Bhd, MY
+38493|BD|apnic|2007-03-26|Royal Green Communication Limited, BD
+38496|ID|apnic|2007-03-28|Indonesia Network Information Center [ID-NIC], ID
+38726|VN|apnic|2007-09-14|VNNIC-ASBLOCK-VN, VN
+38880|AU|apnic|2008-01-18|Micron21 Datacentre Pty Ltd, AU
+38883|AU|apnic|2008-01-23|FireNet Pty Ltd, AU
+39107|RO|ripencc|2005-12-14|Interlan Internet Exchange SRL, RO
+39120|IT|ripencc|2005-12-15|Convergenze S.p.A., IT
+39122|IE|ripencc|2005-12-16|Blacknight Internet Solutions Limited, IE
+39351|SE|ripencc|2006-02-06|31173 Services AB, SE
+39533|HU|ripencc|2017-11-24|asympto - Asympto Networks Kft., HU
+39591|NL|ripencc|2007-06-22|Previder B.V., NL
+39642|DK|ripencc|2006-03-31|Sinal-AS - Sinal A/S, DK
+39756|RO|ripencc|2006-04-20|EASYHOST SRL, RO
+39792|FR|ripencc|2020-10-08|Nicolas CHEVRIER, FR
+40191|CA|arin|2006-08-15|AS-PRE2POST-1 - Beanfield Technologies Inc., CA
+40217|US|arin|2006-08-18|DACS-NX, US
+40300|US|arin|2007-01-02|DR Fortress, LLC, US
+40387|US|arin|2007-02-07|University of Illinois, US
+40630|US|arin|2008-02-14|GridFury, LLC, US
+40864|CA|arin|2011-04-20|Targo Communications Inc., CA
+40934|US|arin|2008-05-29|Fortinet Inc., US
+41073|IE|ripencc|2006-06-08|Raidio Teilifis Eireann, IE
+41095|GB|ripencc|2006-06-14|IPTP LTD, GB
+41327|IT|ripencc|2019-09-13|Fiber Telecom S.p.A., IT
+41666|FI|ripencc|2006-10-03|Institute for Pyrotechnical Cleaning (limited company), FI
+41695|GB|ripencc|2006-10-10|VOSTRON Limited, GB
+41805|IQ|ripencc|2020-09-30|SAWAD LAND for Information Technology Ltd, IQ
+41811|GB|ripencc|2006-10-30|CONVERGENCE (GROUP NETWORKS) LIMITED, GB
+42184|DE|ripencc|2007-01-10|AS-TKRZ - TKRZ Stadtwerke GmbH, DE
+42473|AT|ripencc|2007-02-27|AS-ANEXIA - Anexia Cloud Solutions GmbH, AT
+42541|DK|ripencc|2009-11-13|Fiberby ApS, DK
+44324|US|ripencc|2024-01-04|MoeDove LLC, US
+44620|TR|ripencc|2022-04-05|Netlen Internet Hizmetleri Ltd. Sti., TR
+44901|BG|ripencc|2016-04-18|belcloud - Belcloud LTD, BG
+45090|CN|apnic|2008-02-01|CNNIC ASN block, CN
+45102|CN|apnic|2008-02-01|CNNIC ASN block, CN
+45177|NZ|apnic|2008-04-07|Devoli LTD, NZ
+45204|MN|apnic|2009-08-31|Gemnet, MN
+45352|MY|apnic|2008-08-15|IP ServerOne Solutions Sdn Bhd, MY
+45437|AU|apnic|2008-09-16|Real World Technology Solutions Pty Ltd, AU
+45494|NP|apnic|2008-10-24|Nepal R&E Network, NP
+45634|SG|apnic|2009-02-19|Sparkstation Pte Ltd, SG
+45701|ID|apnic|2009-04-06|PT Internet Madju Abad Milenindo, ID
+45896|VN|apnic|2009-08-28|VNNIC-ASBLOCK-VN, VN
+46450|US|arin|2014-06-04|Pilot Fiber, Inc., US
+46997|US|arin|2020-05-04|Black Mesa Corporation, US
+47065|US|arin|2009-06-16|USC / UFMG PEERING Research Testbed, US
+47787|PT|ripencc|2018-09-20|EDGOO NETWORKS UNIPESSOAL LDA, PT
+47872|BG|ripencc|2008-09-10|Sofia Connect EAD, BG
+47957|FR|ripencc|2008-09-22|Worldline IGSA SA, FR
+48070|GB|ripencc|2008-10-07|DSM (GB) Limited, GB
+48112|RO|ripencc|2008-10-14|XINDI Networks SRL, RO
+48237|SA|ripencc|2008-10-28|Etihad Etisalat, a joint stock company, SA
+48285|CY|ripencc|2008-11-04|TRISOPTERUS LTD, CY
+48292|TR|ripencc|2008-11-05|intibu - Ciklet Tasarim Iletisim ve Org. Tic. Ltd. Sti., TR
+48526|LU|ripencc|2008-12-05|TANGO-PROXIMUS_NXT - Proximus Luxembourg S.A., LU
+48678|TR|ripencc|2020-12-31|Pentech Bilisim Teknolojileri Sanayi Ve Ticaret Limited Sirketi, TR
+49515|SE|ripencc|2009-06-23|DND Nordic AB, SE
+49544|NL|ripencc|2009-06-29|i3Dnet - i3D.net B.V, NL
+49788|NO|ripencc|2009-09-10|Nexthop AS, NO
+49832|AE|ripencc|2019-12-30|AS-QBIC - QBIC COMMUNICATIONS DMCC, AE
+50236|US|ripencc|2023-09-14|Vertexlink_Communications - VertexLink Inc., US
+50763|IM|ripencc|2010-03-19|Robert McKay, IM
+50839|IT|ripencc|2021-05-31|Netlayer - Cinzia Tocci trading as Lumanex Srl, IT
+51019|IS|ripencc|2022-12-01|Kria Elinarbur, IS
+51088|NL|ripencc|2010-05-28|A2B IP B.V., NL
+51185|IT|ripencc|2010-06-16|MainStreaming SpA, IT
+51375|BH|ripencc|2010-08-04|STC BAHRAIN B.S.C CLOSED, BH
+51519|SE|ripencc|2021-10-29|Karabro - Karabro AB, SE
+51907|CH|ripencc|2022-08-29|Kanton Zug, CH
+51930|TW|ripencc|2021-09-22|Tsung-Yi Yu, TW
+52005|SE|ripencc|2010-12-14|Netnod AB, SE
+52025|GB|ripencc|2023-05-01|ParadoxNetworks Limited, GB
+52075|FR|ripencc|2010-12-23|Wifirst S.A.S., FR
+52210|CA|arin|2024-12-12|Accuris Technologies Ltd., CA
+52320|CO|lacnic|2011-04-05|GlobeNet Cabos Submarinos Colombia, S.A.S., CO
+52385|CR|lacnic|2012-08-02|Academia Nacional de Ciencias, CR
+52468|PA|lacnic|2013-05-08|UFINET PANAMA S.A., PA
+52686|BR|lacnic|2012-12-12|F.J.FANTINI AMPARO ME, BR
+52694|BR|lacnic|2012-12-17|NEXSUL TELECOM LTDA, BR
+52720|BR|lacnic|2013-01-16|WEBFOCO TELECOMUNICACOES LTDA, BR
+52814|BR|lacnic|2012-10-09|INTERNET PLAY LTDA, BR
+52863|BR|lacnic|2011-12-20|UPX TECNOLOGIA LTDA, BR
+52871|BR|lacnic|2012-01-31|TASCOM TELECOMUNICACOES LTDA, BR
+52873|BR|lacnic|2012-02-07|Softdados Telecomunicacoes, BR
+52888|BR|lacnic|2012-05-24|UNIVERSIDADE FEDERAL DE SAO CARLOS, BR
+53013|BR|lacnic|2011-07-05|UFINET BRASIL S.A., BR
+53046|BR|lacnic|2011-10-11|UNIVERSIDADE ESTADUAL DE PONTA GROSSA, BR
+53062|BR|lacnic|2009-08-21|ALT GRUPO BRASIL TECPAR, BR
+53180|BR|lacnic|2010-08-13|INFORTEL COMUNICACOES LTDA, BR
+53202|BR|lacnic|2010-09-09|Acesso10 Telecom, BR
+53237|BR|lacnic|2010-12-10|TELECOMUNICACOES BRASILEIRAS S. A. - TELEBRAS, BR
+53274|US|arin|2014-06-10|Skyrunner, Inc., US
+53343|US|arin|2024-12-13|sc Network, US
+53364|CA|arin|2009-12-31|AS-PRE2POST-2 - Beanfield Technologies Inc., CA
+53427|US|arin|2023-03-13|TGLOBAL NETWORKS, US
+53767|US|arin|2011-05-13|iCastCenter, US
+53828|US|arin|2011-07-06|NETWORK INNOVATIONS, LLC, US
+54054|US|arin|2011-09-19|Deteque, US
+54073|US|arin|2019-04-24|Diebold Nixdorf, Incorporated, US
+54113|US|arin|2011-10-04|Fastly, Inc., US
+54309|US|arin|2023-08-16|NEGU, US
+54574|US|arin|2018-02-15|DMIT Cloud Services, US
+54728|US|arin|2021-10-13|DataPlane.org, US
+55222|CA|arin|2013-04-24|9219-1568 Quebec Inc., CA
+56140|MY|apnic|2011-03-17|Nocser Technology, MY
+56286|MY|apnic|2011-05-16|IX Telecom, MY
+56662|PL|ripencc|2011-04-21|Marcin Gondek, PL
+56665|LU|ripencc|2011-04-21|TANGO-PROXIMUS_NXT - Proximus Luxembourg S.A., LU
+56911|IT|ripencc|2011-06-09|ASN-WARIAN - Warian S.R.L., IT
+56987|FR|ripencc|2022-09-19|AS-ABACLOUDA - ABACLOUDA SAS, FR
+57050|RO|ripencc|2020-03-31|DreamServer S.R.L., RO
+57111|IT|ripencc|2017-04-12|NOVA NETWORKS S.R.L., IT
+57152|TR|ripencc|2011-08-05|Nuh Ahmet Firat trading as TEKNET YAZILIM VE BILGISAYAR TEKNOLOJILERI, TR
+57187|AE|ripencc|2011-08-15|Emirates Integrated Telecommunications Company PJSC, AE
+57324|IQ|ripencc|2011-09-26|Al Lawn Al Akhdar International Company for Communications and Information Technology Ltd., IQ
+57344|BG|ripencc|2011-10-03|Telehouse EAD, BG
+57463|BG|ripencc|2011-11-02|NetIX - NetIX Communications JSC, BG
+57630|SE|ripencc|2019-03-11|AS-84GRAMS - 84 Grams AB, SE
+57695|US|ripencc|2017-06-20|Misaka Network, Inc., US
+57866|NL|ripencc|2012-02-28|Fusix Networks B.V., NL
+58436|SG|apnic|2015-09-03|SecureAX Pte Ltd, SG
+58511|AU|apnic|2012-01-13|Anycast Holdings Pty Ltd, AU
+58601|BD|apnic|2012-05-11|Aamra technologies limited, BD
+58621|SG|apnic|2012-06-01|Vodien Internet Solutions Pte Ltd, SG
+58682|BD|apnic|2012-08-16|LEVEL3 CARRIER LIMITED, BD
+58717|BD|apnic|2012-10-10|Summit Communications Limited, BD
+58901|IN|apnic|2013-04-17|IRINN AS-BLOCK, IN
+58952|MM|apnic|2013-07-02|Frontiir Co., Ltd, MM
+59238|TH|apnic|2013-11-19|Innovative Extremist Co., Ltd., TH
+59318|KH|apnic|2014-02-19|S.I Group, KH
+59469|DK|ripencc|2012-07-19|Sentia Denmark A/S, DK
+59605|AE|ripencc|2012-08-17|Zain Omantel International FZ-LLC, AE
+59715|IT|ripencc|2012-10-04|Comune di San Benedetto del Tronto, IT
+59790|DE|ripencc|2016-06-29|bungalski-as - Marco Bungalski GmbH, DE
+60051|AE|ripencc|2018-02-13|Earthlink-dmcc - Earthlink Telecommunications Equipment Trading & Services DMCC, AE
+60144|NL|ripencc|2014-04-30|3W Infra B.V., NL
+60150|DE|ripencc|2023-06-02|area-7 - area-7 IT-Services GmbH, DE
+60503|BR|ripencc|2013-07-09|FNX Tecnologia LTDA, BR
+60539|HK|ripencc|2023-08-14|Huicast_Telecom - Huicast Telecom Limited, HK
+60557|NL|ripencc|2021-02-23|Krik van der Vinne trading as Alpine North, NL
+60602|MD|ripencc|2013-06-18|Inovare-Prim SRL, MD
+60614|US|ripencc|2020-12-18|OwO-NETWORK - OwO Network, LLC, US
+60707|TR|ripencc|2021-08-24|Kapteyan Bilisim Teknolojileri Sanayi ve Ticaret A.S, TR
+60924|IE|ripencc|2013-04-11|Orixcom Limited, IE
+61049|GB|ripencc|2013-03-05|Exascale Ltd, GB
+61138|US|ripencc|2015-03-04|Zappie Host LLC, US
+61374|DE|ripencc|2012-11-05|DE-CIX Management GmbH, DE
+61461|VE|lacnic|2014-07-15|Airtek Solutions C.A., VE
+61522|CL|lacnic|2016-09-22|PIT CHILE SP, CL
+61525|CL|lacnic|2017-09-15|PIT CHILE SP, CL
+61568|BR|lacnic|2014-09-18|ALOO TELECOM - FSF TECNOLOGIA SA, BR
+61573|BR|lacnic|2015-06-18|IP TELECOM, BR
+61586|BR|lacnic|2017-05-02|PEER2 NETWORKS DO BRASIL LTDA, BR
+61588|BR|lacnic|2018-01-09|DIGITAL PROVEDOR DE ACESSO A INTERNET LTDA, BR
+61595|BR|lacnic|2018-10-24|TELIC TECHNOLOGIES, BR
+61618|BR|lacnic|2024-06-27|VIVA TECNOLOGIA TELECOMUNICACOES LTDA, BR
+61749|BR|lacnic|2014-08-11|FUNDACAO DE ENSINO E PESQ SUL DE MINAS, BR
+61832|BR|lacnic|2014-07-01|DB3 SERVICOS DE TELECOMUNICACOES S.A, BR
+61851|BR|lacnic|2014-07-04|Garra Fibra, BR
+61955|DE|ripencc|2014-04-17|ColocationIX-AS - ColocationIX GmbH, DE
+62458|AE|ripencc|2013-09-16|MBC FZ-LLC, AE
+62805|US|arin|2016-07-26|xTom.com, Inc., US
+62955|US|arin|2013-12-05|eBay, Inc, US
+63028|US|arin|2014-01-06|NWAX, US
+63034|US|arin|2014-01-09|DE-CIX North America Inc., US
+63055|US|arin|2014-01-14|San Francisco Metropolitan Internet Exchange (SFMIX), US
+63221|US|arin|2014-09-16|Community IX Holdings, Inc., US
+63293|US|arin|2014-11-10|Facebook, Inc., US
+63516|ID|apnic|2014-05-23|Indonesia Network Information Center [ID-NIC], ID
+63528|TH|apnic|2014-08-20|Bangkok Neutral Internet Exchange, TH
+63529|TH|apnic|2014-08-20|Bangkok Neutral Internet Exchange Route Servers, TH
+63920|AU|apnic|2014-12-02|Superloop (VostroNet), AU
+63927|HK|apnic|2014-12-12|RISE, HK
+63956|AU|apnic|2015-03-09|5G NETWORK OPERATIONS PTY LTD, AU
+64050|HK|apnic|2015-10-20|BGP Network Limited, HK
+64096|HK|apnic|2016-03-29|BIH-Global - INTERNET HARBOR INTERNATIONAL CO.,LIMITED, HK
+64112|CL|lacnic|2018-08-31|PIT CHILE SP, CL
+64115|PE|lacnic|2019-09-04|PIT PERU S.A.C, PE
+64116|PE|lacnic|2019-09-20|PIT PERU S.A.C, PE
+64199|CA|arin|2022-05-18|TCPShield, CA
+64289|US|arin|2023-06-05|Macarne.com, US
+65122||||NO_NAME
+65123||||NO_NAME
+65125||||NO_NAME
+65126||||NO_NAME
+65127||||NO_NAME
+65128||||NO_NAME
+65129||||NO_NAME
+65534||||NO_NAME
+65535||||NO_NAME
+132203|CN|apnic|2012-03-13|Shenzhen Tencent Computer Systems Company Limited, CN
+132213|KH|apnic|2012-03-21|Cambodian Network Exchange Co., Ltd., KH
+132280|TH|apnic|2012-05-23|Symphony Communication Public Company Limited, TH
+132337|SG|apnic|2020-02-25|AXCLUSIVE PTE. LTD., SG
+132847|AU|apnic|2016-09-08|Network Solutions Group Pty Ltd, AU
+132884|BD|apnic|2013-06-26|Summit Communications Limited, BD
+133480|AU|apnic|2014-05-11|5G NETWORK OPERATIONS PTY LTD, AU
+133950|NZ|apnic|2015-02-05|Hoopla Hosting Limited, NZ
+134363|SG|apnic|2015-06-29|EZIT Solutions Pte Ltd, SG
+134640|ID|apnic|2015-09-04|Indonesia Network Information Center [ID-NIC], ID
+134708|ID|apnic|2026-04-08|PT Barakkana Usaha Bersama, ID
+134712|BD|apnic|2015-10-07|Pipex Network, BD
+135419|TH|apnic|2018-08-02|Cableconnect Co.,Ltd, TH
+135423|PH|apnic|2016-05-16|Total Information Management Corporation, PH
+135895|AU|apnic|2016-11-14|CENTORRINO Technologies Pty Ltd, AU
+136106|ID|apnic|2016-12-05|Indonesia Network Information Center [ID-NIC], ID
+136168|MM|apnic|2017-01-04|Campana MYTHIC Co. Ltd., MM
+136557|AU|apnic|2017-05-10|Host Universal Pty Ltd, AU
+136749|MY|apnic|2017-06-14|KS IT SOLUTIONS SDN BHD, MY
+136907|HK|apnic|2017-08-07|HUAWEI CLOUDS, HK
+137367|ID|apnic|2018-01-03|Indonesia Network Information Center [ID-NIC], ID
+137409|AU|apnic|2018-01-16|GSL Networks Pty LTD, AU
+137490|NL|apnic|2018-03-01|Navice Consulting, NL
+137491|BD|apnic|2018-03-02|PEEREX NETWORKS LTD./IIG, BD
+137566|TH|apnic|2018-04-12|Data Zone Company Limited, TH
+137818|PH|apnic|2018-05-02|Panay Telephone Corporation, PH
+137831|SG|apnic|2018-05-14|SHOPEE SINGAPORE PRIVATE LIMITED, SG
+137853|KH|apnic|2018-05-17|TELNET CO.,LTD, KH
+137868|BD|apnic|2018-05-24|Star Internet Service, BD
+137922|US|apnic|2018-06-20|IBOSS Inc., US
+138362|BD|apnic|2018-10-19|PLEXUS CLOUD, BD
+138685|TH|apnic|2021-04-06|Mahidol Wittayanusorn School, TH
+138886|ID|apnic|2019-02-21|Indonesia Network Information Center [ID-NIC], ID
+139057|SG|apnic|2019-05-14|Edgenext Legend Dynasty Pte. Ltd., SG
+139317|CN|apnic|2019-07-15|Ningbo Dahuamao Information Technology Co Ltd, CN
+139833|PH|apnic|2024-09-27|Cable Television Network Inc., PH
+139901|BD|apnic|2019-12-19|Apple Communication Ltd., BD
+140443|ID|apnic|2020-03-27|Indonesia Network Information Center [IDNIC], ID
+140627|AU|apnic|2020-05-08|OneQode, AU
+140684|BD|apnic|2020-05-28|Bangladesh Internet Exchange Trust, BD
+140731|CN|apnic|2020-06-16|TOHU Public Internet, CN
+140984|PH|apnic|2020-08-06|WTW HIGHTECH COMPANY INC, PH
+141011|MY|apnic|2023-08-17|Borneo Restu Sdn. Bhd., MY
+141137|ID|apnic|2020-09-01|Indonesia Network Information Center [IDNIC], ID
+141237|HK|apnic|2020-10-07|Moecast Network, HK
+141694|JP|apnic|2025-06-27|Ermis Ltd., JP
+141712|HK|apnic|2021-02-05|luYs, Inc., HK
+141776|CN|apnic|2021-03-04|Baoshuo Network, CN
+142108|TH|apnic|2024-05-22|Rotko Networks, TH
+142271|PH|apnic|2021-05-14|EWS DS Networks Inc, PH
+142289|NL|apnic|2021-05-24|Roxonic Systems, NL
+142580|BD|apnic|2025-01-24|Ms Online, BD
+142582|IN|apnic|2025-01-09|Bajaj Finserv Asset Management Limited, IN
+148968|AU|apnic|2021-10-20|Falcore Investments Pty Ltd, AU
+149058|BD|apnic|2021-12-02|Speed Links, BD
+149825|PH|apnic|2022-05-09|RFi Fiber, PH
+150000|PH|apnic|2022-07-02|Data-Beam Business Solution, PH
+150369|JP|apnic|2022-10-13|Infal - JPNIC-4Byte-ASBLOCK-AP, JP
+150462|ID|apnic|2022-12-01|Indonesia Network Information Center [IDNIC], ID
+151326|SG|apnic|2023-05-15|DCConnect Communication Pte. Ltd., SG
+151704|IN|apnic|2023-08-25|IRINN AS-BLOCK, IN
+154335|PH|apnic|2025-10-31|NAYSWAN NETWORK AND DATA SOLUTION, PH
+196959|IT|ripencc|2010-03-08|Namex-Rome-RS - NAMEX CONSORZIO, IT
+197264|LU|ripencc|2010-09-14|LuxNetwork-Private-Operator - LUXNETWORK S.A., LU
+197477|DE|ripencc|2023-07-31|Moritz Mantel trading as Nerdscave, DE
+199310|CN|ripencc|2023-03-20|QFLink-AS - XIN BING XIAN, CN
+199518|US|ripencc|2023-03-10|Gregory Shapiro, US
+199524|LU|ripencc|2012-12-10|G-Core Labs S.A., LU
+200242|DE|ripencc|2023-01-05|IDDQD-AS, DE
+202109|UA|ripencc|2026-01-22|ROBOK LLC, UA
+202365|TR|ripencc|2018-05-24|Chronos - Omer GOLGELI, TR
+202409|DE|ripencc|2018-05-18|Hilko Boecker, DE
+202427|CH|ripencc|2022-11-22|Ursin Filli, CH
+202831|KZ|ripencc|2025-12-12|Ablaykhan Akylbekovich Sharimov, KZ
+203125|CH|ripencc|2016-03-24|CoreRoute - Julian Braun, CH
+204028|DE|ripencc|2015-09-10|DolphinIT - Dolphin IT-Systeme e.K., DE
+204508|IT|ripencc|2022-06-21|Gatterer Manuel trading as MLGT, IT
+206064|TR|ripencc|2025-07-30|vdffaktoring - VDF FAKTORING ANONIM SIRKETI, TR
+206271|TR|ripencc|2022-06-07|Fatih Unlu, TR
+206315|CN|ripencc|2022-07-04|Shucheng Li, CN
+206479|GB|ripencc|2025-07-15|AceRDP - AceRDP Ltd, GB
+207268|GB|ripencc|2020-03-10|STRATEGIC EXPLORATIONS LTD, GB
+207427|GB|ripencc|2025-06-04|IBILLY MEDIA GROUP LTD, GB
+207740|EG|ripencc|2019-12-03|Youssef Hamed, EG
+207934|DK|ripencc|2019-10-30|WNB A/S, DK
+208594|TR|ripencc|2019-07-08|Netbone Telekomunikasyon A.S., TR
+208753|IT|ripencc|2019-06-11|Marco d_Angelo, IT
+208821|TR|ripencc|2019-05-29|durunet - DURU INTERNET VE BILISIM TEKNOLOJILERI SANAYI TICARET LIMITED SIRKETI, TR
+209306|CN|ripencc|2019-02-28|Jin Shaohai, CN
+209823|FR|ripencc|2022-01-13|Enki Multimedia EURL, FR
+209870|GB|ripencc|2025-04-24|Cylo - Cylo Ltd, GB
+210633|DE|ripencc|2021-10-15|DevStorage UG (haftungsbeschraenkt) trading as DevStorage IT-Services UG (haftungsbeschraenkt) & Co. KG, DE
+211100|IQ|ripencc|2021-06-29|Civilisation Information Technology, communication and internet services Co., LTD, IQ
+211398|BE|ripencc|2021-04-30|Mike Marchal, BE
+211722|FI|ripencc|2021-02-26|Nullroute ry, FI
+211942|QA|ripencc|2025-03-05|Ooredoo Q.S.C., QA
+212271|IT|ripencc|2020-11-26|Cinzia Tocci trading as Lumanex Srl, IT
+212317|DE|ripencc|2022-05-09|Hetzner Online GmbH, DE
+212330|IQ|ripencc|2020-11-19|Civilisation Information Technology, communication and internet services Co., LTD, IQ
+212483|GB|ripencc|2022-08-08|level86 - LEVEL EIGHTY-SIX COMMUNICATIONS LTD, GB
+212983|UA|ripencc|2025-03-19|METANNET LLC, UA
+213035|NL|ripencc|2020-06-25|AS-SERVERION - Des Capital B.V., NL
+213151|DE|ripencc|2020-06-02|Christian Elsen, DE
+213241|BE|ripencc|2020-05-12|TECHIT.BE SRL, BE
+213262|GB|ripencc|2020-05-07|Moe-Network - Moe Overflow Electric Limited, GB
+213326|IN|ripencc|2020-04-23|Kalpak_Mukhopadhyay_Network_LAB - Kalpak Mukhopadhyay, IN
+214443|IT|ripencc|2024-07-31|BE BYTE SRL, IT
+214809|FI|ripencc|2024-05-28|Stocade - Jere Kiitola trading as Stocade, FI
+215230|RO|ripencc|2024-03-26|DEVGEEKS S.R.L., RO
+215859|DE|ripencc|2023-12-11|Hetzner Online GmbH, DE
+216056|CN|ripencc|2023-11-01|XaVen-Network - Jingqiu Xu, CN
+216182|NL|ripencc|2023-10-11|devcat - Jorn Dullemans trading as Devcat, NL
+216285|GR|ripencc|2023-09-19|MYIP NETWORKS G.P., GR
+216311|GB|ripencc|2026-05-04|NORYLIX LTD, GB
+216343|TR|ripencc|2023-09-06|Mertcan Gokgoz, TR
+262317|BR|lacnic|2011-12-16|ROS Telecom, BR
+262393|BR|lacnic|2012-02-23|A ALVES GOMES INFORMATICA - ME, BR
+262427|BR|lacnic|2011-03-28|Invista Net Provedor de Acesso Ltda, BR
+262462|BR|lacnic|2011-05-06|Aranet Play, BR
+262494|BR|lacnic|2011-06-08|Virtex Telecom, BR
+262507|BR|lacnic|2011-06-21|OSI CONNECT TELECOMUNICACOES E SERVICOS LTDA, BR
+262632|BR|lacnic|2011-11-01|Graja Fibra, BR
+262749|BR|lacnic|2010-06-28|Telecom Leopoldina LTDA, BR
+262757|BR|lacnic|2010-07-26|Insidesign Tecnologia Ltda EPP, BR
+262791|BR|lacnic|2010-09-27|NETWAY SVA LTDA, BR
+263009|BR|lacnic|2012-05-23|FORTE TELECOM LTDA., BR
+263047|BR|lacnic|2012-03-08|CORP BR TELECOMUNICACOES LTDA - LINK FULL, BR
+263142|BR|lacnic|2014-05-15|Route Way Telecomunicacoes LTDA ME, BR
+263237|CL|lacnic|2014-05-22|PowerHost Telecom SPA, CL
+263242|BO|lacnic|2014-05-30|DIGITAL WORK, BO
+263328|BR|lacnic|2014-03-11|Panda Network, BR
+263444|BR|lacnic|2013-12-05|Open X Tecnologia Ltda, BR
+263480|BR|lacnic|2013-12-19|TELNET SERVICOS EM TELECOMUNICACOES LTDA, BR
+263541|BR|lacnic|2014-01-27|IMF NETWORK DATA LTDA - ME, BR
+263626|BR|lacnic|2013-09-23|G-LAB Telecom Informatica LTDA - ME, BR
+263674|BR|lacnic|2013-11-22|JSneT Fibra, BR
+263945|BR|lacnic|2015-08-19|ProveNET Internet Services LTDA, BR
+264380|BR|lacnic|2014-09-23|Server Fast Telecom, BR
+264397|BR|lacnic|2014-10-02|SUPRANET TELECOM INFORMATICA LTDA, BR
+264409|BR|lacnic|2014-10-14|GRUPO YAX, BR
+264479|BR|lacnic|2014-11-18|Turbozone Internet, BR
+264574|BR|lacnic|2015-01-22|Elite Internet e Servicos Ltda, BR
+264893|BR|lacnic|2016-03-28|Maronline Solucoes em Tecnologia LTDA-ME, BR
+265066|BR|lacnic|2016-06-28|Conect Provedor de Acesso a Internet Ltda Me, BR
+265187|BR|lacnic|2015-12-09|STEEL WEB PROVEDORES DE ACESSO LTDA, BR
+265269|BR|lacnic|2016-01-14|MEGA TELE INFORMATICA, BR
+265496|BR|lacnic|2016-09-20|MAIQVOX TELECOM, BR
+265912|BR|lacnic|2017-06-30|BIT-TEC Tecnologia Ltda, BR
+265937|BR|lacnic|2017-07-07|Alianca TecnoinfoLtda, BR
+265943|BR|lacnic|2017-07-11|RCTelecom Telecomunicacoes LTDA-ME, BR
+266149|BR|lacnic|2017-04-11|BDC TELECOM, BR
+266213|BR|lacnic|2017-04-26|PLANETCLICK TELECOMUNICACOES LTDA, BR
+266365|BR|lacnic|2016-11-17|INTERIP TECNOLOGIA LTDA - EPP, BR
+266437|BR|lacnic|2016-12-20|Rodrigo Fernandes Miniello - ME, BR
+266470|BR|lacnic|2017-01-05|GSM BAHIA PROVEDOR DE INTERNET LTDA, BR
+266534|BR|lacnic|2017-05-10|AZECOM INTERNET, BR
+266593|BR|lacnic|2017-06-01|JASGAB TELECOM, BR
+266830|CL|lacnic|2018-06-20|AIRPOINT TELECOMUNICACIONES LIMITADA, CL
+266925|BR|lacnic|2017-10-18|UPIX NETWORKS, BR
+266993|BR|lacnic|2017-11-07|FLOWSPEC SOLUTIONS, BR
+267013|BR|lacnic|2017-11-21|INTERNET SOLUTION PROVIDER TELECOM. LTDA ME, BR
+267056|BR|lacnic|2017-12-07|EVEREST RIDGE DO BRASIL LTDA, BR
+267113|BR|lacnic|2017-12-27|CLICKCONNECT SOLUCOES EM INTERNET E TECNOLOGIA, BR
+267129|BR|lacnic|2018-01-08|Pimentel Network Servicos de Telecomunicacao, BR
+267201|BR|lacnic|2018-02-15|Fiber One Telecomunicacoes EIRELI, BR
+267232|BR|lacnic|2018-02-26|Good Net Provedor de Internet Ltda - EPP, BR
+267279|BR|lacnic|2018-03-13|RIVALDO VITURINO NUNES BORGES - ME, BR
+267560|BR|lacnic|2017-09-01|PC CONNECT TELECOMUNICACOES LTDA, BR
+267613|BR|lacnic|2017-09-25|ELETRONET S.A., BR
+268011|BR|lacnic|2018-11-26|S.BARROS DE SOUZA-ME, BR
+268207|BR|lacnic|2018-05-07|RVT SERVICOS DE TELECOMUNICACOES LTDA, BR
+268221|BR|lacnic|2018-05-09|FIBER BANDA LARGA SERV DE CONEXAO INT E LIVROS DIG, BR
+268430|BR|lacnic|2018-08-10|L&R Solucoes em Telecomunicacoes e Servicos Ltda, BR
+268512|BR|lacnic|2018-09-06|VOO TELECOM, BR
+268551|BR|lacnic|2018-09-21|DMC TELECOM, BR
+268560|BR|lacnic|2018-10-01|FIBRA VIP, BR
+268647|BR|lacnic|2018-10-18|DFLASH NET TELECOM E TURISMO LTDA, BR
+268976|BR|lacnic|2019-05-23|Weclix Telecom S/A, BR
+269053|BR|lacnic|2019-06-17|3WACCES ME, BR
+269090|BR|lacnic|2019-06-27|C P COMUNICACAO LTDA, BR
+269180|BR|lacnic|2019-07-26|VIPNET Conexao, BR
+269369|BR|lacnic|2019-09-24|WHD Internet, BR
+269956|CL|lacnic|2020-03-01|HABLAIP SPA, CL
+270803|BR|lacnic|2020-06-10|Cofiber Multimidia ltda, BR
+270907|BR|lacnic|2020-07-06|PLAY SERVICO DE VALOR AGREGADO LTDA, BR
+271049|BR|lacnic|2020-08-04|Rede EXS Telecomunicacoes LTDA, BR
+271253|BR|lacnic|2020-08-20|LINK BRASIL TELECOMUNICACOES LTDA, BR
+271437|BR|lacnic|2020-10-13|JMV Technology Eireli - EPP, BR
+272403|MX|lacnic|2024-06-26|RAFAEL RIGOBERTO LOPEZ OROZCO, MX
+327754|ZA|afrinic|2014-05-01|RMS Powertronics CC - RMS Powertronics CC, ZA
+327813|ZA|afrinic|2014-10-30|Host Africa (Pty) Ltd - Host Africa (Pty) Ltd, ZA
+327991|ZA|afrinic|2016-03-22|Megasurf Wireless Internet CC - Megasurf Wireless Internet CC, ZA
+327992|GH|afrinic|2016-03-23|Ghanaian Academic and Research Network - Ghanaian Academic and Research Network, GH
+328049|ZA|afrinic|2016-07-29|Haupt Online (Pty) Ltd - Haupt Online (Pty) Ltd, ZA
+328137|ZA|afrinic|2017-03-08|Web Squad Connect (Pty) Ltd - Web Squad Connect (Pty) Ltd, ZA
+328206|ZA|afrinic|2017-08-11|Johannesburg Area Wireless User Group (JAWUG) - Johannesburg Area Wireless User Group (JAWUG), ZA
+328266|ZA|afrinic|2018-01-15|Atomic (Pty) Ltd - Atomic (Pty) Ltd, ZA
+328320|ZA|afrinic|2018-05-30|Kurlec Wireless (PTY) Ltd - Kurlec Wireless (PTY) Ltd, ZA
+328384|ZA|afrinic|2018-10-12|ComX Networks (PTY) LTD - ComX Networks (PTY) LTD, ZA
+328475|KE|afrinic|2019-04-22|AFRIQ NETWORK SOLUTIONS LIMITED - AFRIQ NETWORK SOLUTIONS LIMITED, KE
+328512|ZA|afrinic|2019-07-05|Backspace Technologies (Pty) Ltd - Backspace Technologies (Pty) Ltd, ZA
+328562|ZA|afrinic|2019-10-25|Swift Connect Private Company - Swift Connect Private Company, ZA
+328576|ZA|afrinic|2019-11-18|Surf4Life Pty (LTD) - Surf4Life Pty (LTD), ZA
+328633|ZA|afrinic|2020-03-27|MikroTikSA Networks CC - MikroTikSA Networks CC, ZA
+328677|ZA|afrinic|2020-06-17|KorCom (Pty) Ltd - KorCom (Pty) Ltd, ZA
+328832|ZA|afrinic|2021-04-11|Network Platforms (PTY) LTD - Network Platforms (PTY) LTD, ZA
+328840|CM|afrinic|2021-04-22|ST DIGITAL - ST DIGITAL, CM
+328913|CM|afrinic|2021-08-16|ST DIGITAL - ST DIGITAL, CM
+328964|ZA|afrinic|2021-10-19|Insight Actuarial Solutions (Pty) Ltd - Insight Actuarial Solutions (Pty) Ltd, ZA
+328977|KE|afrinic|2021-11-19|Wavex Internet Service Provider LTD - Wavex Internet Service Provider LTD, KE
+329539|KE|afrinic|2025-06-27|Grid-Link Networks Limited - Grid-Link Networks Limited, KE
+393577|US|arin|2022-11-01|Tritan Development, US
+393853|US|arin|2015-03-17|Digital Network Access Communications, INC, US
+395570|CA|arin|2016-10-07|Beanfield Technologies Inc., CA
+395880|US|arin|2017-01-17|Boomerang Communications LLC, US
+396390|US|arin|2017-05-30|Indiana University, US
+396998|US|arin|2018-08-21|Path Network, Inc., US
+397131|CA|arin|2019-01-14|Everythink Innovations Limited, CA
+397715|US|arin|2019-07-10|KPFA, US
+398465|US|arin|2020-06-15|Rackdog, LLC, US
+398493|US|arin|2020-07-01|System In Place, US
+399114|SG|arin|2020-12-16|Hyonix, SG
+399580|CA|arin|2021-04-19|Radish Networks, CA
+399728|US|arin|2021-06-01|P Foundation, US
+400442|CA|arin|2022-02-11|Vulpine Networks, CA
+401021|US|arin|2024-04-23|FastPix Inc., US
+401111|US|arin|2025-12-22|Wavepoint LLC, US
+401332|US|arin|2024-08-30|Triplebit, US
+134218069||||NO_NAME
+542000468||||NO_NAME

@@ -55,6 +55,8 @@ pub(crate) struct Dashboard {
     as_adjacency: HashMap<(u32, u32), u64>,
     as_frequency: HashMap<u32, u64>,
     rpki: Option<RPKICache>,
+    keepalive_count: u64,
+    session_start: Instant,
 }
 
 impl Dashboard {
@@ -81,6 +83,8 @@ impl Dashboard {
             as_adjacency: HashMap::new(),
             as_frequency: HashMap::new(),
             rpki: None,
+            keepalive_count: 0,
+            session_start: Instant::now(),
         }
     }
 
@@ -111,96 +115,105 @@ impl Dashboard {
                     }
                 }
 
-                // Push into scrolling message log
                 let mut prefixes = extract_prefixes(&frame.full_data);
-                // RPKI validation
-                if let Some(ref mut pc) = prefixes {
-                    let mut worst = None;
-                    for (p, origin) in &pc.announced {
-                        if let Some(ref mut rpki) = self.rpki {
-                            let (status, detail) = rpki.validate(p, *origin);
-                            worst = Some(match worst {
-                                None => status,
-                                Some(s @ crate::rpki::Status::Invalid)
-                                | Some(s @ crate::rpki::Status::InvalidWrongAsn)
-                                | Some(s @ crate::rpki::Status::InvalidTooLong) => s,
-                                Some(crate::rpki::Status::NotFound) => {
-                                    if matches!(
-                                        status,
-                                        crate::rpki::Status::Invalid
-                                            | crate::rpki::Status::InvalidWrongAsn
-                                            | crate::rpki::Status::InvalidTooLong
-                                    ) {
-                                        status
-                                    } else {
-                                        crate::rpki::Status::NotFound
+
+                // Keepalive: BGP UPDATE with no prefix changes — count, skip log.
+                let is_keepalive = matches!(
+                    &prefixes,
+                    Some(pc) if pc.announced.is_empty() && pc.withdrawn.is_empty()
+                );
+                if is_keepalive {
+                    self.keepalive_count += 1;
+                } else {
+                    // RPKI validation
+                    if let Some(ref mut pc) = prefixes {
+                        let mut worst = None;
+                        for (p, origin) in &pc.announced {
+                            if let Some(ref mut rpki) = self.rpki {
+                                let (status, detail) = rpki.validate(p, *origin);
+                                worst = Some(match worst {
+                                    None => status,
+                                    Some(s @ crate::rpki::Status::Invalid)
+                                    | Some(s @ crate::rpki::Status::InvalidWrongAsn)
+                                    | Some(s @ crate::rpki::Status::InvalidTooLong) => s,
+                                    Some(crate::rpki::Status::NotFound) => {
+                                        if matches!(
+                                            status,
+                                            crate::rpki::Status::Invalid
+                                                | crate::rpki::Status::InvalidWrongAsn
+                                                | crate::rpki::Status::InvalidTooLong
+                                        ) {
+                                            status
+                                        } else {
+                                            crate::rpki::Status::NotFound
+                                        }
                                     }
+                                    Some(s) => s,
+                                });
+                                // Store detail for the first invalid prefix
+                                if pc.rpki_detail.is_none()
+                                    && matches!(
+                                        status,
+                                        crate::rpki::Status::InvalidWrongAsn
+                                            | crate::rpki::Status::InvalidTooLong
+                                    )
+                                {
+                                    pc.rpki_detail = Some(detail);
                                 }
-                                Some(s) => s,
-                            });
-                            // Store detail for the first invalid prefix
-                            if pc.rpki_detail.is_none()
-                                && matches!(
-                                    status,
-                                    crate::rpki::Status::InvalidWrongAsn
-                                        | crate::rpki::Status::InvalidTooLong
-                                )
-                            {
-                                pc.rpki_detail = Some(detail);
                             }
                         }
+                        pc.rpki = worst;
                     }
-                    pc.rpki = worst;
-                }
-                // Track churn, origins, and AS relationships
-                if let Some(ref pc) = prefixes {
-                    for (p, origin) in &pc.announced {
-                        *self.churn_counts.entry(p.clone()).or_insert(0) += 1;
-                        if *origin > 0 {
-                            self.prefix_origins.insert(p.clone(), *origin);
+                    // Track churn, origins, and AS relationships
+                    if let Some(ref pc) = prefixes {
+                        for (p, origin) in &pc.announced {
+                            *self.churn_counts.entry(p.clone()).or_insert(0) += 1;
+                            if *origin > 0 {
+                                self.prefix_origins.insert(p.clone(), *origin);
+                            }
+                            self.prefix_last_path.insert(p.clone(), pc.as_path.clone());
                         }
-                        self.prefix_last_path.insert(p.clone(), pc.as_path.clone());
-                    }
-                    for (p, origin) in &pc.withdrawn {
-                        *self.churn_counts.entry(p.clone()).or_insert(0) += 1;
-                        if *origin > 0 {
-                            self.prefix_origins.insert(p.clone(), *origin);
+                        for (p, origin) in &pc.withdrawn {
+                            *self.churn_counts.entry(p.clone()).or_insert(0) += 1;
+                            if *origin > 0 {
+                                self.prefix_origins.insert(p.clone(), *origin);
+                            }
+                        }
+                        for asn in &pc.as_path {
+                            *self.as_frequency.entry(*asn).or_insert(0) += 1;
+                        }
+                        for pair in pc.as_path.windows(2) {
+                            let key = (pair[0], pair[1]);
+                            *self.as_adjacency.entry(key).or_insert(0) += 1;
                         }
                     }
-                    for asn in &pc.as_path {
-                        *self.as_frequency.entry(*asn).or_insert(0) += 1;
-                    }
-                    for pair in pc.as_path.windows(2) {
-                        let key = (pair[0], pair[1]);
-                        *self.as_adjacency.entry(key).or_insert(0) += 1;
-                    }
-                }
-                let ts_sec = frame
-                    .per_peer_header
-                    .as_ref()
-                    .map(|pph| pph.timestamp_seconds)
-                    .unwrap_or(0);
-                let ip_short = peer_key
-                    .as_ref()
-                    .and_then(|pk| pk.peer_ip.as_ref())
-                    .map(|ip| {
-                        if ip.len() > 18 {
-                            format!("{}..", &ip[..16])
-                        } else {
-                            ip.clone()
-                        }
+                    let ts_sec = frame
+                        .per_peer_header
+                        .as_ref()
+                        .map(|pph| pph.timestamp_seconds)
+                        .unwrap_or(0);
+                    let ip_short = peer_key
+                        .as_ref()
+                        .and_then(|pk| pk.peer_ip.as_ref())
+                        .map(|ip| {
+                            if ip.len() > 18 {
+                                format!("{}..", &ip[..16])
+                            } else {
+                                ip.clone()
+                            }
+                        });
+                    self.message_log.push(MessageLine {
+                        msg_type: frame.msg_type_raw,
+                        asn: peer_key.as_ref().and_then(|pk| pk.peer_asn),
+                        ip_short,
+                        ts_sec,
+                        prefixes,
                     });
-                self.message_log.push(MessageLine {
-                    msg_type: frame.msg_type_raw,
-                    asn: peer_key.as_ref().and_then(|pk| pk.peer_asn),
-                    ip_short,
-                    ts_sec,
-                    prefixes,
-                });
-                // Keep log bounded
-                while self.message_log.len() > self.max_log_lines {
-                    self.message_log.remove(0);
-                }
+                    // Keep log bounded
+                    while self.message_log.len() > self.max_log_lines {
+                        self.message_log.remove(0);
+                    }
+                } // end else (non-keepalive)
 
                 // Capture OpenBMP metadata for the header
                 if self.metadata.is_none() {
@@ -418,13 +431,177 @@ fn as_name_seed() -> &'static HashMap<u32, String> {
     })
 }
 
+/// Strip redundant ASN prefix from Team Cymru names.
+pub(crate) fn normalize_cymru_name(asn: u32, raw: &str) -> String {
+    let name = raw.trim();
+    if name.is_empty() {
+        return String::new();
+    }
+    let prefixes = [
+        format!("AS{asn} - "),
+        format!("AS{asn} "),
+        format!("{asn} - "),
+        format!("{asn} "),
+    ];
+    for prefix in &prefixes {
+        if let Some(stripped) = name.strip_prefix(prefix.as_str()) {
+            let s = stripped.trim();
+            if !s.is_empty() {
+                return s.to_string();
+            }
+            return name.to_string();
+        }
+    }
+    // Strip handle-style prefix: "COGENT-174 - Description"
+    if let Some((handle, rest)) = name.split_once(" - ") {
+        let is_handle = handle
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '-');
+        let is_different_asn = handle.starts_with("AS") && !handle.contains(&asn.to_string());
+        if is_handle && !is_different_asn {
+            let s = rest.trim();
+            if !s.is_empty() {
+                return s.to_string();
+            }
+        }
+    }
+    name.to_string()
+}
+
+/// Bundled Team Cymru seed — broad first-run coverage.
+fn as_name_seed_cymru() -> &'static HashMap<u32, String> {
+    static SEED: std::sync::OnceLock<HashMap<u32, String>> = std::sync::OnceLock::new();
+    SEED.get_or_init(|| {
+        let data = include_str!("../data/as_names_cymru.txt");
+        let mut map = HashMap::new();
+        for line in data.lines() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            let parts: Vec<&str> = line.split('|').collect();
+            if parts.len() < 5 {
+                continue;
+            }
+            if let Ok(asn) = parts[0].parse::<u32>() {
+                let name = normalize_cymru_name(asn, parts[4].trim());
+                if !name.is_empty() {
+                    map.insert(asn, name);
+                }
+            }
+        }
+        map
+    })
+}
+
+/// Bundled RouteViews peer metadata — collector-specific peer names and prefix counts.
+struct RouteViewsPeer {
+    as_name: String,
+    prefixes: u64,
+}
+
+/// RouteViews peer metadata index: (collector_key, asn) → peer info.
+/// When multiple sessions exist for the same collector+ASN (IPv4 + IPv6),
+/// keeps the row with the largest prefix count.
+fn routeviews_peers() -> &'static HashMap<(String, u32), RouteViewsPeer> {
+    static PEERS: OnceLock<HashMap<(String, u32), RouteViewsPeer>> = OnceLock::new();
+    PEERS.get_or_init(|| {
+        let data = include_str!("../data/routeviews_peers.tsv");
+        let mut map: HashMap<(String, u32), RouteViewsPeer> = HashMap::new();
+        for line in data.lines() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            let parts: Vec<&str> = line.split('\t').collect();
+            if parts.len() < 7 {
+                continue;
+            }
+            let collector_key = parts[0].to_string();
+            let asn: u32 = match parts[1].parse() {
+                Ok(a) => a,
+                Err(_) => continue,
+            };
+            let prefixes: u64 = match parts[3].parse() {
+                Ok(p) => p,
+                Err(_) => continue,
+            };
+            let as_name = parts[6].trim().to_string();
+            if as_name.is_empty() {
+                continue;
+            }
+            let key = (collector_key, asn);
+            match map.get(&key) {
+                Some(existing) if existing.prefixes >= prefixes => {
+                    // keep existing row — it has more prefixes
+                }
+                _ => {
+                    map.insert(key, RouteViewsPeer { as_name, prefixes });
+                }
+            }
+        }
+        map
+    })
+}
+
+/// RouteViews peer name fallback by ASN only.
+/// When multiple entries exist for the same ASN, prefers the one with the largest prefix count.
+fn routeviews_asn_fallback() -> &'static HashMap<u32, String> {
+    static FALLBACK: OnceLock<HashMap<u32, String>> = OnceLock::new();
+    FALLBACK.get_or_init(|| {
+        let mut map: HashMap<u32, (String, u64)> = HashMap::new();
+        for ((_col, asn), peer) in routeviews_peers().iter() {
+            match map.get(asn) {
+                Some((_, existing_pfx)) if *existing_pfx >= peer.prefixes => {
+                    // keep existing — larger prefix count
+                }
+                _ => {
+                    map.insert(*asn, (peer.as_name.clone(), peer.prefixes));
+                }
+            }
+        }
+        map.into_iter().map(|(k, (name, _))| (k, name)).collect()
+    })
+}
+
+/// Look up prefix count for a specific collector+ASN peer.
+pub(crate) fn routeviews_prefix_count(collector_key: &str, asn: u32) -> Option<u64> {
+    routeviews_peers()
+        .get(&(collector_key.to_string(), asn))
+        .map(|p| p.prefixes)
+}
+
+/// Look up RouteViews peer name for a specific collector+ASN (for search).
+pub(crate) fn routeviews_peer_name(collector_key: &str, asn: u32) -> Option<&str> {
+    routeviews_peers()
+        .get(&(collector_key.to_string(), asn))
+        .map(|p| p.as_name.as_str())
+}
+
+/// Format a prefix count for compact display.
+pub(crate) fn format_prefix_count(n: u64) -> String {
+    if n >= 1_000_000 {
+        let m = n as f64 / 1_000_000.0;
+        if m >= 10.0 {
+            format!("{:.0}M pfx", m)
+        } else {
+            format!("{:.1}M pfx", m)
+        }
+    } else if n >= 1_000 {
+        format!("{}k pfx", n / 1_000)
+    } else {
+        format!("{n} pfx")
+    }
+}
+
 /// Global AS name cache shared between the stream browser and dashboard.
 fn global_name_cache() -> &'static Mutex<HashMap<u32, String>> {
     static CACHE: OnceLock<Mutex<HashMap<u32, String>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-/// Resolve an ASN to a name. Checks global cache → bundled seed → Team Cymru cache.
+/// Resolve an ASN to a name. Checks global cache → bundled seed → Team Cymru cache →
+/// bundled Cymru seed → RouteViews peer fallback.
 /// Never blocks. No network I/O. Returns "ASxxxxx" for unknowns.
 pub(crate) fn as_name_resolve(asn: u32) -> String {
     {
@@ -446,6 +623,24 @@ pub(crate) fn as_name_resolve(asn: u32) -> String {
     }
     // Check Team Cymru cache (no network — loads from disk)
     if let Some(name) = crate::asnames::lookup_cached_name(asn) {
+        global_name_cache()
+            .lock()
+            .unwrap()
+            .insert(asn, name.clone());
+        return name;
+    }
+    // Bundled Team Cymru seed — first-run coverage (no network).
+    if let Some(name) = as_name_seed_cymru().get(&asn) {
+        let name = name.clone();
+        global_name_cache()
+            .lock()
+            .unwrap()
+            .insert(asn, name.clone());
+        return name;
+    }
+    // RouteViews peer metadata fallback (by ASN only, no collector context).
+    if let Some(name) = routeviews_asn_fallback().get(&asn) {
+        let name = name.clone();
         global_name_cache()
             .lock()
             .unwrap()
@@ -601,12 +796,18 @@ fn render_status_bar(frame: &mut Frame, area: Rect, dash: &Dashboard) {
         )
     } else if dash.rolling.total_seen() > 0 {
         Span::styled(" OK", Color::Green)
+    } else if dash.session_start.elapsed() >= Duration::from_secs(10) {
+        Span::raw(" no messages yet")
     } else {
         Span::raw(" connecting...")
     };
 
     let rate = format!(" {}/s", dash.current_rate());
-    let msgs = format!(" msgs:{}", dash.total_messages);
+    let msgs = if dash.keepalive_count > 0 {
+        format!(" msgs:{} KA:{}", dash.total_messages, dash.keepalive_count)
+    } else {
+        format!(" msgs:{}", dash.total_messages)
+    };
     let keys = format!(
         " [q]quit [b]browse [c]comms{} [p]{}",
         if dash.show_communities { ":on" } else { "" },
@@ -641,7 +842,11 @@ fn render_header(frame: &mut Frame, area: Rect, dash: &Dashboard, connected: boo
     };
 
     let title = if !connected {
-        format!(" BMPWatch — {meta_str}Connecting... ")
+        if dash.session_start.elapsed() >= Duration::from_secs(10) {
+            format!(" BMPWatch — {meta_str}No messages yet — stream may be quiet ")
+        } else {
+            format!(" BMPWatch — {meta_str}Connecting... ")
+        }
     } else if dash.paused {
         format!(" BMPWatch — {meta_str}⏸ PAUSED — press p to resume ")
     } else {
@@ -791,13 +996,6 @@ fn render_message_log(frame: &mut Frame, area: Rect, dash: &Dashboard) {
                         spans.push(Span::from(label).dark_gray());
                     }
                     lines.push(Line::from(spans));
-                }
-                if pc.announced.is_empty() && pc.withdrawn.is_empty() {
-                    lines.push(Line::from(vec![
-                        Span::raw(format!("{ts} ")),
-                        Span::styled(format!("{type_str:<8}"), type_color),
-                        Span::raw(" (keepalive)").dark_gray(),
-                    ]));
                 }
             }
             None => {
@@ -1292,6 +1490,18 @@ mod tests {
         assert_eq!(as_name_resolve(13335), "Cloudflare");
     }
 
+    #[test]
+    fn test_as_name_cymru_seed_resolves_unknown() {
+        // AS11537 is in the Cymru seed ("Internet2, US") but not curated seed.
+        let name = as_name_resolve(11537);
+        assert!(
+            !name.starts_with("AS"),
+            "AS11537 should resolve from Cymru seed, got {name}"
+        );
+        // Clean up global cache side effect
+        global_name_cache().lock().unwrap().remove(&11537);
+    }
+
     // -----------------------------------------------------------------------
     // parse_topic
     // -----------------------------------------------------------------------
@@ -1415,5 +1625,194 @@ mod tests {
         terminal
             .draw(|f| render_loading(f, f.area(), "test-topic", "broker:9092"))
             .expect("render_loading should not panic");
+    }
+
+    #[test]
+    fn test_keepalive_count_starts_zero() {
+        let dash = Dashboard::new("test", 10);
+        assert_eq!(dash.keepalive_count, 0);
+    }
+
+    #[test]
+    fn test_render_no_keepalive_text() {
+        let mut dash = Dashboard::new("test", 10);
+        dash.keepalive_count = 5;
+        dash.rolling.push(0, false, vec![], None);
+        dash.total_messages = 6;
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|f| render(f, &dash, true)).unwrap();
+        let text: String = terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|c| c.symbol())
+            .collect::<Vec<_>>()
+            .join("");
+        assert!(!text.contains("(keepalive)"));
+    }
+
+    #[test]
+    fn test_render_waiting_connecting_before_10s() {
+        let dash = Dashboard::new("test", 10);
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|f| render(f, &dash, false)).unwrap();
+        let text: String = terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|c| c.symbol())
+            .collect::<Vec<_>>()
+            .join("");
+        assert!(text.contains("Connecting"));
+        assert!(text.contains("connecting..."));
+    }
+
+    #[test]
+    fn test_render_waiting_no_messages_after_10s() {
+        let mut dash = Dashboard::new("test", 10);
+        dash.session_start = Instant::now() - Duration::from_secs(11);
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|f| render(f, &dash, false)).unwrap();
+        let text: String = terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|c| c.symbol())
+            .collect::<Vec<_>>()
+            .join("");
+        assert!(text.contains("No messages yet"));
+        assert!(text.contains("no messages yet"));
+    }
+
+    #[test]
+    fn test_normalize_cymru_strips_asn_prefix() {
+        assert_eq!(
+            normalize_cymru_name(1916, "AS1916 - Rede Nacional..."),
+            "Rede Nacional..."
+        );
+        assert_eq!(
+            normalize_cymru_name(1916, "AS1916 Rede Nacional..."),
+            "Rede Nacional..."
+        );
+    }
+
+    #[test]
+    fn test_normalize_cymru_strips_handle_prefix() {
+        assert_eq!(
+            normalize_cymru_name(174, "COGENT-174 - Cogent Communications, LLC, US"),
+            "Cogent Communications, LLC, US"
+        );
+    }
+
+    #[test]
+    fn test_normalize_cymru_preserves_nonmatching() {
+        assert_eq!(
+            normalize_cymru_name(1916, "Rede Nacional..."),
+            "Rede Nacional..."
+        );
+    }
+
+    // ── RouteViews peer metadata tests ──
+
+    #[test]
+    fn test_format_prefix_count() {
+        assert_eq!(format_prefix_count(520), "520 pfx");
+        assert_eq!(format_prefix_count(950_000), "950k pfx");
+        assert_eq!(format_prefix_count(1_044_754), "1.0M pfx");
+        assert_eq!(format_prefix_count(10_500_000), "10M pfx");
+        assert_eq!(format_prefix_count(0), "0 pfx");
+    }
+
+    #[test]
+    fn test_routeviews_peers_loads() {
+        let peers = routeviews_peers();
+        // 1921 peer sessions → ~830 unique (collector, asn) pairs (IPv4+IPv6 dedup)
+        assert!(
+            peers.len() > 500,
+            "expected >500 peers, got {}",
+            peers.len()
+        );
+    }
+
+    #[test]
+    fn test_routeviews_prefix_count_known() {
+        // amsix.ams + AS1103 = SURFnet, ~1M prefixes (IPv6 entry may overwrite IPv4)
+        let pfx = routeviews_prefix_count("amsix.ams", 1103);
+        assert!(pfx.is_some(), "amsix.ams+AS1103 should be in peer data");
+        assert!(pfx.unwrap() > 100_000);
+    }
+
+    #[test]
+    fn test_routeviews_prefix_count_unknown() {
+        assert_eq!(routeviews_prefix_count("nonexistent", 99999), None);
+    }
+
+    #[test]
+    fn test_routeviews_peer_name_lookup() {
+        let name = routeviews_peer_name("amsix.ams", 1103);
+        assert!(name.is_some(), "amsix.ams+AS1103 should have a peer name");
+        let n = name.unwrap().to_lowercase();
+        assert!(
+            n.contains("surf"),
+            "expected SURFnet-related name, got: {n}"
+        );
+    }
+
+    #[test]
+    fn test_routeviews_asn_fallback() {
+        let fallback = routeviews_asn_fallback();
+        // AS1103 should be in the fallback map
+        assert!(fallback.contains_key(&1103));
+    }
+
+    #[test]
+    fn test_routeviews_fallback_populated() {
+        let fallback = routeviews_asn_fallback();
+        // Should contain hundreds of ASNs from peering-status.html
+        assert!(fallback.len() > 200);
+    }
+
+    #[test]
+    fn test_duplicate_peer_rows_keep_max_prefixes() {
+        // route-views3 + AS29479 has two rows in bundled TSV: 952511 and 2
+        let pfx = routeviews_prefix_count("route-views3", 29479);
+        assert!(pfx.is_some(), "route-views3+AS29479 should be in peer data");
+        assert!(
+            pfx.unwrap() >= 900_000,
+            "should keep max-prefix row (952511), got: {}",
+            pfx.unwrap()
+        );
+    }
+
+    #[test]
+    fn test_as29479_name_not_overwritten_by_ipv6() {
+        // The IPv6 row for AS29479 may have a slightly different name.
+        // Max-prefix row (952511) name should be preferred.
+        let name = routeviews_peer_name("route-views3", 29479);
+        assert!(name.is_some());
+        // The large-table row name should contain the main org name
+        let n = name.unwrap().to_lowercase();
+        assert!(
+            n.contains("transdata"),
+            "expected Transdata name from max-prefix row, got: {n}"
+        );
+    }
+
+    #[test]
+    fn test_asn_fallback_keeps_max_prefix_name() {
+        // For AS29479, the fallback name should come from the max-prefix entry
+        let fallback = routeviews_asn_fallback();
+        let name = fallback.get(&29479);
+        assert!(name.is_some(), "AS29479 should be in fallback");
+        assert!(
+            name.unwrap().to_lowercase().contains("transdata"),
+            "fallback should use max-prefix name"
+        );
     }
 }

@@ -9,7 +9,9 @@ use ratatui::crossterm::execute;
 use ratatui::layout::Rect;
 use ratatui::DefaultTerminal;
 
-use crate::dashboard::as_name;
+use crate::dashboard::{
+    as_name, format_prefix_count, routeviews_peer_name, routeviews_prefix_count,
+};
 
 #[derive(Clone)]
 pub(crate) struct ParsedTopic {
@@ -195,10 +197,6 @@ pub(crate) fn topic_browser(
                     esc_state = EscState::None;
                 }
                 match key.code {
-                    KeyCode::Char('q') => {
-                        diag("=== return=quit key=q");
-                        return Ok(None);
-                    }
                     KeyCode::Up => {
                         model.apply(model::Action::MoveUp);
                         click_tracker.reset();
@@ -322,7 +320,7 @@ fn compute_layout(area: Rect) -> BrowserLayout {
         Constraint::Length(3), // title
         Constraint::Length(3), // search
         Constraint::Min(0),    // body
-        Constraint::Length(3), // footer
+        Constraint::Length(4), // footer
     ])
     .split(area);
     let body = Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
@@ -392,10 +390,9 @@ fn click_target(
         let pane = &layout.stream_pane;
         if let Some(content_row) = row.checked_sub(pane.y + 1).map(|r| r as usize) {
             let height = pane.height.saturating_sub(2) as usize;
-            let streams = model.current_streams();
             if content_row < height {
-                let actual_idx = model.stream_scroll + content_row;
-                if actual_idx < streams.len() {
+                let visible_idx = model.stream_scroll + content_row;
+                if let Some(actual_idx) = model.visible_stream_at(visible_idx) {
                     return Some((model::Pane::Streams, actual_idx));
                 }
             }
@@ -521,7 +518,10 @@ mod model {
     use std::collections::BTreeMap;
     use std::fmt;
 
-    use super::{as_name, collector_label, parse_topic, truncate_str, ParsedTopic};
+    use super::{
+        as_name, collector_label, format_prefix_count, parse_topic, routeviews_peer_name,
+        routeviews_prefix_count, truncate_str, ParsedTopic,
+    };
 
     #[derive(Clone)]
     pub(super) struct ModelCollector {
@@ -554,6 +554,8 @@ mod model {
         pub(super) active_pane: Pane,
         pub(super) collector_scroll: usize,
         pub(super) stream_scroll: usize,
+        /// Filtered stream indices into current_streams(). None = show all.
+        filtered_stream_indices: Option<Vec<usize>>,
     }
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -611,6 +613,7 @@ mod model {
                 active_pane: Pane::Collectors,
                 collector_scroll: 0,
                 stream_scroll: 0,
+                filtered_stream_indices: None,
             };
             model.rebuild_filter();
             model
@@ -636,6 +639,12 @@ mod model {
                             pt.asn_str.contains(&lower)
                                 || pt.full.to_lowercase().contains(&lower)
                                 || as_name(&pt.asn_str).to_lowercase().contains(&lower)
+                                || pt
+                                    .asn_str
+                                    .parse::<u32>()
+                                    .ok()
+                                    .and_then(|a| routeviews_peer_name(&pt.collector, a))
+                                    .is_some_and(|n| n.to_lowercase().contains(&lower))
                         })
                 })
                 .map(|(i, _)| i)
@@ -647,11 +656,59 @@ mod model {
             let stream_len = self.current_streams().len();
             self.selected_stream = clamp_opt(self.selected_stream, stream_len);
 
+            self.recompute_stream_filter();
+
             if self.active_pane == Pane::Collectors && self.filtered_indices.is_empty() {
                 self.active_pane = Pane::Streams;
             }
-            if self.active_pane == Pane::Streams && stream_len == 0 {
+            if self.active_pane == Pane::Streams && self.visible_stream_count() == 0 {
                 self.active_pane = Pane::Collectors;
+            }
+        }
+
+        /// Recompute stream filter for current collector. Call on filter or collector change.
+        fn recompute_stream_filter(&mut self) {
+            let searching = !self.filter.is_empty();
+            self.filtered_stream_indices = if searching {
+                let lower = self.filter.to_lowercase();
+                let collector_matched = self
+                    .current_collector()
+                    .map(|mc| {
+                        mc.label.to_lowercase().contains(&lower)
+                            || mc.raw_name.to_lowercase().contains(&lower)
+                    })
+                    .unwrap_or(false);
+                if collector_matched {
+                    None // show all streams
+                } else {
+                    let streams = self.current_streams();
+                    let matching: Vec<usize> = streams
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, pt)| {
+                            pt.asn_str.contains(&lower)
+                                || pt.full.to_lowercase().contains(&lower)
+                                || as_name(&pt.asn_str).to_lowercase().contains(&lower)
+                                || pt
+                                    .asn_str
+                                    .parse::<u32>()
+                                    .ok()
+                                    .and_then(|a| routeviews_peer_name(&pt.collector, a))
+                                    .is_some_and(|n| n.to_lowercase().contains(&lower))
+                        })
+                        .map(|(i, _)| i)
+                        .collect();
+                    Some(matching)
+                }
+            } else {
+                None // empty filter — show all
+            };
+
+            let visible_count = self.visible_stream_count();
+            if let Some(sel) = self.selected_stream {
+                if !self.is_stream_visible(sel) {
+                    self.selected_stream = if visible_count > 0 { Some(0) } else { None };
+                }
             }
         }
 
@@ -665,6 +722,33 @@ mod model {
             match self.current_collector() {
                 Some(mc) => &mc.streams,
                 None => &[],
+            }
+        }
+
+        fn visible_stream_count(&self) -> usize {
+            match &self.filtered_stream_indices {
+                Some(indices) => indices.len(),
+                None => self.current_streams().len(),
+            }
+        }
+
+        fn is_stream_visible(&self, stream_idx: usize) -> bool {
+            match &self.filtered_stream_indices {
+                Some(indices) => indices.contains(&stream_idx),
+                None => stream_idx < self.current_streams().len(),
+            }
+        }
+
+        pub(super) fn visible_stream_at(&self, visible_idx: usize) -> Option<usize> {
+            match &self.filtered_stream_indices {
+                Some(indices) => indices.get(visible_idx).copied(),
+                None => {
+                    if visible_idx < self.current_streams().len() {
+                        Some(visible_idx)
+                    } else {
+                        None
+                    }
+                }
             }
         }
 
@@ -698,9 +782,14 @@ mod model {
             match self.active_pane {
                 Pane::Collectors => {
                     self.selected_collector = dec_opt(self.selected_collector);
+                    self.recompute_stream_filter();
                 }
                 Pane::Streams => {
-                    self.selected_stream = dec_opt(self.selected_stream);
+                    if let Some(indices) = &self.filtered_stream_indices {
+                        self.selected_stream = dec_opt_in_list(self.selected_stream, indices);
+                    } else {
+                        self.selected_stream = dec_opt(self.selected_stream);
+                    }
                 }
             }
         }
@@ -710,19 +799,61 @@ mod model {
                 Pane::Collectors => {
                     self.selected_collector =
                         inc_opt(self.selected_collector, self.filtered_indices.len());
+                    self.recompute_stream_filter();
                 }
                 Pane::Streams => {
-                    self.selected_stream =
-                        inc_opt(self.selected_stream, self.current_streams().len());
+                    if let Some(indices) = &self.filtered_stream_indices.clone() {
+                        self.selected_stream = inc_opt_in_list(self.selected_stream, indices);
+                    } else {
+                        self.selected_stream =
+                            inc_opt(self.selected_stream, self.current_streams().len());
+                    }
                 }
             }
+        }
+
+        /// Best first visible stream: prefers metadata, then non-AS0, then first.
+        fn first_useful_visible_stream(&self) -> Option<usize> {
+            let streams = self.current_streams();
+            let visible_count = self.visible_stream_count();
+            if visible_count == 0 {
+                return None;
+            }
+            let collector_key = self
+                .current_collector()
+                .map(|mc| mc.raw_name.as_str())
+                .unwrap_or("");
+            // Pass 1: first stream with RouteViews peer metadata
+            for vi in 0..visible_count {
+                if let Some(orig) = self.visible_stream_at(vi) {
+                    let pt = &streams[orig];
+                    if let Ok(asn) = pt.asn_str.parse::<u32>() {
+                        if routeviews_prefix_count(collector_key, asn).is_some() {
+                            return Some(orig);
+                        }
+                    }
+                }
+            }
+            // Pass 2: first non-AS0 stream
+            for vi in 0..visible_count {
+                if let Some(orig) = self.visible_stream_at(vi) {
+                    if streams[orig].asn_str != "0" {
+                        return Some(orig);
+                    }
+                }
+            }
+            // Pass 3: first visible
+            self.visible_stream_at(0)
         }
 
         fn do_switch_pane(&mut self) {
             match self.active_pane {
                 Pane::Collectors => {
-                    if !self.current_streams().is_empty() {
+                    if self.visible_stream_count() > 0 {
                         self.active_pane = Pane::Streams;
+                        if self.selected_stream.is_none() {
+                            self.selected_stream = self.first_useful_visible_stream();
+                        }
                     }
                 }
                 Pane::Streams => {
@@ -739,7 +870,7 @@ mod model {
                     if !self.current_streams().is_empty() {
                         self.active_pane = Pane::Streams;
                         if self.selected_stream.is_none() {
-                            self.selected_stream = Some(0);
+                            self.selected_stream = self.first_useful_visible_stream();
                         }
                     }
                     ActionResult::None
@@ -763,7 +894,7 @@ mod model {
                 collector_total,
                 collector_height,
             );
-            let stream_total = self.current_streams().len();
+            let stream_total = self.visible_stream_count();
             ensure_visible(
                 self.selected_stream,
                 &mut self.stream_scroll,
@@ -793,7 +924,28 @@ mod model {
     fn inc_opt(sel: Option<usize>, len: usize) -> Option<usize> {
         match sel {
             Some(i) if i + 1 < len => Some(i + 1),
+            None if len > 0 => Some(0),
             _ => sel,
+        }
+    }
+
+    fn dec_opt_in_list(sel: Option<usize>, indices: &[usize]) -> Option<usize> {
+        match sel {
+            Some(current) => indices
+                .iter()
+                .rposition(|&i| i < current)
+                .map(|pos| indices[pos]),
+            None => indices.last().copied(),
+        }
+    }
+
+    fn inc_opt_in_list(sel: Option<usize>, indices: &[usize]) -> Option<usize> {
+        match sel {
+            Some(current) => indices
+                .iter()
+                .position(|&i| i > current)
+                .map(|pos| indices[pos]),
+            None => indices.first().copied(),
         }
     }
 
@@ -829,7 +981,7 @@ mod model {
             Constraint::Length(3), // title
             Constraint::Length(3), // search
             Constraint::Min(0),    // body (2 panes)
-            Constraint::Length(3), // detail + footer
+            Constraint::Length(4), // detail + footer
         ])
         .split(area);
 
@@ -903,12 +1055,20 @@ mod model {
 
         // Right: Streams
         let streams = m.current_streams();
+        let collector_key = m
+            .current_collector()
+            .map(|mc| mc.raw_name.as_str())
+            .unwrap_or("");
         let stream_height = body[1].height.saturating_sub(2) as usize;
-        let stream_total = streams.len();
+        let stream_total = m.visible_stream_count();
         let stream_range = m.stream_scroll..(m.stream_scroll + stream_height).min(stream_total);
         let mut stream_lines: Vec<Line> = Vec::new();
-        for i in stream_range {
-            let pt = &streams[i];
+        for visible_idx in stream_range {
+            let orig_idx = match m.visible_stream_at(visible_idx) {
+                Some(idx) => idx,
+                None => continue,
+            };
+            let pt = &streams[orig_idx];
             let name = as_name(&pt.asn_str);
             let name_display = if name.len() > 26 {
                 truncate_str(&name, 24)
@@ -917,20 +1077,27 @@ mod model {
             } else {
                 name
             };
-            let on = m.active_pane == Pane::Streams && m.selected_stream == Some(i);
+            let pfx_str = pt
+                .asn_str
+                .parse::<u32>()
+                .ok()
+                .and_then(|a| routeviews_prefix_count(collector_key, a))
+                .map(format_prefix_count);
+            let on = m.active_pane == Pane::Streams && m.selected_stream == Some(orig_idx);
             if on {
-                stream_lines.push(
-                    Line::from(vec![
-                        Span::raw("  "),
-                        Span::styled(format!("AS{}", pt.asn_str), Color::Green),
-                        Span::raw(" "),
-                        Span::styled(name_display, Color::Yellow),
-                    ])
-                    .on_white()
-                    .black(),
-                );
+                let mut spans = vec![
+                    Span::raw("  "),
+                    Span::styled(format!("AS{}", pt.asn_str), Color::Green),
+                    Span::raw(" "),
+                    Span::styled(name_display, Color::Yellow),
+                ];
+                if let Some(ref pfx) = pfx_str {
+                    spans.push(Span::raw("  "));
+                    spans.push(Span::styled(pfx.clone(), Color::DarkGray));
+                }
+                stream_lines.push(Line::from(spans).on_white().black());
             } else {
-                stream_lines.push(Line::from(vec![
+                let mut spans = vec![
                     Span::raw("  "),
                     Span::styled(format!("AS{}", pt.asn_str), Color::Green),
                     Span::raw(" "),
@@ -939,14 +1106,27 @@ mod model {
                     } else {
                         Span::raw("")
                     },
-                ]));
+                ];
+                if let Some(ref pfx) = pfx_str {
+                    spans.push(Span::raw("  "));
+                    spans.push(Span::styled(pfx.clone(), Color::DarkGray));
+                }
+                stream_lines.push(Line::from(spans));
             }
         }
         if stream_lines.is_empty() {
             stream_lines.push(Line::from(" (no streams)").dark_gray());
         }
         let stream_title = match m.current_collector() {
-            Some(mc) => format!("Streams — {}", mc.label),
+            Some(mc) => {
+                let visible = m.visible_stream_count();
+                let total = streams.len();
+                if visible != total {
+                    format!("Streams — {} ({}/{})", mc.label, visible, total)
+                } else {
+                    format!("Streams — {}", mc.label)
+                }
+            }
             None => "Streams".into(),
         };
         f.render_widget(
@@ -957,6 +1137,37 @@ mod model {
 
         // ── Selected detail + Footer ──
         let detail = m.selected_topic().unwrap_or("no stream selected");
+        let peer_meta = m.selected_topic().and_then(parse_topic).and_then(|pt| {
+            pt.asn_str
+                .parse::<u32>()
+                .ok()
+                .and_then(|a| routeviews_prefix_count(&pt.collector, a))
+                .map(format_prefix_count)
+        });
+        let detail_line = if let Some(ref pfx) = peer_meta {
+            Line::from(vec![
+                Span::raw("  "),
+                Span::styled(detail, Color::Green),
+                Span::raw("  "),
+                Span::styled(pfx.to_string(), Color::DarkGray),
+                Span::raw("  "),
+                Span::styled("offline: bmpwatch <capture.bmpd>", Color::DarkGray),
+            ])
+        } else {
+            Line::from(vec![
+                Span::raw("  "),
+                Span::styled(
+                    detail,
+                    if m.selected_topic().is_some() {
+                        Color::Green
+                    } else {
+                        Color::DarkGray
+                    },
+                ),
+                Span::raw("  "),
+                Span::styled("offline: bmpwatch <capture.bmpd>", Color::DarkGray),
+            ])
+        };
         f.render_widget(
             Paragraph::new(vec![
                 Line::from(vec![
@@ -974,19 +1185,7 @@ mod model {
                     Span::styled("wheel", Color::White).bold(),
                     Span::raw(" scroll"),
                 ]),
-                Line::from(vec![
-                    Span::raw("  "),
-                    Span::styled(
-                        detail,
-                        if m.selected_topic().is_some() {
-                            Color::Green
-                        } else {
-                            Color::DarkGray
-                        },
-                    ),
-                    Span::raw("  "),
-                    Span::styled("offline: bmpwatch <capture.bmpd>", Color::DarkGray),
-                ]),
+                detail_line,
             ])
             .block(Block::bordered().borders(Borders::ALL)),
             chunks[3],
@@ -1070,6 +1269,78 @@ mod model {
                 .any(|&i| m.all_collectors[i].raw_name.contains("UNDEFINED"));
             assert!(has_undef);
             assert_invariants(&m);
+        }
+
+        #[test]
+        fn test_filter_shows_only_matching_streams() {
+            let mut m = BrowserModel::new(&test_topics());
+            for c in "6939".chars() {
+                m.apply(Action::TypeChar(c));
+            }
+            // chicago has AS13335 and AS2914; linx has AS13335 and AS3257
+            // AS6939 is not in any collector — filter should yield empty
+            // Actually 6939 is not in our test set. Let's use 13335.
+            m.apply(Action::Backspace);
+            m.apply(Action::Backspace);
+            m.apply(Action::Backspace);
+            m.apply(Action::Backspace);
+            for c in "13335".chars() {
+                m.apply(Action::TypeChar(c));
+            }
+            // Both chicago and linx have AS13335
+            assert!(!m.filtered_indices.is_empty());
+            // Right pane should only show AS13335 (not AS2914)
+            let visible = m.visible_stream_count();
+            for vi in 0..visible {
+                let orig = m.visible_stream_at(vi).unwrap();
+                let pt = &m.current_streams()[orig];
+                assert!(
+                    pt.asn_str.contains("13335"),
+                    "stream {} should match filter",
+                    pt.full
+                );
+            }
+        }
+
+        #[test]
+        fn test_filter_switching_collectors_preserves_stream_filter() {
+            // Custom topics: two collectors, each with distinct ASNs
+            let topics = vec![
+                "routeviews.colA.11537.bmp_raw".to_string(),
+                "routeviews.colA.2497.bmp_raw".to_string(),
+                "routeviews.colB.11537.bmp_raw".to_string(),
+                "routeviews.colB.7018.bmp_raw".to_string(),
+            ];
+            let mut m = BrowserModel::new(&topics);
+            for c in "11537".chars() {
+                m.apply(Action::TypeChar(c));
+            }
+            // Both collectors visible
+            assert_eq!(m.filtered_indices.len(), 2);
+            // First collector (colA, 2 streams): only AS11537 visible
+            assert_eq!(m.visible_stream_count(), 1);
+            let orig = m.visible_stream_at(0).unwrap();
+            assert!(m.current_streams()[orig].asn_str == "11537");
+
+            // Switch to second collector (colB)
+            m.apply(Action::MoveDown); // selects colB
+            assert_eq!(m.visible_stream_count(), 1);
+            let orig = m.visible_stream_at(0).unwrap();
+            assert_eq!(
+                m.current_streams()[orig].asn_str,
+                "11537",
+                "after switching collectors, only AS11537 should be visible"
+            );
+
+            // Clear filter — all streams restored
+            m.apply(Action::Backspace);
+            m.apply(Action::Backspace);
+            m.apply(Action::Backspace);
+            m.apply(Action::Backspace);
+            m.apply(Action::Backspace);
+            assert!(m.filter.is_empty());
+            // colB has 2 streams
+            assert_eq!(m.visible_stream_count(), 2);
         }
 
         #[test]
@@ -1161,21 +1432,45 @@ mod model {
         }
 
         #[test]
-        fn test_switch_pane_works_after_collector_selection() {
+        fn test_switch_pane_to_stream_selects_first_visible_stream() {
             let mut m = BrowserModel::new(&test_topics());
+            // Model auto-selects first stream on construction via clamp_opt.
+            // Force selected_stream to None to simulate edge case (e.g. filter clear).
+            m.selected_stream = None;
             m.apply(Action::SwitchPane);
             assert_eq!(m.active_pane, Pane::Streams);
+            assert_eq!(
+                m.selected_stream,
+                Some(0),
+                "Tab should select first visible stream"
+            );
+            assert_invariants(&m);
+        }
+
+        #[test]
+        fn test_switch_pane_to_empty_streams_stays() {
+            let mut m = BrowserModel::new(&[]);
+            m.apply(Action::SwitchPane);
+            assert_eq!(m.active_pane, Pane::Collectors);
+            assert!(m.selected_stream.is_none());
             assert_invariants(&m);
         }
 
         // ── Enter behavior ──
 
         #[test]
-        fn test_enter_on_collector_switches_to_streams() {
+        fn test_enter_on_collector_selects_first_stream() {
             let mut m = BrowserModel::new(&test_topics());
+            // Force None to test that Enter sets it
+            m.selected_stream = None;
             let result = m.apply(Action::Enter);
             assert_eq!(result, ActionResult::None);
             assert_eq!(m.active_pane, Pane::Streams);
+            assert_eq!(
+                m.selected_stream,
+                Some(0),
+                "Enter should select first stream"
+            );
             assert_invariants(&m);
         }
 
@@ -1425,6 +1720,163 @@ mod model {
                 .expect("should not panic with Unicode labels");
         }
 
+        #[test]
+        fn test_footer_shows_prefix_count_for_selected_stream() {
+            // Use real collector keys that match RouteViews TSV data.
+            let topics = vec!["routeviews.amsix.ams.1103.bmp_raw".to_string()];
+            let mut m = BrowserModel::new(&topics);
+            // Enter to switch to stream pane and select first stream
+            m.apply(Action::Enter);
+            assert!(m.selected_topic().is_some());
+            let backend = TestBackend::new(100, 30);
+            let mut terminal = Terminal::new(backend).unwrap();
+            terminal
+                .draw(|f| render_model(f, f.area(), &m))
+                .expect("render with selected stream");
+            let text: String = terminal
+                .backend()
+                .buffer()
+                .content
+                .iter()
+                .map(|c| c.symbol())
+                .collect::<Vec<_>>()
+                .join("");
+            assert!(
+                text.contains("pfx"),
+                "footer should include prefix count, got footer text around selected topic"
+            );
+        }
+
+        #[test]
+        fn test_selected_topic_after_tab_without_down() {
+            let mut m = BrowserModel::new(&test_topics());
+            // Tab switches to streams and selects first
+            m.apply(Action::SwitchPane);
+            assert!(
+                m.selected_topic().is_some(),
+                "Tab should select first stream"
+            );
+            // Enter connects the selected stream without requiring Down
+            let result = m.apply(Action::Enter);
+            assert!(
+                matches!(result, ActionResult::Selected(_)),
+                "Enter after Tab should connect first stream"
+            );
+        }
+
+        // ── RouteViews row metadata and selection tests ──
+
+        #[test]
+        fn test_stream_row_shows_prefix_count() {
+            // amsix.ams + AS1103 has known prefix count in RouteViews TSV
+            let topics = vec!["routeviews.amsix.ams.1103.bmp_raw".to_string()];
+            let m = BrowserModel::new(&topics);
+            let backend = TestBackend::new(80, 24);
+            let mut terminal = Terminal::new(backend).unwrap();
+            terminal
+                .draw(|f| render_model(f, f.area(), &m))
+                .expect("render");
+            let text: String = terminal
+                .backend()
+                .buffer()
+                .content
+                .iter()
+                .map(|c| c.symbol())
+                .collect::<Vec<_>>()
+                .join("");
+            // The stream row should include the formatted prefix count
+            assert!(
+                text.contains("pfx"),
+                "stream row should show prefix count for known peer"
+            );
+        }
+
+        #[test]
+        fn test_stream_row_no_prefix_count_for_unknown() {
+            let topics = vec!["routeviews.amsix.ams.99999.bmp_raw".to_string()];
+            let m = BrowserModel::new(&topics);
+            let backend = TestBackend::new(80, 24);
+            let mut terminal = Terminal::new(backend).unwrap();
+            terminal
+                .draw(|f| render_model(f, f.area(), &m))
+                .expect("render");
+            // Should not panic — just no pfx displayed
+        }
+
+        #[test]
+        fn test_tab_selects_first_useful_stream() {
+            // AS0 first, then a stream with metadata — Tab should skip AS0
+            let topics = vec![
+                "routeviews.amsix.ams.0.bmp_raw".to_string(),
+                "routeviews.amsix.ams.1103.bmp_raw".to_string(),
+            ];
+            let mut m = BrowserModel::new(&topics);
+            // Force None to test selection logic
+            m.selected_stream = None;
+            m.apply(Action::SwitchPane);
+            assert_eq!(m.active_pane, Pane::Streams);
+            let streams = m.current_streams();
+            let sel = m.selected_stream.unwrap();
+            assert_ne!(
+                streams[sel].asn_str, "0",
+                "Tab should not select AS0 when metadata-backed stream exists"
+            );
+            assert_invariants(&m);
+        }
+
+        #[test]
+        fn test_search_filtered_row_shows_prefix_count() {
+            // Two streams, one with metadata. Filter to the metadata one.
+            let topics = vec![
+                "routeviews.amsix.ams.1103.bmp_raw".to_string(),
+                "routeviews.amsix.ams.29075.bmp_raw".to_string(),
+            ];
+            let mut m = BrowserModel::new(&topics);
+            for c in "1103".chars() {
+                m.apply(Action::TypeChar(c));
+            }
+            let backend = TestBackend::new(80, 24);
+            let mut terminal = Terminal::new(backend).unwrap();
+            terminal
+                .draw(|f| render_model(f, f.area(), &m))
+                .expect("render");
+            let text: String = terminal
+                .backend()
+                .buffer()
+                .content
+                .iter()
+                .map(|c| c.symbol())
+                .collect::<Vec<_>>()
+                .join("");
+            assert!(text.contains("1103"), "filtered view should show AS1103");
+            assert!(
+                text.contains("pfx"),
+                "filtered row should include prefix count"
+            );
+        }
+
+        #[test]
+        fn test_selected_topic_after_tab_connects_useful_stream() {
+            let topics = vec![
+                "routeviews.amsix.ams.0.bmp_raw".to_string(),
+                "routeviews.amsix.ams.1103.bmp_raw".to_string(),
+            ];
+            let mut m = BrowserModel::new(&topics);
+            m.selected_stream = None;
+            // Tab to streams — should pick useful stream
+            m.apply(Action::SwitchPane);
+            let result = m.apply(Action::Enter);
+            match result {
+                ActionResult::Selected(topic) => {
+                    assert!(
+                        topic.contains("1103"),
+                        "Enter after Tab should connect useful stream, got: {topic}"
+                    );
+                }
+                other => panic!("expected Selected topic, got {other:?}"),
+            }
+        }
+
         // ── Escape-sequence fragment tests ──
 
         #[test]
@@ -1433,6 +1885,20 @@ mod model {
             m.apply(Action::TypeChar('a'));
             m.apply(Action::TypeChar('b'));
             assert_eq!(m.filter, "ab");
+        }
+
+        #[test]
+        fn test_char_q_goes_to_filter_not_quit() {
+            let mut m = BrowserModel::new(&test_topics());
+            m.apply(Action::TypeChar('q'));
+            assert_eq!(m.filter, "q");
+        }
+
+        #[test]
+        fn test_char_b_goes_to_filter_not_browse() {
+            let mut m = BrowserModel::new(&test_topics());
+            m.apply(Action::TypeChar('b'));
+            assert_eq!(m.filter, "b");
         }
 
         #[test]
@@ -1461,6 +1927,67 @@ mod model {
             assert_eq!(super::truncate_str("São Paulo", 4), "São …");
             assert_eq!(super::truncate_str("Malmö", 8), "Malmö");
             assert_eq!(super::truncate_str("Querétaro", 6), "Querét…");
+        }
+
+        // ── RouteViews peer metadata search tests ──
+
+        fn routeviews_test_topics() -> Vec<String> {
+            vec![
+                "routeviews.amsix.ams.1103.bmp_raw".into(), // SURFNET-NL SURF B.V.
+                "routeviews.amsix.ams.29075.bmp_raw".into(), // IELO IELO Main Network
+                "routeviews.route-views.chicago.13335.bmp_raw".into(), // Cloudflare
+            ]
+        }
+
+        #[test]
+        fn test_search_by_routeviews_peer_name() {
+            let mut m = BrowserModel::new(&routeviews_test_topics());
+            // "surf" appears in RouteViews peer name for amsix.ams+AS1103
+            for c in "surf".chars() {
+                m.apply(Action::TypeChar(c));
+            }
+            assert!(
+                !m.filtered_indices.is_empty(),
+                "should find collector by peer name"
+            );
+            let mc = m.current_collector().unwrap();
+            assert_eq!(mc.raw_name, "amsix.ams", "expected amsix.ams collector");
+        }
+
+        #[test]
+        fn test_search_by_routeviews_peer_name_stream_filter() {
+            let mut m = BrowserModel::new(&routeviews_test_topics());
+            // "ielo" is in RouteViews peer name for amsix.ams+AS29075
+            for c in "ielo".chars() {
+                m.apply(Action::TypeChar(c));
+            }
+            assert!(!m.filtered_indices.is_empty());
+            let mc = m.current_collector().unwrap();
+            assert_eq!(mc.raw_name, "amsix.ams", "expected amsix.ams collector");
+        }
+
+        #[test]
+        fn test_search_by_asn_still_works() {
+            // Regression: search for 13335 should only match streams with that ASN
+            let topics = vec![
+                "routeviews.route-views.chicago.13335.bmp_raw".into(),
+                "routeviews.route-views.chicago.2914.bmp_raw".into(),
+                "routeviews.route-views.linx.13335.bmp_raw".into(),
+            ];
+            let mut m = BrowserModel::new(&topics);
+            for c in "13335".chars() {
+                m.apply(Action::TypeChar(c));
+            }
+            let visible = m.visible_stream_count();
+            let streams = m.current_streams();
+            assert!(
+                visible < streams.len(),
+                "filter should reduce visible streams"
+            );
+            for vi in 0..visible {
+                let orig = m.visible_stream_at(vi).unwrap();
+                assert_eq!(streams[orig].asn_str, "13335");
+            }
         }
     }
 } // mod model
