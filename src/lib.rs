@@ -10,6 +10,7 @@ pub mod kafka;
 pub mod lint;
 pub mod obmp_reader;
 pub mod obmp_writer;
+pub mod peering;
 pub mod raw_bmp;
 pub mod report;
 pub mod rolling;

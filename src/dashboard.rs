@@ -289,6 +289,11 @@ pub(crate) fn run_dashboard(
             a_undef.cmp(&b_undef).then_with(|| a.cmp(b))
         });
 
+        // Filter to active peerings only (peering-status.html).
+        // This hides Kafka-advertised streams for dead or inactive peerings.
+        let active = crate::peering::load_active_peering_set();
+        filtered = crate::peering::filter_active_topics(&filtered, &active);
+
         if filtered.is_empty() {
             let msg = if collector.is_some() || asn.is_some() {
                 "No topics matched filters. Try broader --collector/--asn, or run without filters."
@@ -399,6 +404,8 @@ pub(crate) fn run_dashboard(
             let b_undef = b.contains("UNDEFINED_ROUTER_GROUP");
             a_undef.cmp(&b_undef).then_with(|| a.cmp(b))
         });
+        let active = crate::peering::load_active_peering_set();
+        filtered = crate::peering::filter_active_topics(&filtered, &active);
         match topic_browser(&mut terminal, &filtered)? {
             Some(t) => chosen = t,
             None => {
@@ -576,6 +583,17 @@ pub(crate) fn routeviews_peer_name(collector_key: &str, asn: u32) -> Option<&str
     routeviews_peers()
         .get(&(collector_key.to_string(), asn))
         .map(|p| p.as_name.as_str())
+}
+
+/// Build the active (collector_key, asn) set from the bundled TSV.
+/// Excludes zero-prefix entries. Used as ultimate fallback when
+/// peering-status.html cannot be fetched and no cache exists.
+pub(crate) fn bundled_active_set() -> std::collections::HashSet<(String, u32)> {
+    routeviews_peers()
+        .iter()
+        .filter(|(_, peer)| peer.prefixes > 0)
+        .map(|((col, asn), _)| (col.clone(), *asn))
+        .collect()
 }
 
 /// Format a prefix count for compact display.
