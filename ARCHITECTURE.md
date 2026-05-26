@@ -72,9 +72,11 @@ File → format detection (input.rs) → Iterator (RawBmpIterator or ObmpReader)
 | `rolling.rs` | RollingSummary for bounded-window message aggregation (used by `bmpwatch <file>` replay mode) |
 | `input.rs` | Format detection from file content, `file_size_and_format()` |
 | `kafka.rs` | Shared Kafka utilities: `fetch_topics`, `apply_filters`, `create_consumer` |
-| `browser.rs` | Hierarchical topic browser (regions → collectors → streams) for dashboard |
-| `rpki.rs` | Minimal RTR client (RFC 8210), VRP cache, RPKI prefix validation |
-| `dashboard.rs` | Live TUI dashboard: message log, Prefix Flaps, RPKI, WHOIS, AS name cache |
+| `browser.rs` | Stream browser TUI (collector pane + stream pane) with search, mouse, and keyboard navigation |
+| `rpki.rs` | RTR client (RFC 8210), VRP cache, multi-covering-VRP RPKI prefix validation |
+| `dashboard.rs` | Live TUI dashboard: message log, RPKI, Prefix Flaps, AS name resolution (cache-based, no network I/O) |
+| `peering.rs` | Active peering filter: fetches RouteViews peering-status page, caches for 15 min, filters Kafka topics |
+| `asnames.rs` | Team Cymru bulk WHOIS client for offline AS name cache refresh (`bmpwatch refresh-asnames`) |
 | `bin/record_openbmp_kafka.rs` | Separate binary: Kafka consumer for public BMP feeds, writes `.bmpd` via ObmpWriter |
 
 ### Lint rules (8)

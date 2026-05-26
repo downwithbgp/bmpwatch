@@ -162,11 +162,8 @@ bmpwatch dump samples/nwax-sample.bmpd --jsonl | head -5
 
 ## Notes
 
-- Messages arrive as raw BMP frames (common header + payload). No OpenBMP
-  length-delimited wrapper is applied to individual Kafka messages.
-- When captured to a `.bmpd` file, the `examples/record_openbmp_kafka.rs`
-  tool (future) will add the `BMPDOPENBMP1` + `u32` BE length wrapper to
-  each frame on write.
+- Messages arrive as raw BMP frames (common header + payload). RouteViews
+  Kafka payloads are typically OpenBMP `OBMP`-wrapped.
+- The `record_openbmp_kafka` binary (at `src/bin/record_openbmp_kafka.rs`)
+  adds the `BMPDOPENBMP1` + `u32` BE length wrapper to each frame on write.
 - The broker may throttle or close connections that consume too fast.
-- For production capture, `examples/record_openbmp_kafka.rs` (future) will
-  handle reconnection, offset tracking, and rotation.

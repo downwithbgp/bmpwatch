@@ -63,7 +63,6 @@ Historical tags (`v0.1.*`) are checkpoints, not polished releases.
 - Deep BGP UPDATE semantic validation
 - Full observability platform / storage backend
 - Prometheus metrics / Parquet export
-- Native Kafka input in core `bmpwatch`
 - TCP listener mode
 - RFC 8671 / 9069 / 9736 interpretation until base RFC 7854 behavior is mature
 - CAIDA Kafka integration (`bmp.bgpstream.caida.org:9092` remains unreachable)

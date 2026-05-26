@@ -1,8 +1,8 @@
 # BMP Data Sources
 
 This document catalogs known sources of raw BMP data that BMPWatch targets.
-These are not built into the core CLI; they are experimental references for
-capture, relay, or integration work.
+RouteViews Kafka is the primary live data source for the TUI dashboard.
+File-based capture and inspection are also supported.
 
 ## Source ladder
 
@@ -29,7 +29,7 @@ provide real BGP data for integration testing. The `.rawbmp` extension
 distinguishes raw concatenated BMP frames from BMPWatch container
 captures.
 
-### Tier 3: RouteViews Kafka `.bmpd` — active next milestone
+### Tier 3: RouteViews Kafka — implemented
 
 `stream.routeviews.org:9092` is the verified working OpenBMP Kafka broker
 for BMPWatch integration. It serves live BMP data from RouteViews
@@ -117,8 +117,8 @@ $ kcat -b bmp.bgpstream.caida.org:9092 -L
 Broker transport failure
 ```
 
-Kafka-based capture and `.bmpd` file support are blocked until a reachable
-broker is confirmed.
+Kafka-based capture and `.bmpd` file support are implemented and verified
+against RouteViews' broker.
 
 ### References
 
@@ -137,7 +137,7 @@ Payload:    raw BMP frame    (Length bytes)
 ```
 
 Each record is a single BMP frame prefixed by the magic header and length.
-BMPWatch does not yet support this format; see `docs/future-issues.md`.
+BMPWatch supports this format natively; see the main README for usage.
 
 ## Raw BMP frame files (.rawbmp)
 

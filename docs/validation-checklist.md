@@ -110,12 +110,8 @@ See `docs/caida-kafka-verification.md`.
 - [ ] Adj-RIB-Out vs Loc-RIB not distinguished (RFC 8671, RFC 9069)
 - [ ] Peer Up TLV parsing not implemented (RFC 9736)
 - [ ] Post-policy (L) flag not interpreted beyond noting its presence
-- [ ] Stats Report counters not decoded
-- [ ] Initiation/Termination TLVs not parsed
 - [ ] Route Mirroring TLVs not parsed
-- [ ] Peer Down reason codes reported as raw integers, not labels
 - [ ] No compression support (`.bz2`, `.gz`)
-- [ ] No BMPWatch container format support (`.bmpd`)
 - [ ] Findings are capped at `--max-findings` (default 1000); findings
       beyond the cap are silently dropped with a truncation warning
 - [ ] No TCP listener or streaming input mode
