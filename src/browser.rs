@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use ratatui::crossterm::event::{
-    self, Event, KeyCode, KeyEventKind, MouseButton, MouseEvent, MouseEventKind,
+    self, Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
 use ratatui::crossterm::execute;
 use ratatui::layout::Rect;
@@ -174,6 +174,10 @@ pub(crate) fn topic_browser(
                         continue;
                     }
                     diag(&format!("=== return=quit key={:?}", key.code));
+                    return Ok(None);
+                }
+                if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
+                    diag("=== return=quit ctrl+c");
                     return Ok(None);
                 }
                 // Swallow escape-sequence fragments so raw `[A`/`[B`

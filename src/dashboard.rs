@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
-use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Stylize};
 use ratatui::text::{Line, Span, Text};
@@ -255,6 +255,9 @@ impl Dashboard {
 
 fn handle_key(key: event::KeyEvent, dash: &mut Dashboard) {
     match key.code {
+        KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            dash.exit = true;
+        }
         KeyCode::Char('q') | KeyCode::Esc => dash.exit = true,
         KeyCode::Char('b') => {
             dash.browse = true;
