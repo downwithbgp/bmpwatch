@@ -1,13 +1,15 @@
-<p align="center">
-  <strong>A terminal-native RouteViews BMP stream monitor with RPKI validation.</strong>
-</p>
+<div align="center">
 
-<p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
-  <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Rust-stable-orange.svg" alt="Rust stable"></a>
-  <img src="https://img.shields.io/badge/status-experimental-yellow.svg" alt="Status: experimental">
-  <img src="https://img.shields.io/badge/version-0.1.0-lightgrey.svg" alt="Version: 0.1.0">
-</p>
+# bmpwatch
+
+**A terminal-native RouteViews BMP stream monitor with RPKI validation.**
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Rust stable](https://img.shields.io/badge/Rust-stable-orange.svg)](https://www.rust-lang.org)
+[![Status: experimental](https://img.shields.io/badge/status-experimental-yellow.svg)](https://github.com/downwithbgp/bmpwatch)
+[![Version: 0.1.0](https://img.shields.io/badge/version-0.1.0-lightgrey.svg)](Cargo.toml)
+
+</div>
 
 bmpwatch connects to RouteViews' public BMP Kafka streams and provides an
 interactive TUI dashboard for live route monitoring. It consumes
@@ -205,9 +207,10 @@ sources are unavailable):
 Before showing a Kafka topic in the browser, bmpwatch checks whether the
 `(collector, ASN)` pair appears in the active peering inventory (fetched from
 RouteViews' peering-status page, with a bundled TSV fallback). Topics for
-dead, inactive, or reserved peerings are hidden. Hidden topics and fetch
-failures are logged to stderr. Set `BMPWATCH_DEBUG_PEERING=1` to list every
-hidden topic.
+dead, inactive, or reserved peerings are hidden. Normal TUI operation produces
+no peering diagnostics on stderr. Set `BMPWATCH_DEBUG_PEERING=1` to write
+peering diagnostics and hidden-topic listings to
+`/tmp/bmpwatch-peering.log`.
 
 ## RPKI validation
 
@@ -273,10 +276,11 @@ cargo clippy --all-targets -- -D warnings
 
 ### Debug flags
 
-| Variable | Effect |
-|----------|--------|
-| `BMPWATCH_BROWSER_DEBUG` | Log browser event-loop diagnostics to `/tmp/bmpwatch-browser-debug.log` |
-| `BMPWATCH_DEBUG_PEERING` | List every Kafka topic hidden by the active-peering filter |
+| Variable | Log file | Effect |
+|----------|----------|--------|
+| `BMPWATCH_BROWSER_DEBUG` | `/tmp/bmpwatch-browser-debug.log` | Browser event-loop diagnostics and mouse-capture warnings |
+| `BMPWATCH_DEBUG_PEERING` | `/tmp/bmpwatch-peering.log` | Peering-filter diagnostics and hidden-topic listings |
+| `BMPWATCH_DASHBOARD_DEBUG` | `/tmp/bmpwatch-dashboard.log` | Kafka poll errors during dashboard operation |
 
 ## Limitations
 
@@ -297,4 +301,4 @@ cargo clippy --all-targets -- -D warnings
 
 ## License
 
-MIT
+MIT © 2026 Vadim Petrov
