@@ -10,6 +10,10 @@ repository = "https://github.com/downwithbgp/bmpwatch"
 name = "bmpwatch"
 path = "src/main.rs"
 
+[[bin]]
+name = "record_openbmp_kafka"
+path = "src/bin/record_openbmp_kafka.rs"
+
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
