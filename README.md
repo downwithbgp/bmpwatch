@@ -165,7 +165,7 @@ panel shows Prefix Flaps grouped by origin ASN.
 |-------|--------|
 | Type / Backspace | Filter streams by ASN, name, collector, or topic |
 | `↑` `↓` / mouse wheel | Navigate within the active pane |
-| `Tab` | Switch pane (collectors ↔ streams) |
+| `←` `→` / `Tab` | Switch pane (collectors ↔ streams) |
 | `Enter` / double-click | Connect to the selected stream |
 | `Esc` / `Ctrl+C` | Exit application |
 

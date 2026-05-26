@@ -213,6 +213,14 @@ pub(crate) fn topic_browser(
                         model.apply(model::Action::SwitchPane);
                         click_tracker.reset();
                     }
+                    KeyCode::Left => {
+                        model.apply(model::Action::FocusCollectors);
+                        click_tracker.reset();
+                    }
+                    KeyCode::Right => {
+                        model.apply(model::Action::FocusStreams);
+                        click_tracker.reset();
+                    }
                     KeyCode::Enter => {
                         let result = model.apply(model::Action::Enter);
                         click_tracker.reset();
@@ -567,6 +575,8 @@ mod model {
         MoveUp,
         MoveDown,
         SwitchPane,
+        FocusCollectors,
+        FocusStreams,
         TypeChar(char),
         Backspace,
         Enter,
@@ -769,6 +779,8 @@ mod model {
                 Action::MoveUp => self.do_move_up(),
                 Action::MoveDown => self.do_move_down(),
                 Action::SwitchPane => self.do_switch_pane(),
+                Action::FocusCollectors => self.do_focus_collectors(),
+                Action::FocusStreams => self.do_focus_streams(),
                 Action::TypeChar(c) => {
                     self.filter.push(c);
                     self.rebuild_filter();
@@ -864,6 +876,21 @@ mod model {
                     if !self.filtered_indices.is_empty() {
                         self.active_pane = Pane::Collectors;
                     }
+                }
+            }
+        }
+
+        fn do_focus_collectors(&mut self) {
+            if !self.filtered_indices.is_empty() {
+                self.active_pane = Pane::Collectors;
+            }
+        }
+
+        fn do_focus_streams(&mut self) {
+            if self.visible_stream_count() > 0 {
+                self.active_pane = Pane::Streams;
+                if self.selected_stream.is_none() {
+                    self.selected_stream = self.first_useful_visible_stream();
                 }
             }
         }
@@ -1457,6 +1484,71 @@ mod model {
             m.apply(Action::SwitchPane);
             assert_eq!(m.active_pane, Pane::Collectors);
             assert!(m.selected_stream.is_none());
+            assert_invariants(&m);
+        }
+
+        // ── Left/Right arrow pane focus ──
+
+        #[test]
+        fn test_left_arrow_focuses_collectors() {
+            let mut m = BrowserModel::new(&test_topics());
+            m.apply(Action::FocusStreams);
+            assert_eq!(m.active_pane, Pane::Streams);
+            m.apply(Action::FocusCollectors);
+            assert_eq!(m.active_pane, Pane::Collectors);
+            assert_invariants(&m);
+        }
+
+        #[test]
+        fn test_right_arrow_focuses_streams() {
+            let mut m = BrowserModel::new(&test_topics());
+            m.selected_stream = None;
+            assert_eq!(m.active_pane, Pane::Collectors);
+            m.apply(Action::FocusStreams);
+            assert_eq!(m.active_pane, Pane::Streams);
+            assert!(
+                m.selected_stream.is_some(),
+                "Right arrow should select first visible stream when none selected"
+            );
+            assert_invariants(&m);
+        }
+
+        #[test]
+        fn test_left_arrow_from_empty_collectors_stays() {
+            let mut m = BrowserModel::new(&[]);
+            m.active_pane = Pane::Streams; // simulate previous move
+            m.apply(Action::FocusCollectors);
+            // No collectors exist, stays on Streams (which is also empty)
+            assert_invariants(&m);
+        }
+
+        #[test]
+        fn test_right_arrow_from_empty_streams_stays() {
+            let mut m = BrowserModel::new(&[]);
+            m.active_pane = Pane::Collectors;
+            m.apply(Action::FocusStreams);
+            assert_eq!(m.active_pane, Pane::Collectors); // no streams to focus
+            assert_invariants(&m);
+        }
+
+        #[test]
+        fn test_tab_still_toggles_both_ways() {
+            let mut m = BrowserModel::new(&test_topics());
+            m.selected_stream = None;
+            // Collectors → Streams
+            m.apply(Action::SwitchPane);
+            assert_eq!(m.active_pane, Pane::Streams);
+            // Streams → Collectors
+            m.apply(Action::SwitchPane);
+            assert_eq!(m.active_pane, Pane::Collectors);
+            assert_invariants(&m);
+        }
+
+        #[test]
+        fn test_q_still_types_into_filter() {
+            let mut m = BrowserModel::new(&test_topics());
+            m.apply(Action::TypeChar('q'));
+            assert_eq!(m.filter, "q");
             assert_invariants(&m);
         }
 
