@@ -18,7 +18,8 @@ framing, resolves AS names from multiple data sources, and cross-checks
 announced prefixes against RPKI VRPs loaded from an RTR server.
 
 > **Status:** experimental, pre-1.0, active development. CLI and TUI interfaces
-> may change. Not yet published to crates.io — build from source.
+> may change. Published to crates.io and available as prebuilt GitHub Release
+> artifacts for Linux and macOS.
 
 ```
  Interface    terminal UI (ratatui + crossterm)
