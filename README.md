@@ -6,8 +6,8 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Rust stable](https://img.shields.io/badge/Rust-stable-orange.svg)](https://www.rust-lang.org)
-[![Status: experimental](https://img.shields.io/badge/status-experimental-yellow.svg)](https://github.com/downwithbgp/bmpwatch)
-[![Version: 0.1.0](https://img.shields.io/badge/version-0.1.0-lightgrey.svg)](Cargo.toml)
+[![CI](https://github.com/downwithbgp/bmpwatch/actions/workflows/ci.yml/badge.svg)](https://github.com/downwithbgp/bmpwatch/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/bmpwatch.svg)](https://crates.io/crates/bmpwatch)
 
 </div>
 
