@@ -10,10 +10,6 @@ repository = "https://github.com/downwithbgp/bmpwatch"
 name = "bmpwatch"
 path = "src/main.rs"
 
-[[bin]]
-name = "record_openbmp_kafka"
-path = "src/bin/record_openbmp_kafka.rs"
-
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
@@ -31,3 +27,8 @@ ureq = "3"
 [dev-dependencies]
 tempfile = "3"
 portable-pty = "0.8"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
