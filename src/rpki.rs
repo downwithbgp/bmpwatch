@@ -57,10 +57,14 @@ pub struct RPKICache {
     not_found_count: u64,
 }
 
+/// RPKI VRP cache TTL — 72 hours. ROA data changes slowly; refetching on
+/// every TUI start is unnecessary and impolite to the RTR server.
+const RPKI_CACHE_TTL_SECS: u64 = 72 * 3600;
+
 impl RPKICache {
     pub fn load_or_download(host: &str, port: u16) -> Result<Self, String> {
         let cache_path = rpki_cache_path();
-        let cache_max_age = Duration::from_secs(6 * 3600);
+        let cache_max_age = Duration::from_secs(RPKI_CACHE_TTL_SECS);
 
         if let Ok(meta) = fs::metadata(&cache_path) {
             if let Ok(mtime) = meta.modified() {
@@ -886,6 +890,11 @@ mod tests {
 
         assert_eq!(cache.validate("172.16.5.0/24", 555).0, Status::Valid);
         assert_eq!(cache.validate("172.16.5.0/24", 777).0, Status::Valid);
+    }
+
+    #[test]
+    fn test_cache_ttl_is_72_hours() {
+        assert_eq!(RPKI_CACHE_TTL_SECS, 72 * 3600);
     }
 
     /// Helper: parse "a.b.c.d" into a u32 in network byte order.
