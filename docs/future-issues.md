@@ -5,7 +5,7 @@ Historical tags (`v0.1.*`) are checkpoints, not polished releases.
 ## Implemented (archived)
 
 ### 1. record_openbmp_kafka.rs
-**Status:** Implemented and verified. Standalone binary at `src/bin/record_openbmp_kafka.rs`.
+**Status:** Implemented and verified. Standalone binary in `record_openbmp_kafka/src/main.rs`.
 
 ### 2. --format bmpd
 **Status:** Implemented and verified. Container parsing + OpenBMP unwrap.

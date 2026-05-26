@@ -5,7 +5,7 @@ Record of a verified end-to-end test against a live RouteViews Kafka capture.
 ## Capture
 
 ```sh
-cargo run --bin record_openbmp_kafka -- \
+cargo run -p record_openbmp_kafka -- \
   --broker stream.routeviews.org:9092 \
   --topic-regex '^routeviews.*\.bmp_raw$' \
   --out samples/routeviews-broad-100.bmpd \

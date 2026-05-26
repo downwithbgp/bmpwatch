@@ -47,16 +47,16 @@ Use the recorder's built-in topic discovery:
 
 ```sh
 # List all topics from a collector group
-cargo run --bin record_openbmp_kafka -- --list-topics --collector chicago
+cargo run -p record_openbmp_kafka -- --list-topics --collector chicago
 
 # List by peer ASN
-cargo run --bin record_openbmp_kafka -- --list-topics --asn 13335
+cargo run -p record_openbmp_kafka -- --list-topics --asn 13335
 
 # Narrow to one collector + one ASN
-cargo run --bin record_openbmp_kafka -- --list-topics --collector chicago --asn 13335
+cargo run -p record_openbmp_kafka -- --list-topics --collector chicago --asn 13335
 
 # JSON output for scripts
-cargo run --bin record_openbmp_kafka -- --list-topics-json --collector nwax
+cargo run -p record_openbmp_kafka -- --list-topics-json --collector nwax
 ```
 
 `--collector` filters by a case-insensitive fragment in the topic name
@@ -74,10 +74,10 @@ kcat -b stream.routeviews.org:9092 -L
 
 ```sh
 # Step 1: find a topic
-cargo run --bin record_openbmp_kafka -- --list-topics --asn 13335
+cargo run -p record_openbmp_kafka -- --list-topics --asn 13335
 
 # Step 2: record from that exact topic
-cargo run --bin record_openbmp_kafka -- \
+cargo run -p record_openbmp_kafka -- \
   --topic routeviews.chicago.13335.bmp_raw \
   --out samples/chicago-13335.bmpd \
   --max-messages 100
@@ -130,13 +130,13 @@ BMP messages to a `.bmpd` file:
 
 ```sh
 # Exact topic
-cargo run --bin record_openbmp_kafka -- \
+cargo run -p record_openbmp_kafka -- \
   --topic routeviews.nwax.13335.bmp_raw \
   --out samples/nwax-sample.bmpd \
   --max-messages 100
 
 # Topic regex (subscribes to all matching topics)
-cargo run --bin record_openbmp_kafka -- \
+cargo run -p record_openbmp_kafka -- \
   --topic-regex '^route-?views\..*\.bmp_raw$' \
   --out samples/routeviews-sample.bmpd \
   --max-messages 10 \
@@ -164,6 +164,6 @@ bmpwatch dump samples/nwax-sample.bmpd --jsonl | head -5
 
 - Messages arrive as raw BMP frames (common header + payload). RouteViews
   Kafka payloads are typically OpenBMP `OBMP`-wrapped.
-- The `record_openbmp_kafka` binary (at `src/bin/record_openbmp_kafka.rs`)
+- The `record_openbmp_kafka` binary (at `record_openbmp_kafka/src/main.rs`)
   adds the `BMPDOPENBMP1` + `u32` BE length wrapper to each frame on write.
 - The broker may throttle or close connections that consume too fast.

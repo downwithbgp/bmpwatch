@@ -135,7 +135,7 @@ Expected: `malformed_messages=0`, `total_messages=2`.
 ### Record a capture (network required)
 
 ```sh
-cargo run --bin record_openbmp_kafka -- \
+cargo run -p record_openbmp_kafka -- \
   --topic-regex '^routeviews.*\.bmp_raw$' \
   --out samples/capture.bmpd \
   --max-messages 100
@@ -266,12 +266,12 @@ bmpwatch refresh-asnames --stale
 # Build
 cargo build
 
-# Run all tests (unit + integration)
-cargo test
+# Run all tests (unit + integration, entire workspace)
+cargo test --workspace
 
 # Format and lint (must pass before committing)
 cargo fmt --check
-cargo clippy --all-targets -- -D warnings
+cargo clippy --workspace --all-targets -- -D warnings
 ```
 
 ### Debug flags

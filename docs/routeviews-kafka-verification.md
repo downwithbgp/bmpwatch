@@ -79,7 +79,7 @@ Metadata for all topics (from broker -1: stream.routeviews.org:9092/bootstrap):
 ### Verified recorder smoke test
 
 ```sh
-cargo run --bin record_openbmp_kafka -- \
+cargo run -p record_openbmp_kafka -- \
   --broker stream.routeviews.org:9092 \
   --topic-regex '^routeviews.*\.bmp_raw$' \
   --out samples/routeviews-broad-100.bmpd \

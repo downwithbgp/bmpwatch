@@ -8,8 +8,8 @@ Project architecture and development guide for BMPWatch.
 # Build
 cargo build
 
-# Run all tests
-cargo test
+# Run all tests (entire workspace)
+cargo test --workspace
 
 # Run a single test (any substring match)
 cargo test obmp_reader::tests::test_committed_fixture_two_openbmp_records
@@ -18,7 +18,7 @@ cargo test obmp_reader::tests::test_committed_fixture_two_openbmp_records
 cargo run --bin bmpwatch -- inspect <file> [--summary-json] [--format auto|raw-bmp|bmpd]
 
 # Run the Kafka recorder binary
-cargo run --bin record_openbmp_kafka -- --out samples/capture.bmpd --max-messages 100
+cargo run -p record_openbmp_kafka -- --out samples/capture.bmpd --max-messages 100
 
 # Install binaries to ~/.cargo/bin/
 cargo install --path .
@@ -26,7 +26,7 @@ cargo install --path .
 
 ## Architecture
 
-BMP stream viewer and diagnostic tool for BGP Monitoring Protocol (RFC 7854). Two binaries from one crate: `bmpwatch` (main CLI) and `record_openbmp_kafka` (Kafka recorder for public BMP feeds).
+BMP stream viewer and diagnostic tool for BGP Monitoring Protocol (RFC 7854). Two binaries in a Cargo workspace: `bmpwatch` (main CLI in the root crate) and `record_openbmp_kafka` (Kafka recorder in its own workspace crate).
 
 ### Input pipeline
 
@@ -77,7 +77,7 @@ File → format detection (input.rs) → Iterator (RawBmpIterator or ObmpReader)
 | `dashboard.rs` | Live TUI dashboard: message log, RPKI, Prefix Flaps, AS name resolution (cache-based, no network I/O) |
 | `peering.rs` | Active peering filter: fetches RouteViews peering-status page, caches for 15 min, filters Kafka topics |
 | `asnames.rs` | Team Cymru bulk WHOIS client for offline AS name cache refresh (`bmpwatch refresh-asnames`) |
-| `bin/record_openbmp_kafka.rs` | Separate binary: Kafka consumer for public BMP feeds, writes `.bmpd` via ObmpWriter |
+| `record_openbmp_kafka/src/main.rs` | Recorder crate: Kafka consumer for public BMP feeds, writes `.bmpd` via ObmpWriter |
 
 ### Lint rules (8)
 
