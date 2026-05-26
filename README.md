@@ -26,10 +26,9 @@ announced prefixes against RPKI VRPs loaded from an RTR server.
 
 ## Preview
 
-<!-- Screenshot coming soon. Save TUI screenshots under docs/screenshots/
-     and uncomment the line below:
-![bmpwatch topic browser](docs/screenshots/topic-browser.png)
--->
+![bmpwatch topic browser showing RouteViews collectors, stream search, AS names, and prefix counts](docs/screenshots/topic-browser.png)
+
+![bmpwatch stream view showing live route updates, AS paths, RPKI state, and prefix flap tracking](docs/screenshots/stream-view.png)
 
 ## What it does
 
