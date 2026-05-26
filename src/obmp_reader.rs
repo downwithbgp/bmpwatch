@@ -8,6 +8,10 @@ use crate::error::DoctorError;
 use crate::obmp_writer::MAGIC;
 use crate::raw_bmp::{parse_frame_from_bytes, RawBmpFrame};
 
+/// Maximum `.bmpd` record payload length (64 MiB). Realistic BMP frames are
+/// well under 1 MB; this bound prevents OOM from a malicious length prefix.
+const MAX_PAYLOAD_LEN: usize = 64 * 1024 * 1024;
+
 /// Payload classification for `.bmpd` container records.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PayloadKind {
@@ -257,6 +261,13 @@ impl Iterator for ObmpReader {
 
         self.file_offset += 4;
         let payload_len = u32::from_be_bytes(len_buf) as usize;
+
+        if payload_len > MAX_PAYLOAD_LEN {
+            self.eof = true;
+            return Some(Err(DoctorError::Frame(format!(
+                "Payload length {payload_len} exceeds maximum {MAX_PAYLOAD_LEN}"
+            ))));
+        }
 
         let mut payload = vec![0u8; payload_len];
         match self.reader.read_exact(&mut payload) {
@@ -788,5 +799,22 @@ mod tests {
         let frames: Vec<_> = reader.collect();
         assert_eq!(frames.len(), 1);
         assert!(frames[0].is_err());
+    }
+
+    #[test]
+    fn test_payload_length_exceeds_max() {
+        // A length prefix near u32::MAX must not cause a huge allocation.
+        let mut buf = Vec::from(crate::obmp_writer::MAGIC.as_slice());
+        buf.extend_from_slice(&u32::MAX.to_be_bytes());
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&buf).unwrap();
+        let path = tmp.into_temp_path();
+
+        let reader = ObmpReader::open(&path).unwrap();
+        let frames: Vec<_> = reader.collect();
+        assert_eq!(frames.len(), 1);
+        let err = frames[0].as_ref().unwrap_err().to_string();
+        assert!(err.contains("exceeds maximum"));
     }
 }

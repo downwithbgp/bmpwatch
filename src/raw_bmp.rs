@@ -438,7 +438,9 @@ pub fn parse_frame_from_bytes(data: &[u8], file_offset: u64) -> Result<RawBmpFra
     };
 
     let stats_info = match msg_type {
-        Some(BmpMessageType::StatisticsReport) => parse_stats(&payload[BMP_PER_PEER_HEADER_SIZE..]),
+        Some(BmpMessageType::StatisticsReport) => payload
+            .get(BMP_PER_PEER_HEADER_SIZE..)
+            .and_then(parse_stats),
         _ => None,
     };
 
@@ -551,9 +553,9 @@ impl Iterator for RawBmpIterator {
         };
 
         let stats_info = match msg_type {
-            Some(BmpMessageType::StatisticsReport) => {
-                parse_stats(&payload[BMP_PER_PEER_HEADER_SIZE..])
-            }
+            Some(BmpMessageType::StatisticsReport) => payload
+                .get(BMP_PER_PEER_HEADER_SIZE..)
+                .and_then(parse_stats),
             _ => None,
         };
 
@@ -1015,5 +1017,33 @@ mod tests {
         buf.extend_from_slice(&(value.len() as u16).to_be_bytes());
         buf.extend_from_slice(value);
         buf
+    }
+
+    #[test]
+    fn test_short_statistics_report_no_panic() {
+        // Crafted 8-byte frame that would panic before C1 fix:
+        // version=3, msg_len=8, type=1 (StatisticsReport), 2 payload bytes.
+        // payload.len() = 2 < BMP_PER_PEER_HEADER_SIZE (42), so slicing panics.
+        let frame: [u8; 8] = [0x03, 0x00, 0x00, 0x00, 0x08, 0x01, 0xFF, 0xFF];
+        let result = parse_frame_from_bytes(&frame, 0).unwrap();
+        assert_eq!(result.msg_type, Some(BmpMessageType::StatisticsReport));
+        // stats_info should be None, not panic
+        assert!(result.stats_info.is_none());
+    }
+
+    #[test]
+    fn test_short_statistics_report_iterator_no_panic() {
+        // Same crafted 8-byte frame, but exercised through RawBmpIterator.
+        let frame: [u8; 8] = [0x03, 0x00, 0x00, 0x00, 0x08, 0x01, 0xFF, 0xFF];
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&frame).unwrap();
+        let path = tmp.into_temp_path();
+
+        let iter = RawBmpIterator::open(&path).unwrap();
+        let frames: Vec<_> = iter.collect::<Result<Vec<_>, _>>().unwrap();
+        assert_eq!(frames.len(), 1);
+        assert_eq!(frames[0].msg_type, Some(BmpMessageType::StatisticsReport));
+        assert!(frames[0].stats_info.is_none());
     }
 }

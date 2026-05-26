@@ -27,6 +27,7 @@ pub const RULE_ROUTE_MONITORING_BEFORE_PEER_UP: &str = "route_monitoring_before_
 pub const RULE_DUPLICATE_PEER_UP: &str = "duplicate_peer_up";
 pub const RULE_PEER_DOWN_WITHOUT_PEER_UP: &str = "peer_down_without_peer_up";
 pub const RULE_TIMESTAMP_REGRESSION: &str = "timestamp_regression";
+pub const RULE_TRUNCATED_PEER_DOWN_REASON: &str = "truncated_peer_down_reason";
 
 pub fn finding_invalid_version(offset: u64, version: u8) -> Finding {
     Finding {
@@ -139,6 +140,20 @@ pub fn finding_timestamp_regression(
             prev_us,
             curr_secs,
             curr_us,
+        ),
+    }
+}
+
+pub fn finding_truncated_peer_down_reason(offset: u64, peer: crate::state::PeerKey) -> Finding {
+    Finding {
+        severity: Severity::Error,
+        rule: RULE_TRUNCATED_PEER_DOWN_REASON.to_string(),
+        offset: Some(offset),
+        peer: Some(peer.clone()),
+        message: format!(
+            "Peer Down Notification for peer {} at offset {} missing mandatory reason byte (payload too short)",
+            peer.display(),
+            offset,
         ),
     }
 }

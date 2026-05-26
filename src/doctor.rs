@@ -164,18 +164,24 @@ impl Doctor {
         let mut parse_ok = true;
 
         if frame_findings.is_empty() && msg_type.is_some() {
-            match try_bgpkit_parse(&frame.full_data) {
-                Ok(count) => {
-                    bgp_elems_count = count;
-                    self.state.bgp_elem_count += count;
-                }
-                Err(err_msg) => {
-                    parse_ok = false;
-                    frame_findings.push(lint::finding_parse_error(
-                        frame.offset,
-                        peer_key.clone(),
-                        err_msg,
-                    ));
+            let should_parse = matches!(
+                msg_type,
+                Some(BmpMessageType::RouteMonitoring | BmpMessageType::RouteMirroringMessage)
+            );
+            if should_parse {
+                match try_bgpkit_parse(&frame.full_data) {
+                    Ok(count) => {
+                        bgp_elems_count = count;
+                        self.state.bgp_elem_count += count;
+                    }
+                    Err(err_msg) => {
+                        parse_ok = false;
+                        frame_findings.push(lint::finding_parse_error(
+                            frame.offset,
+                            peer_key.clone(),
+                            err_msg,
+                        ));
+                    }
                 }
             }
         }
@@ -237,11 +243,16 @@ impl Doctor {
                     // 2=Local system closed (admin), 3=Remote system closed,
                     // 4=Remote notification, 5=Peer de-configured, 6=Local
                     // system terminated, 7=Local system exhausted resources.
-                    let reason = frame
-                        .payload
-                        .get(BMP_PER_PEER_HEADER_SIZE)
-                        .copied()
-                        .unwrap_or(0);
+                    let reason = match frame.payload.get(BMP_PER_PEER_HEADER_SIZE) {
+                        Some(&r) => r,
+                        None => {
+                            frame_findings.push(lint::finding_truncated_peer_down_reason(
+                                frame.offset,
+                                pk.clone(),
+                            ));
+                            0
+                        }
+                    };
                     peer.last_peer_down_reason = Some(reason);
                     if !peer.active {
                         frame_findings.push(lint::finding_peer_down_without_peer_up(
@@ -457,8 +468,8 @@ mod tests {
         assert_eq!(peer.peer_down_count, 1);
         assert!(!peer.active);
 
-        // Ignore parse errors from bgpkit-parser on synthetic BGP data.
-        // Core diagnostics: no peer lifecycle warnings.
+        // bgpkit-parser is only invoked for RouteMonitoring/RouteMirroring,
+        // not for PeerUp/PeerDown/Stats/etc., so no spurious parse_error here.
         let peer_lint_rules: Vec<_> = doctor
             .state
             .findings
@@ -958,6 +969,35 @@ mod tests {
             .findings
             .iter()
             .any(|f| f.rule == "invalid_bmp_version"));
+    }
+
+    #[test]
+    fn test_peer_down_missing_reason_byte() {
+        // PeerDown with only the Per-Peer Header and no reason byte.
+        // msg_len = 6 + 42 = 48, payload is exactly 42 bytes (PPH only).
+        let pph = fixtures::make_per_peer_header(65000, [10, 0, 0, 1], 100, 0);
+        let header = fixtures::make_common_header(2, pph.len() as u32); // type=2 PeerDown
+        let mut frame = Vec::new();
+        frame.extend_from_slice(&header);
+        frame.extend_from_slice(&pph);
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&frame).unwrap();
+        let path = tmp.into_temp_path();
+
+        let mut doctor = Doctor::new(&path).unwrap();
+        doctor.process(false).unwrap();
+
+        assert_eq!(doctor.state.total_messages, 1);
+        let has_truncated_reason = doctor
+            .state
+            .findings
+            .iter()
+            .any(|f| f.rule == "truncated_peer_down_reason");
+        assert!(
+            has_truncated_reason,
+            "Expected truncated_peer_down_reason finding"
+        );
     }
 
     #[test]
