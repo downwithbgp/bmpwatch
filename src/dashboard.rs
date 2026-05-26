@@ -4,8 +4,10 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
+use ratatui::crossterm::execute;
+use ratatui::crossterm::terminal::{Clear, ClearType};
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Color, Stylize};
+use ratatui::style::{Color, Style, Stylize};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::{DefaultTerminal, Frame};
@@ -258,11 +260,11 @@ fn handle_key(key: event::KeyEvent, dash: &mut Dashboard) {
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             dash.exit = true;
         }
-        KeyCode::Char('q') | KeyCode::Esc => dash.exit = true,
-        KeyCode::Char('b') => {
+        KeyCode::Char('q') | KeyCode::Char('b') => {
             dash.browse = true;
             dash.exit = true;
         }
+        KeyCode::Esc => dash.exit = true,
         KeyCode::Char('p') => dash.paused = !dash.paused,
         KeyCode::Char('c') => dash.show_communities = !dash.show_communities,
         _ => {}
@@ -339,6 +341,9 @@ pub(crate) fn run_dashboard(
 
         let mut dash = Dashboard::new(&chosen, window_messages);
 
+        // Clear browser artifacts before entering the dashboard.
+        force_terminal_clear(&mut terminal)?;
+
         // Load caches and RPKI inside the TUI (no shell output)
         terminal.draw(|f| render_loading(f, f.area(), &chosen, broker))?;
         load_as_name_cache();
@@ -399,7 +404,7 @@ pub(crate) fn run_dashboard(
             return result;
         }
 
-        // User pressed 'b' — back to browser without leaving alternate screen.
+        // User pressed 'q' or 'b' — back to browser without leaving alternate screen.
         let all = kafka::fetch_topics(broker, "^routeviews.*\\.bmp_raw$")?;
         let mut filtered = kafka::apply_filters(all, None, None);
         filtered.sort_by(|a, b| {
@@ -409,6 +414,10 @@ pub(crate) fn run_dashboard(
         });
         let active = crate::peering::load_active_peering_set();
         filtered = crate::peering::filter_active_topics(&filtered, &active);
+
+        // Clear dashboard artifacts before re-entering the browser.
+        force_terminal_clear(&mut terminal)?;
+
         match topic_browser(&mut terminal, &filtered)? {
             Some(t) => chosen = t,
             None => {
@@ -692,6 +701,21 @@ pub(crate) fn as_name(asn_str: &str) -> String {
     as_name_resolve(asn)
 }
 
+/// Force-clear the terminal and reset ratatui's internal buffer so the
+/// next draw starts from a clean slate.  Call this at every mode/view
+/// transition (browser → dashboard, dashboard → browser) to prevent
+/// stale cells or stderr artifacts from the previous view.
+fn force_terminal_clear(terminal: &mut DefaultTerminal) -> Result<()> {
+    // Clear the physical display (also removes any stderr garbage).
+    execute!(terminal.backend_mut(), Clear(ClearType::All))?;
+    // Overwrite every cell in ratatui's buffer with a reset style so the
+    // next real draw diffs against a clean baseline and flushes all cells.
+    terminal.draw(|f| {
+        f.render_widget(Block::new().style(Style::reset()), f.area());
+    })?;
+    Ok(())
+}
+
 fn topic_browser(terminal: &mut DefaultTerminal, topics: &[String]) -> Result<Option<String>> {
     crate::browser::topic_browser(terminal, topics)
 }
@@ -830,7 +854,7 @@ fn render_status_bar(frame: &mut Frame, area: Rect, dash: &Dashboard) {
         format!(" msgs:{}", dash.total_messages)
     };
     let keys = format!(
-        " [q]quit [b]browse [c]comms{} [p]{}",
+        " [q/b]back [c]comms{} [p]{}",
         if dash.show_communities { ":on" } else { "" },
         if dash.paused { "resume" } else { "pause" },
     );
@@ -921,7 +945,9 @@ fn render_message_log(frame: &mut Frame, area: Rect, dash: &Dashboard) {
                     Some(crate::rpki::Status::NotFound) => Color::Gray,
                     None => Color::Gray,
                 };
-                let rpki_hint = pc.rpki_detail.as_ref().map(|d| {
+                // Suppress empty hints (e.g. when multiple ASNs are
+                // authorized and expected_asn is None with no max_len issue).
+                let rpki_hint = pc.rpki_detail.as_ref().and_then(|d| {
                     let mut parts = Vec::new();
                     if let Some(expected) = d.expected_asn {
                         let name = as_name_resolve(expected);
@@ -934,8 +960,19 @@ fn render_message_log(frame: &mut Frame, area: Rect, dash: &Dashboard) {
                     if let Some(max_len) = d.max_prefix_len {
                         parts.push(format!("max /{max_len}"));
                     }
-                    parts.join(", ")
+                    if parts.is_empty() {
+                        None
+                    } else {
+                        Some(parts.join(", "))
+                    }
                 });
+                // RPKI-driven origin color: valid → green, wrong-asn → yellow,
+                // otherwise dim. Shared by the path ASN and the origin name.
+                let origin_rpki_color = match pc.rpki {
+                    Some(crate::rpki::Status::Valid) => Color::Green,
+                    Some(crate::rpki::Status::InvalidWrongAsn) => Color::Yellow,
+                    _ => Color::DarkGray,
+                };
                 let display_path = strip_known_prefix(&pc.as_path, dash);
                 let path_str = compact_path(&display_path);
                 for (p, _) in &pc.announced {
@@ -951,28 +988,18 @@ fn render_message_log(frame: &mut Frame, area: Rect, dash: &Dashboard) {
                             if let Some((transit, origin)) = path_str.rsplit_once(" → ") {
                                 let transit_owned = format!("  {transit} → ");
                                 let origin_owned = origin.to_string();
-                                let origin_color = match pc.rpki {
-                                    Some(crate::rpki::Status::Valid) => Color::Green,
-                                    Some(crate::rpki::Status::InvalidWrongAsn) => Color::Yellow,
-                                    _ => Color::DarkGray,
-                                };
                                 spans.push(Span::styled(transit_owned, Color::DarkGray));
-                                spans.push(Span::styled(origin_owned, origin_color));
+                                spans.push(Span::styled(origin_owned, origin_rpki_color));
                             }
                         } else {
-                            let color = match pc.rpki {
-                                Some(crate::rpki::Status::Valid) => Color::Green,
-                                Some(crate::rpki::Status::InvalidWrongAsn) => Color::Yellow,
-                                _ => Color::DarkGray,
-                            };
                             let owned = format!("  {path_str}");
-                            spans.push(Span::styled(owned, color));
+                            spans.push(Span::styled(owned, origin_rpki_color));
                         }
                     }
                     if let Some(ref hint) = rpki_hint {
                         spans.push(Span::from(format!("  ({hint})")).yellow());
                     }
-                    // Origin AS name (last hop)
+                    // Origin AS name — follows RPKI status, not hardcoded yellow.
                     if let Some(origin) = display_path.last() {
                         let name = as_name_resolve(*origin);
                         if !name.is_empty() && !name.starts_with("AS") {
@@ -982,7 +1009,7 @@ fn render_message_log(frame: &mut Frame, area: Rect, dash: &Dashboard) {
                                 name
                             };
                             spans.push(Span::raw(" "));
-                            spans.push(Span::styled(truncated, Color::Yellow));
+                            spans.push(Span::styled(truncated, origin_rpki_color));
                         }
                     }
                     // Show communities (max 3, only when toggled on)

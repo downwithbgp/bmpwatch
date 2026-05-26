@@ -249,6 +249,12 @@ impl RPKICache {
 
     // ── IPv4 validation ──
 
+    /// Validate a prefix against all covering VRPs.
+    ///
+    /// A route is VALID if **any** covering VRP authorizes the prefix
+    /// with a matching origin ASN and sufficient maxLength.  It is
+    /// INVALID only when covering VRPs exist but *none* match the origin
+    /// ASN.  It is UNKNOWN when no covering VRP exists at all.
     fn validate_v4(&mut self, addr: u32, prefix_len: u8, asn: u32) -> Status {
         let network = addr
             & if prefix_len == 0 {
@@ -256,6 +262,10 @@ impl RPKICache {
             } else {
                 !0u32 << (32 - prefix_len)
             };
+        let mut covering_valid_asn = false;
+        let mut covering_wrong_asn = false;
+        let mut any_too_long = false;
+
         for vrp_plen in (0..=prefix_len).rev() {
             let mask = if vrp_plen == 0 {
                 0
@@ -272,26 +282,39 @@ impl RPKICache {
                     let v = &self.vrps4[i];
                     if v.prefix_len == vrp_plen {
                         if v.max_len >= prefix_len {
-                            return if v.asn == asn {
-                                self.valid_count += 1;
-                                Status::Valid
+                            if v.asn == asn {
+                                covering_valid_asn = true;
                             } else {
-                                self.invalid_count += 1;
-                                Status::InvalidWrongAsn
-                            };
+                                covering_wrong_asn = true;
+                            }
                         } else {
-                            self.invalid_count += 1;
-                            return Status::InvalidTooLong;
+                            any_too_long = true;
                         }
                     }
                     i += 1;
                 }
             }
         }
-        self.not_found_count += 1;
-        Status::NotFound
+
+        if covering_valid_asn {
+            self.valid_count += 1;
+            Status::Valid
+        } else if covering_wrong_asn {
+            self.invalid_count += 1;
+            Status::InvalidWrongAsn
+        } else if any_too_long {
+            self.invalid_count += 1;
+            Status::InvalidTooLong
+        } else {
+            self.not_found_count += 1;
+            Status::NotFound
+        }
     }
 
+    /// Collect the set of ASNs that are authorized for a prefix by any
+    /// covering VRP.  Returns `Some(asn)` when exactly one ASN is
+    /// authorized; `None` when zero or multiple ASNs are authorized
+    /// (ambiguous — can't point to a single "expected" origin).
     fn lookup_authorized_asn_v4(&self, addr: u32, prefix_len: u8) -> Option<u32> {
         let network = addr
             & if prefix_len == 0 {
@@ -299,6 +322,7 @@ impl RPKICache {
             } else {
                 !0u32 << (32 - prefix_len)
             };
+        let mut authorized: Vec<u32> = Vec::new();
         for vrp_plen in (0..=prefix_len).rev() {
             let mask = if vrp_plen == 0 {
                 0
@@ -313,14 +337,21 @@ impl RPKICache {
                 }
                 while i < self.vrps4.len() && self.vrps4[i].prefix == key {
                     let v = &self.vrps4[i];
-                    if v.prefix_len == vrp_plen && v.max_len >= prefix_len {
-                        return Some(v.asn);
+                    if v.prefix_len == vrp_plen
+                        && v.max_len >= prefix_len
+                        && !authorized.contains(&v.asn)
+                    {
+                        authorized.push(v.asn);
                     }
                     i += 1;
                 }
             }
         }
-        None
+        if authorized.len() == 1 {
+            Some(authorized[0])
+        } else {
+            None
+        }
     }
 
     fn lookup_max_len_v4(&self, addr: u32, prefix_len: u8) -> Option<u8> {
@@ -363,6 +394,10 @@ impl RPKICache {
             } else {
                 !0u128 << (128 - prefix_len)
             };
+        let mut covering_valid_asn = false;
+        let mut covering_wrong_asn = false;
+        let mut any_too_long = false;
+
         for vrp_plen in (0..=prefix_len).rev() {
             let mask = if vrp_plen == 0 {
                 0
@@ -379,24 +414,33 @@ impl RPKICache {
                     let v = &self.vrps6[i];
                     if v.prefix_len == vrp_plen {
                         if v.max_len >= prefix_len {
-                            return if v.asn == asn {
-                                self.valid_count += 1;
-                                Status::Valid
+                            if v.asn == asn {
+                                covering_valid_asn = true;
                             } else {
-                                self.invalid_count += 1;
-                                Status::InvalidWrongAsn
-                            };
+                                covering_wrong_asn = true;
+                            }
                         } else {
-                            self.invalid_count += 1;
-                            return Status::InvalidTooLong;
+                            any_too_long = true;
                         }
                     }
                     i += 1;
                 }
             }
         }
-        self.not_found_count += 1;
-        Status::NotFound
+
+        if covering_valid_asn {
+            self.valid_count += 1;
+            Status::Valid
+        } else if covering_wrong_asn {
+            self.invalid_count += 1;
+            Status::InvalidWrongAsn
+        } else if any_too_long {
+            self.invalid_count += 1;
+            Status::InvalidTooLong
+        } else {
+            self.not_found_count += 1;
+            Status::NotFound
+        }
     }
 
     fn lookup_authorized_asn_v6(&self, addr: u128, prefix_len: u8) -> Option<u32> {
@@ -406,6 +450,7 @@ impl RPKICache {
             } else {
                 !0u128 << (128 - prefix_len)
             };
+        let mut authorized: Vec<u32> = Vec::new();
         for vrp_plen in (0..=prefix_len).rev() {
             let mask = if vrp_plen == 0 {
                 0
@@ -420,14 +465,21 @@ impl RPKICache {
                 }
                 while i < self.vrps6.len() && self.vrps6[i].prefix == key {
                     let v = &self.vrps6[i];
-                    if v.prefix_len == vrp_plen && v.max_len >= prefix_len {
-                        return Some(v.asn);
+                    if v.prefix_len == vrp_plen
+                        && v.max_len >= prefix_len
+                        && !authorized.contains(&v.asn)
+                    {
+                        authorized.push(v.asn);
                     }
                     i += 1;
                 }
             }
         }
-        None
+        if authorized.len() == 1 {
+            Some(authorized[0])
+        } else {
+            None
+        }
     }
 
     fn lookup_max_len_v6(&self, addr: u128, prefix_len: u8) -> Option<u8> {
@@ -692,5 +744,153 @@ mod tests {
         let (s, d) = cache.validate("192.0.2.0/24", 65000);
         assert_eq!(s, Status::InvalidWrongAsn);
         assert_eq!(d.expected_asn, Some(64496));
+    }
+
+    #[test]
+    fn test_multiple_covering_vrps_origin_matches_one_is_valid() {
+        // Regression: 156.244.184.0/24 with AS9294 must be VALID because
+        // 156.244.160.0/19 maxLength 24 AS9294 covers it, even though a
+        // more-specific 156.244.184.0/24 VRP exists for AS17561.
+        let vrps = vec![
+            // 156.244.128.0/17 — network = 156.244.128.0, prefix_len=17
+            Vrp4 {
+                prefix: ip4_net("156.244.128.0"),
+                prefix_len: 17,
+                max_len: 24,
+                asn: 17561,
+            },
+            // 156.244.160.0/19 — network = 156.244.160.0
+            Vrp4 {
+                prefix: ip4_net("156.244.160.0"),
+                prefix_len: 19,
+                max_len: 24,
+                asn: 9294,
+            },
+            // 156.244.184.0/24 — network = 156.244.184.0
+            Vrp4 {
+                prefix: ip4_net("156.244.184.0"),
+                prefix_len: 24,
+                max_len: 24,
+                asn: 17561,
+            },
+        ];
+        let mut cache = RPKICache {
+            vrps4: vrps,
+            vrps6: vec![],
+            valid_count: 0,
+            invalid_count: 0,
+            not_found_count: 0,
+        };
+        cache.vrps4.sort_by_key(|v| v.prefix);
+
+        // AS9294 is authorized by 156.244.160.0/19 maxLength 24 → Valid
+        assert_eq!(cache.validate("156.244.184.0/24", 9294).0, Status::Valid);
+
+        // AS17561 is also authorized (by both the /17 and the exact /24) → Valid
+        assert_eq!(cache.validate("156.244.184.0/24", 17561).0, Status::Valid);
+
+        // AS99999 is not authorized by any covering VRP → InvalidWrongAsn
+        let (s, d) = cache.validate("156.244.184.0/24", 99999);
+        assert_eq!(s, Status::InvalidWrongAsn);
+        // Multiple authorized ASNs (9294, 17561) → no single "expected" origin
+        assert_eq!(d.expected_asn, None);
+    }
+
+    #[test]
+    fn test_exact_match_vrp_does_not_override_other_covering_vrp() {
+        // 10.0.0.0/24 has:
+        //   VRP 10.0.0.0/8  maxLength 24 AS100
+        //   VRP 10.0.0.0/24 maxLength 24 AS200  (exact match)
+        // Origin AS100 must be Valid because the /8 VRP covers it,
+        // even though the exact-match /24 VRP is for AS200.
+        let vrps = vec![
+            Vrp4 {
+                prefix: ip4_net("10.0.0.0"),
+                prefix_len: 8,
+                max_len: 24,
+                asn: 100,
+            },
+            Vrp4 {
+                prefix: ip4_net("10.0.0.0"),
+                prefix_len: 24,
+                max_len: 24,
+                asn: 200,
+            },
+        ];
+        let mut cache = RPKICache {
+            vrps4: vrps,
+            vrps6: vec![],
+            valid_count: 0,
+            invalid_count: 0,
+            not_found_count: 0,
+        };
+        cache.vrps4.sort_by_key(|v| v.prefix);
+
+        assert_eq!(cache.validate("10.0.0.0/24", 100).0, Status::Valid);
+        assert_eq!(cache.validate("10.0.0.0/24", 200).0, Status::Valid);
+        let (s, d) = cache.validate("10.0.0.0/24", 999);
+        assert_eq!(s, Status::InvalidWrongAsn);
+        assert_eq!(d.expected_asn, None);
+    }
+
+    #[test]
+    fn test_single_covering_vrp_expected_asn_unambiguous() {
+        // Only one VRP covers the prefix → expected_asn is unambiguous.
+        let vrps = vec![Vrp4 {
+            prefix: ip4_net("192.168.0.0"),
+            prefix_len: 16,
+            max_len: 24,
+            asn: 65001,
+        }];
+        let mut cache = RPKICache {
+            vrps4: vrps,
+            vrps6: vec![],
+            valid_count: 0,
+            invalid_count: 0,
+            not_found_count: 0,
+        };
+        cache.vrps4.sort_by_key(|v| v.prefix);
+
+        assert_eq!(cache.validate("192.168.1.0/24", 65001).0, Status::Valid);
+        let (s, d) = cache.validate("192.168.1.0/24", 65002);
+        assert_eq!(s, Status::InvalidWrongAsn);
+        assert_eq!(d.expected_asn, Some(65001));
+    }
+
+    #[test]
+    fn test_validate_shortest_prefix_match_wins_for_asn_check() {
+        // When both short and long prefix VRPs exist with different ASNs,
+        // the observed origin needs to match only one of them.
+        let vrps = vec![
+            Vrp4 {
+                prefix: ip4_net("172.16.0.0"),
+                prefix_len: 12,
+                max_len: 24,
+                asn: 555,
+            },
+            Vrp4 {
+                prefix: ip4_net("172.16.0.0"),
+                prefix_len: 16,
+                max_len: 24,
+                asn: 777,
+            },
+        ];
+        let mut cache = RPKICache {
+            vrps4: vrps,
+            vrps6: vec![],
+            valid_count: 0,
+            invalid_count: 0,
+            not_found_count: 0,
+        };
+        cache.vrps4.sort_by_key(|v| v.prefix);
+
+        assert_eq!(cache.validate("172.16.5.0/24", 555).0, Status::Valid);
+        assert_eq!(cache.validate("172.16.5.0/24", 777).0, Status::Valid);
+    }
+
+    /// Helper: parse "a.b.c.d" into a u32 in network byte order.
+    fn ip4_net(s: &str) -> u32 {
+        let octets: Vec<u8> = s.split('.').map(|o| o.parse().unwrap()).collect();
+        u32::from_be_bytes([octets[0], octets[1], octets[2], octets[3]])
     }
 }
