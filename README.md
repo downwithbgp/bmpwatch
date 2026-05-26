@@ -90,8 +90,26 @@ It is not currently a production monitoring platform, a complete BMP
 collector, or a replacement for full RPKI validators.
 
 - APIs, CLI flags, and TUI layout may change between commits.
-- Not published to crates.io — install from source.
+- Published to crates.io — `cargo install bmpwatch`.
 - Tested on macOS and Linux. Windows is untested.
+
+## Install
+
+From crates.io:
+
+```sh
+cargo install bmpwatch
+```
+
+From source:
+
+```sh
+git clone https://github.com/downwithbgp/bmpwatch.git
+cd bmpwatch
+cargo install --path . --bin bmpwatch
+```
+
+Prebuilt binaries are available from [GitHub Releases](https://github.com/downwithbgp/bmpwatch/releases) for Linux (x86_64, ARM64) and macOS (Apple Silicon, Intel).
 
 ## Quick start
 
