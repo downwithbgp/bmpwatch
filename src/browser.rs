@@ -304,7 +304,7 @@ impl MouseGuard {
         )
         .is_ok();
         if !active {
-            eprintln!("(mouse capture unavailable)");
+            diag("(mouse capture unavailable)");
         }
         MouseGuard { active }
     }
@@ -2083,6 +2083,38 @@ mod model {
             for vi in 0..visible {
                 let orig = m.visible_stream_at(vi).unwrap();
                 assert_eq!(streams[orig].asn_str, "13335");
+            }
+        }
+
+        /// Peering-filter diagnostics must never appear in the rendered
+        /// browser header — they go to a debug log file, not stderr.
+        #[test]
+        fn test_browser_header_has_no_peering_diagnostics() {
+            let topics = routeviews_test_topics();
+            let m = BrowserModel::new(&topics);
+            let area = ratatui::layout::Rect::new(0, 0, 100, 30);
+            let backend = ratatui::backend::TestBackend::new(100, 30);
+            let mut terminal = ratatui::Terminal::new(backend).unwrap();
+            terminal
+                .draw(|f| {
+                    super::render_model(f, area, &m);
+                })
+                .unwrap();
+            let buffer = terminal.backend().buffer();
+            // Title area is the first 3 rows (title block).
+            // The debug hint must not appear there.
+            for row in 0..3 {
+                let line: String = (0..area.width)
+                    .map(|col| buffer.cell((col, row)).unwrap().symbol())
+                    .collect();
+                assert!(
+                    !line.contains("BMPWATCH_DEBUG_PEERING"),
+                    "row {row} contains stray peering diagnostic text"
+                );
+                assert!(
+                    !line.contains("hidden"),
+                    "row {row} contains stray peering diagnostic text"
+                );
             }
         }
     }

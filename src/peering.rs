@@ -1,9 +1,27 @@
 use std::collections::HashSet;
+use std::io::Write;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
 const PEERING_STATUS_URL: &str = "https://archive.routeviews.org/peers/peering-status.html";
 const CACHE_TTL_SECS: u64 = 15 * 60;
+
+/// Write peering-filter diagnostic messages to a log file when the
+/// BMPWATCH_DEBUG_PEERING env var is set.  Never writes to stderr/stdout
+/// during TUI operation — this would corrupt the alternate screen.
+fn peering_diag(msg: &str) {
+    if std::env::var("BMPWATCH_DEBUG_PEERING").is_err() {
+        return;
+    }
+    let line = format!("{msg}\n");
+    let _ = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/tmp/bmpwatch-peering.log")
+        .map(|mut f| {
+            let _ = f.write_all(line.as_bytes());
+        });
+}
 
 /// Fetch peering-status.html over HTTP (blocking, ~10 s timeout).
 fn fetch_peering_status() -> Result<String, String> {
@@ -131,22 +149,22 @@ pub(crate) fn load_active_peering_set() -> HashSet<(String, u32)> {
             return active;
         }
         Err(e) => {
-            eprintln!("bmpwatch: peering status fetch failed: {e}");
+            peering_diag(&format!("peering status fetch failed: {e}"));
         }
     }
 
     // 3. Stale disk cache (fetch failed but we have old data)
     let path = cache_path();
     if let Ok(cached) = std::fs::read_to_string(&path) {
-        eprintln!(
-            "bmpwatch: using cached peering status from {}",
+        peering_diag(&format!(
+            "using cached peering status from {}",
             path.display()
-        );
+        ));
         return parse_peering_status(&cached);
     }
 
     // 4. Bundled TSV fallback
-    eprintln!("bmpwatch: no peering status cache, using bundled data");
+    peering_diag("no peering status cache, using bundled data");
     crate::dashboard::bundled_active_set()
 }
 
@@ -182,17 +200,13 @@ pub(crate) fn filter_active_topics(
         }
     }
 
-    if !hidden.is_empty() {
-        eprintln!(
-            "bmpwatch: hiding {} Kafka stream(s) not in peering status",
+    if !hidden.is_empty() && std::env::var("BMPWATCH_DEBUG_PEERING").is_ok() {
+        peering_diag(&format!(
+            "hiding {} Kafka stream(s) not in peering status",
             hidden.len()
-        );
-        if std::env::var("BMPWATCH_DEBUG_PEERING").is_ok() {
-            for h in &hidden {
-                eprintln!("  hidden: {h}");
-            }
-        } else {
-            eprintln!("  (set BMPWATCH_DEBUG_PEERING=1 to list)");
+        ));
+        for h in &hidden {
+            peering_diag(&format!("  hidden: {h}"));
         }
     }
 

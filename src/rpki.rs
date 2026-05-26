@@ -186,11 +186,15 @@ impl RPKICache {
             a.prefix == b.prefix && a.prefix_len == b.prefix_len && a.asn == b.asn
         });
 
-        eprintln!(
-            "  RPKI: {} IPv4 + {} IPv6 VRPs from {host}",
-            vrps4.len(),
-            vrps6.len()
-        );
+        // Diagnostic only — avoids corrupting the TUI during dashboard
+        // startup.  Switch to stderr if running outside TUI mode.
+        if std::env::var("BMPWATCH_DEBUG_PEERING").is_ok() {
+            eprintln!(
+                "  RPKI: {} IPv4 + {} IPv6 VRPs from {host}",
+                vrps4.len(),
+                vrps6.len()
+            );
+        }
 
         Ok(RPKICache {
             vrps4,

@@ -716,6 +716,22 @@ fn force_terminal_clear(terminal: &mut DefaultTerminal) -> Result<()> {
     Ok(())
 }
 
+/// Write dashboard diagnostics to a log file when BMPWATCH_DASHBOARD_DEBUG
+/// is set.  Never writes to stderr/stdout during TUI operation.
+fn dashboard_diag(msg: &str) {
+    if std::env::var("BMPWATCH_DASHBOARD_DEBUG").is_err() {
+        return;
+    }
+    let line = format!("{msg}\n");
+    let _ = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/tmp/bmpwatch-dashboard.log")
+        .map(|mut f| {
+            let _ = std::io::Write::write_all(&mut f, line.as_bytes());
+        });
+}
+
 fn topic_browser(terminal: &mut DefaultTerminal, topics: &[String]) -> Result<Option<String>> {
     crate::browser::topic_browser(terminal, topics)
 }
@@ -747,8 +763,7 @@ fn run_loop(
                     }
                 }
                 Some(Err(e)) => {
-                    // Log Kafka errors to stderr so they're visible after exit
-                    eprintln!("Kafka error: {e}");
+                    dashboard_diag(&format!("Kafka error: {e}"));
                 }
                 None => {}
             }
@@ -761,7 +776,7 @@ fn run_loop(
                             }
                         }
                         Some(Err(e)) => {
-                            eprintln!("Kafka error: {e}");
+                            dashboard_diag(&format!("Kafka error: {e}"));
                         }
                         None => break,
                     }
