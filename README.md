@@ -1,11 +1,13 @@
-# bmpwatch
+<p align="center">
+  <strong>A terminal-native RouteViews BMP stream monitor with RPKI validation.</strong>
+</p>
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Rust stable](https://img.shields.io/badge/Rust-stable-orange.svg)](https://www.rust-lang.org)
-[![Status: experimental](https://img.shields.io/badge/status-experimental-yellow.svg)](https://github.com/downwithbgp/bmpwatch)
-[![Version: 0.1.0](https://img.shields.io/badge/version-0.1.0-lightgrey.svg)](Cargo.toml)
-
-**A terminal-native RouteViews BMP stream monitor with RPKI validation.**
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Rust-stable-orange.svg" alt="Rust stable"></a>
+  <img src="https://img.shields.io/badge/status-experimental-yellow.svg" alt="Status: experimental">
+  <img src="https://img.shields.io/badge/version-0.1.0-lightgrey.svg" alt="Version: 0.1.0">
+</p>
 
 bmpwatch connects to RouteViews' public BMP Kafka streams and provides an
 interactive TUI dashboard for live route monitoring. It consumes
@@ -26,9 +28,9 @@ announced prefixes against RPKI VRPs loaded from an RTR server.
 
 ## Preview
 
-![bmpwatch topic browser showing RouteViews collectors, stream search, AS names, and prefix counts](docs/screenshots/topic-browser.png)
-
-![bmpwatch stream view showing live route updates, AS paths, RPKI state, and prefix flap tracking](docs/screenshots/stream-view.png)
+| Topic browser | Stream view |
+| :-----------: | :---------: |
+| ![bmpwatch topic browser showing RouteViews collectors, stream search, AS names, and prefix counts](docs/screenshots/topic-browser.png) | ![bmpwatch stream view showing live route updates, AS paths, RPKI state, and prefix flap tracking](docs/screenshots/stream-view.png) |
 
 ## What it does
 
