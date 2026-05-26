@@ -15,7 +15,8 @@ exclude = [
     ".github/",
     "ARCHITECTURE.md",
     "dist-workspace.toml",
-    "docs/",
+    "docs/*.md",
+    "docs/checkpoints/",
     "labs/",
 ]
 
