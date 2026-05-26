@@ -3,7 +3,7 @@ members = [".", "record_openbmp_kafka"]
 
 [package]
 name = "bmpwatch"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Terminal-native RouteViews BMP stream monitor with RPKI validation"
 license = "MIT"
