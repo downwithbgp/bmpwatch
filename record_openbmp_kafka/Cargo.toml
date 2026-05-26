@@ -1,0 +1,16 @@
+[package]
+name = "record_openbmp_kafka"
+version = "0.1.0"
+edition = "2021"
+description = "RouteViews Kafka BMP recorder (companion tool for bmpwatch)"
+license = "MIT"
+repository = "https://github.com/downwithbgp/bmpwatch"
+publish = false
+
+[dependencies]
+bmpwatch = { path = ".." }
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+rdkafka = "0.36"
+serde_json = "1"
+ctrlc = "3"

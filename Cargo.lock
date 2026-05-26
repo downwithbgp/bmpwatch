@@ -2223,6 +2223,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "record_openbmp_kafka"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bmpwatch",
+ "clap",
+ "ctrlc",
+ "rdkafka",
+ "serde_json",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.5.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
