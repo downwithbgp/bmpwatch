@@ -1020,14 +1020,14 @@ fn render_status_bar(frame: &mut Frame, area: Rect, dash: &Dashboard) {
 }
 
 fn render_header(frame: &mut Frame, area: Rect, dash: &Dashboard, connected: bool) {
+    // Stream identity from the topic (collector key + resolved AS name +
+    // ASN) is the base in every state; OpenBMP metadata adds the router
+    // (actual BMP speaker identity) once messages arrive.
+    let identity = sanitize_control_chars(&topic_identity(&dash.topic));
     let meta_str = if let Some(ref m) = dash.metadata {
-        let collector = sanitize_control_chars(m.collector.as_deref().unwrap_or("?"));
         let router = sanitize_control_chars(m.router.as_deref().unwrap_or("?"));
-        format!("{collector} / {router}  |  ")
+        format!("{identity} / {router}  |  ")
     } else {
-        // No metadata yet (connecting, or raw-BMP topic): identify the
-        // stream from its topic name instead.
-        let identity = sanitize_control_chars(&topic_identity(&dash.topic));
         format!("{identity}  |  ")
     };
 
