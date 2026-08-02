@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
@@ -29,13 +29,18 @@ fn fetch_peering_status() -> Result<String, String> {
         .timeout_global(Some(Duration::from_secs(10)))
         .build()
         .new_agent();
-    let mut resp = agent
+    let resp = agent
         .get(PEERING_STATUS_URL)
         .call()
         .map_err(|e| format!("fetch peering status: {e}"))?;
-    let body = resp
-        .body_mut()
-        .read_to_string()
+    // Bound the response read; a compromised/misbehaving endpoint must not
+    // stream unbounded data into memory.
+    const MAX_PEERING_STATUS_BYTES: u64 = 1 << 20;
+    let mut body = String::new();
+    let reader = resp.into_body().into_reader();
+    reader
+        .take(MAX_PEERING_STATUS_BYTES)
+        .read_to_string(&mut body)
         .map_err(|e| format!("read peering status: {e}"))?;
     Ok(body)
 }

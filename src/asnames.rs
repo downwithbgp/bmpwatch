@@ -146,8 +146,13 @@ fn run_refresh(asns: &[u32]) -> Result<()> {
     write!(stream, "end\r\n")?;
     stream.flush()?;
 
+    // Bound the response read (~100 bytes/ASN in practice; a hostile or
+    // misbehaving server must not stream unbounded data into memory).
+    const MAX_WHOIS_RESPONSE_BYTES: u64 = 1 << 20;
     let mut response = String::new();
-    stream.read_to_string(&mut response)?;
+    stream
+        .take(MAX_WHOIS_RESPONSE_BYTES)
+        .read_to_string(&mut response)?;
 
     let mut cache = AsNameCache::load();
     let now = SystemTime::now()
