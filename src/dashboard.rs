@@ -761,9 +761,26 @@ fn topic_identity(topic: &str) -> String {
         .or_else(|| asn.map(as_name_resolve))
         .filter(|n| !n.is_empty() && !n.starts_with("AS"));
     match (name, asn) {
-        (Some(n), Some(a)) => format!("{} — {n} (AS{a})", pt.collector),
+        // Truncate the name: Cymru-style names ("CENIC-2152 - CENIC, US")
+        // would otherwise dominate the header width.
+        (Some(n), Some(a)) => {
+            format!("{} — {} (AS{a})", pt.collector, truncate_name(&n, 18))
+        }
         (None, Some(a)) => format!("{} (AS{a})", pt.collector),
         _ => pt.collector,
+    }
+}
+
+/// Append the OpenBMP router to the header identity, skipping it when it is
+/// missing or duplicates the collector key (common for RouteViews, where
+/// the router field equals the collector name).
+fn header_identity(identity: &str, router: Option<&str>, collector_key: &str) -> String {
+    let router = router.map(sanitize_control_chars).unwrap_or_default();
+    let duplicate = !collector_key.is_empty() && router.eq_ignore_ascii_case(collector_key);
+    if router.is_empty() || duplicate {
+        format!("{identity}  |  ")
+    } else {
+        format!("{identity} / {router}  |  ")
     }
 }
 
@@ -1024,9 +1041,11 @@ fn render_header(frame: &mut Frame, area: Rect, dash: &Dashboard, connected: boo
     // ASN) is the base in every state; OpenBMP metadata adds the router
     // (actual BMP speaker identity) once messages arrive.
     let identity = sanitize_control_chars(&topic_identity(&dash.topic));
+    let collector_key = crate::browser::parse_topic(&dash.topic)
+        .map(|pt| pt.collector)
+        .unwrap_or_default();
     let meta_str = if let Some(ref m) = dash.metadata {
-        let router = sanitize_control_chars(m.router.as_deref().unwrap_or("?"));
-        format!("{identity} / {router}  |  ")
+        header_identity(&identity, m.router.as_deref(), &collector_key)
     } else {
         format!("{identity}  |  ")
     };
@@ -2077,6 +2096,48 @@ mod tests {
     #[test]
     fn test_topic_identity_fallback_for_unknown_format() {
         assert_eq!(topic_identity("my.custom.topic"), "my.custom.topic");
+    }
+
+    #[test]
+    fn test_topic_identity_name_is_truncated() {
+        // Long Cymru-style names ("CENIC-2152 - CENIC, US") must not blow
+        // up the header width.
+        let id = topic_identity("routeviews.route-views2.2152.bmp_raw");
+        assert!(id.contains("route-views2"), "got: {id}");
+        assert!(id.contains("(AS2152)"), "got: {id}");
+        assert!(
+            id.len() <= 64,
+            "identity too long ({len}): {id}",
+            len = id.len()
+        );
+    }
+
+    #[test]
+    fn test_header_identity_skips_duplicate_router() {
+        // RouteViews' OpenBMP router usually equals the collector key.
+        assert_eq!(
+            header_identity(
+                "route-views2 — RouteViews 2 (AS2152)",
+                Some("route-views2"),
+                "route-views2"
+            ),
+            "route-views2 — RouteViews 2 (AS2152)  |  "
+        );
+        // Case-insensitive duplicate is also skipped.
+        assert_eq!(
+            header_identity("id", Some("Route-Views2"), "route-views2"),
+            "id  |  "
+        );
+    }
+
+    #[test]
+    fn test_header_identity_shows_distinct_router() {
+        assert_eq!(
+            header_identity("route-views2 (AS2152)", Some("edge1.amsix"), "route-views2"),
+            "route-views2 (AS2152) / edge1.amsix  |  "
+        );
+        // No router metadata at all.
+        assert_eq!(header_identity("id", None, "route-views2"), "id  |  ");
     }
 
     // -----------------------------------------------------------------------
