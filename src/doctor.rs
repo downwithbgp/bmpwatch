@@ -19,10 +19,17 @@ pub struct Doctor {
     pub events: Vec<JsonlEvent>,
     max_findings: usize,
     findings_truncated: bool,
+    max_events: usize,
+    events_truncated: bool,
     format: InputFormat,
 }
 
 const DEFAULT_MAX_FINDINGS: usize = 1000;
+
+/// Cap on buffered JSONL events for `dump --jsonl`. Events are held in
+/// memory until the file is fully processed, so without a bound a large
+/// attacker-supplied capture OOMs the process.
+const DEFAULT_MAX_EVENTS: usize = 100_000;
 
 pub(crate) enum FrameSource {
     RawBmp(RawBmpIterator),
@@ -72,12 +79,43 @@ impl Doctor {
             events: Vec::new(),
             max_findings,
             findings_truncated: false,
+            max_events: DEFAULT_MAX_EVENTS,
+            events_truncated: false,
             format,
         })
     }
 
+    /// Like `with_max_findings`, but with an explicit JSONL event cap.
+    pub fn with_max_events(
+        file_path: &Path,
+        max_findings: usize,
+        max_events: usize,
+        format: InputFormat,
+    ) -> Result<Self, DoctorError> {
+        let mut doctor = Self::with_max_findings(file_path, max_findings, format)?;
+        doctor.max_events = max_events;
+        Ok(doctor)
+    }
+
     pub fn was_truncated(&self) -> bool {
         self.findings_truncated
+    }
+
+    pub fn was_events_truncated(&self) -> bool {
+        self.events_truncated
+    }
+
+    pub fn events_dropped(&self) -> u64 {
+        self.state.events_dropped
+    }
+
+    fn push_event(&mut self, event: JsonlEvent) {
+        if self.events.len() >= self.max_events {
+            self.events_truncated = true;
+            self.state.events_dropped += 1;
+            return;
+        }
+        self.events.push(event);
     }
 
     fn push_finding(&mut self, finding: Finding) {
@@ -128,7 +166,7 @@ impl Doctor {
                             None,
                             &[finding],
                         );
-                        self.events.push(event);
+                        self.push_event(event);
                     }
                 }
                 Err(e) => return Err(e),
@@ -317,7 +355,7 @@ impl Doctor {
                 frame.peer_down_info.as_ref(),
                 &frame_findings,
             );
-            self.events.push(event);
+            self.push_event(event);
         }
     }
 
@@ -792,6 +830,45 @@ mod tests {
         assert_eq!(doctor.state.findings.len(), 0);
         assert!(doctor.was_truncated());
         assert_eq!(doctor.state.findings_dropped, 1);
+    }
+
+    #[test]
+    fn test_max_events_cap() {
+        // dump --jsonl buffers one event per message; the buffer must be
+        // bounded so a large capture cannot OOM the process.
+        let f1 = fixtures::make_invalid_version_frame();
+        let f2 = fixtures::make_invalid_version_frame();
+        let f3 = fixtures::make_invalid_version_frame();
+        let data = fixtures::write_fixture(&[f1, f2, f3]);
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+        let path = tmp.into_temp_path();
+
+        // 3 frames, event cap 1.
+        let mut doctor = Doctor::with_max_events(&path, 2, 1, InputFormat::RawBmp).unwrap();
+        doctor.process(true).unwrap();
+
+        assert_eq!(doctor.events.len(), 1);
+        assert!(doctor.was_events_truncated());
+        assert_eq!(doctor.events_dropped(), 2);
+    }
+
+    #[test]
+    fn test_max_events_cap_zero() {
+        let bad = fixtures::make_invalid_version_frame();
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&bad).unwrap();
+        let path = tmp.into_temp_path();
+
+        // Cap at 0: all events dropped.
+        let mut doctor = Doctor::with_max_events(&path, 2, 0, InputFormat::RawBmp).unwrap();
+        doctor.process(true).unwrap();
+
+        assert_eq!(doctor.events.len(), 0);
+        assert!(doctor.was_events_truncated());
+        assert_eq!(doctor.events_dropped(), 1);
     }
 
     #[test]

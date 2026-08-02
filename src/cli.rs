@@ -12,6 +12,9 @@ use crate::report;
 use crate::doctor;
 
 const DEFAULT_MAX_FINDINGS: usize = 1000;
+// JSONL events are buffered in memory until the file is fully processed;
+// cap them so a large capture cannot OOM the dump.
+const DEFAULT_MAX_EVENTS: usize = 100_000;
 
 fn resolve_format(file: &Path, format: InputFormat) -> InputFormat {
     match format {
@@ -119,6 +122,9 @@ pub enum Command {
         /// Cap findings at N (default 1000)
         #[arg(long, default_value_t = DEFAULT_MAX_FINDINGS)]
         max_findings: usize,
+        /// Cap buffered JSONL events at N (default 100000)
+        #[arg(long, default_value_t = DEFAULT_MAX_EVENTS)]
+        max_events: usize,
         /// Input format: auto, raw-bmp, or bmpd
         #[arg(long, default_value = "auto")]
         format: InputFormat,
@@ -273,21 +279,30 @@ pub fn run() {
             file,
             jsonl: true,
             max_findings,
+            max_events,
             format,
         } => {
             let fmt = resolve_format(&file, format);
-            let mut doctor = match Doctor::with_max_findings(&file, max_findings.max(1), fmt) {
-                Ok(d) => d,
-                Err(e) => {
-                    eprintln!("Error opening file: {e}");
-                    process::exit(1);
-                }
-            };
+            let mut doctor =
+                match Doctor::with_max_events(&file, max_findings.max(1), max_events.max(1), fmt) {
+                    Ok(d) => d,
+                    Err(e) => {
+                        eprintln!("Error opening file: {e}");
+                        process::exit(1);
+                    }
+                };
             if let Err(e) = doctor.process(true) {
                 eprintln!("Error processing file: {e}");
                 process::exit(1);
             }
             doctor.dump_jsonl();
+            if doctor.was_events_truncated() {
+                eprintln!(
+                    "NOTE: JSONL events truncated at {} ({} dropped). Use --max-events to raise.",
+                    max_events.max(1),
+                    doctor.events_dropped(),
+                );
+            }
             if doctor.was_truncated() {
                 eprintln!(
                     "NOTE: findings truncated at {} ({} dropped). Use --max-findings to raise.",
