@@ -673,6 +673,21 @@ fn global_name_cache() -> &'static Mutex<HashMap<u32, String>> {
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+/// Maximum entries in the global ASN name cache. Keys come from the BMP
+/// stream (origin ASNs), so without a cap a hostile feed grows it forever
+/// (~100 MB worst case at 4-byte keys plus names).
+const MAX_CACHED_AS_NAMES: usize = 200_000;
+
+/// Insert `asn -> name` into the global name cache, bounded by
+/// MAX_CACHED_AS_NAMES: existing keys always update, new keys are dropped
+/// once the cap is reached.
+fn cache_name(asn: u32, name: String) {
+    let mut cache = global_name_cache().lock().unwrap();
+    if cache.contains_key(&asn) || cache.len() < MAX_CACHED_AS_NAMES {
+        cache.insert(asn, name);
+    }
+}
+
 /// Add `amount` to `map[key]`, inserting only while the map is under
 /// `cap` — bounds memory growth from attacker-controlled keys (peer IPs,
 /// prefixes, ASNs) without dropping counters for keys already tracked.
@@ -735,42 +750,27 @@ pub(crate) fn as_name_resolve(asn: u32) -> String {
     }
     if let Some(name) = as_name_seed().get(&asn) {
         let name = name.clone();
-        global_name_cache()
-            .lock()
-            .unwrap()
-            .insert(asn, name.clone());
+        cache_name(asn, name.clone());
         return name;
     }
     // Check Team Cymru cache (no network — loads from disk)
     if let Some(name) = crate::asnames::lookup_cached_name(asn) {
-        global_name_cache()
-            .lock()
-            .unwrap()
-            .insert(asn, name.clone());
+        cache_name(asn, name.clone());
         return name;
     }
     // Bundled Team Cymru seed — first-run coverage (no network).
     if let Some(name) = as_name_seed_cymru().get(&asn) {
         let name = name.clone();
-        global_name_cache()
-            .lock()
-            .unwrap()
-            .insert(asn, name.clone());
+        cache_name(asn, name.clone());
         return name;
     }
     // RouteViews peer metadata fallback (by ASN only, no collector context).
     if let Some(name) = routeviews_asn_fallback().get(&asn) {
         let name = name.clone();
-        global_name_cache()
-            .lock()
-            .unwrap()
-            .insert(asn, name.clone());
+        cache_name(asn, name.clone());
         return name;
     }
-    global_name_cache()
-        .lock()
-        .unwrap()
-        .insert(asn, String::new());
+    cache_name(asn, String::new());
     format!("AS{asn}")
 }
 
@@ -2011,6 +2011,18 @@ mod tests {
     fn test_truncate_name_zero_max_chars() {
         assert_eq!(truncate_name("abc", 0), "");
         assert_eq!(truncate_name("", 0), "");
+    }
+
+    #[test]
+    fn test_cache_name_respects_cap() {
+        // Stream-derived ASNs must not grow the global name cache without
+        // bound: beyond MAX_CACHED_AS_NAMES, new keys are dropped.
+        for i in 0..MAX_CACHED_AS_NAMES + 10 {
+            let asn = 4_000_000_000 + i as u32;
+            cache_name(asn, format!("AS{asn}"));
+        }
+        let len = global_name_cache().lock().unwrap().len();
+        assert!(len <= MAX_CACHED_AS_NAMES, "cache grew to {len} entries");
     }
 
     // -----------------------------------------------------------------------
