@@ -630,6 +630,23 @@ fn global_name_cache() -> &'static Mutex<HashMap<u32, String>> {
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+/// Truncate a name for display: names longer than `max_chars` characters are
+/// cut to `max_chars - 1` characters plus an ellipsis, so the rendered width
+/// never exceeds `max_chars`. Slicing lands on char boundaries, so multi-byte
+/// UTF-8 names (e.g. from the network-refreshed WHOIS cache) cannot panic —
+/// unlike the previous raw byte slice `&name[..21]`.
+fn truncate_name(name: &str, max_chars: usize) -> String {
+    if name.chars().count() <= max_chars {
+        return name.to_string();
+    }
+    let end = name
+        .char_indices()
+        .nth(max_chars - 1)
+        .map(|(i, _)| i)
+        .unwrap_or(name.len());
+    format!("{}…", &name[..end])
+}
+
 /// Resolve an ASN to a name. Checks global cache → bundled seed → Team Cymru cache →
 /// bundled Cymru seed → RouteViews peer fallback.
 /// Never blocks. No network I/O. Returns "ASxxxxx" for unknowns.
@@ -1018,11 +1035,7 @@ fn render_message_log(frame: &mut Frame, area: Rect, dash: &Dashboard) {
                     if let Some(origin) = display_path.last() {
                         let name = as_name_resolve(*origin);
                         if !name.is_empty() && !name.starts_with("AS") {
-                            let truncated = if name.len() > 22 {
-                                format!("{}…", &name[..21])
-                            } else {
-                                name
-                            };
+                            let truncated = truncate_name(&name, 22);
                             spans.push(Span::raw(" "));
                             spans.push(Span::styled(truncated, origin_rpki_color));
                         }
@@ -1255,11 +1268,7 @@ fn render_origins(frame: &mut Frame, area: Rect, dash: &Dashboard) {
         let origin_label = if name.is_empty() || name.starts_with("AS") {
             format!("AS{origin}")
         } else {
-            let truncated = if name.len() > 22 {
-                format!("{}…", &name[..21])
-            } else {
-                name
-            };
+            let truncated = truncate_name(&name, 22);
             format!("AS{origin} {truncated}")
         };
 
@@ -1877,5 +1886,47 @@ mod tests {
             name.unwrap().to_lowercase().contains("transdata"),
             "fallback should use max-prefix name"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // truncate_name
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_truncate_name_short_ascii_unchanged() {
+        assert_eq!(truncate_name("AS-Root", 22), "AS-Root");
+    }
+
+    #[test]
+    fn test_truncate_name_exactly_max_chars_unchanged() {
+        // 22 ASCII chars: shown in full (same as old byte-based behavior).
+        assert_eq!(truncate_name(&"A".repeat(22), 22), "A".repeat(22));
+    }
+
+    #[test]
+    fn test_truncate_name_long_ascii_ellipsis() {
+        // 23 ASCII chars: cut to 21 chars + ellipsis (display width 22).
+        assert_eq!(
+            truncate_name(&"A".repeat(23), 22),
+            format!("{}…", "A".repeat(21))
+        );
+    }
+
+    #[test]
+    fn test_truncate_name_multibyte_no_panic() {
+        // "Ä" is 2 bytes, so a 12-char name is 24 bytes. The old byte slice
+        // &name[..21] panicked here (byte 21 splits a UTF-8 char); a name of
+        // 12 chars must be returned whole and never panic.
+        let name = "Ä".repeat(12);
+        assert_eq!(truncate_name(&name, 22), name);
+    }
+
+    #[test]
+    fn test_truncate_name_multibyte_truncation() {
+        // Truncation must land on a char boundary and keep display width 5.
+        let s = truncate_name(&"Ä".repeat(12), 5);
+        assert_eq!(s, format!("{}…", "Ä".repeat(4)));
+        assert!(s.is_char_boundary(s.len()));
+        assert_eq!(s.chars().count(), 5);
     }
 }
