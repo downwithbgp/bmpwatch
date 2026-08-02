@@ -17,6 +17,24 @@ fn format_size(bytes: u64) -> String {
     }
 }
 
+/// Replace control characters (which can inject ANSI/OSC terminal escape
+/// sequences into output) with visible escapes. Applied at the print
+/// boundary to strings derived from untrusted BMP TLVs, so a crafted
+/// capture cannot spoof terminal output or trigger clipboard writes.
+fn sanitize_control_chars(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if c.is_control() => out.push_str(&format!("\\x{:02x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
 #[derive(Serialize)]
 pub(crate) struct FindingsBuckets {
     pub(crate) parse_errors: u64,
@@ -238,7 +256,7 @@ pub fn render_inspect(state: &DoctorState, truncated: bool, max_peers: usize) {
             println!();
             println!("Initiation info:");
             for s in &tlv.strings {
-                println!("  {}: {}", s.type_name, s.value);
+                println!("  {}: {}", s.type_name, sanitize_control_chars(&s.value));
             }
         }
     }
@@ -253,7 +271,7 @@ pub fn render_inspect(state: &DoctorState, truncated: bool, max_peers: usize) {
             );
         }
         for s in &tlv.strings {
-            println!("  {}: {}", s.type_name, s.value);
+            println!("  {}: {}", s.type_name, sanitize_control_chars(&s.value));
         }
     }
 
@@ -1278,5 +1296,41 @@ mod tests {
         // Stream-order warnings = 3 (2 RM + 1 timestamp)
         assert_eq!(buckets.stream_order_warnings, 3);
         assert!(buckets.stream_order_warnings > lifecycle.rm_before_peer_up_warnings);
+    }
+
+    // -----------------------------------------------------------------------
+    // sanitize_control_chars
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_sanitize_control_chars_plain_text_unchanged() {
+        assert_eq!(
+            sanitize_control_chars("FRRouting bmp-speaker"),
+            "FRRouting bmp-speaker"
+        );
+        assert_eq!(sanitize_control_chars("São Paulo"), "São Paulo"); // UTF-8 preserved
+        assert_eq!(sanitize_control_chars(""), "");
+    }
+
+    #[test]
+    fn test_sanitize_control_chars_escapes_esc_sequence() {
+        // The attack: an ESC (0x1b) starts an ANSI/OSC escape sequence that
+        // can spoof terminal output or write to the clipboard.
+        let evil = "\x1b]0;attacker\x07";
+        assert_eq!(sanitize_control_chars(evil), "\\x1b]0;attacker\\x07");
+    }
+
+    #[test]
+    fn test_sanitize_control_chars_escapes_all_controls() {
+        let s = "a\x00b\x1fc\x7fd";
+        assert_eq!(sanitize_control_chars(s), "a\\x00b\\x1fc\\x7fd");
+    }
+
+    #[test]
+    fn test_sanitize_control_chars_escapes_newlines_and_tabs() {
+        assert_eq!(
+            sanitize_control_chars("line1\nline2\tend"),
+            "line1\\nline2\\tend"
+        );
     }
 }
