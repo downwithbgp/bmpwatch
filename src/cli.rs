@@ -16,6 +16,10 @@ const DEFAULT_MAX_FINDINGS: usize = 1000;
 // cap them so a large capture cannot OOM the dump.
 const DEFAULT_MAX_EVENTS: usize = 100_000;
 
+// Rolling window slots are ~100+ bytes each; cap the window so a huge CLI
+// value cannot pre-allocate gigabytes.
+const MAX_WINDOW_MESSAGES: usize = 1_000_000;
+
 fn resolve_format(file: &Path, format: InputFormat) -> InputFormat {
     match format {
         InputFormat::Auto => match detect_format(file) {
@@ -29,7 +33,7 @@ fn resolve_format(file: &Path, format: InputFormat) -> InputFormat {
     }
 }
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 #[command(
     name = "bmpwatch",
     version,
@@ -43,7 +47,11 @@ pub struct Cli {
     pub file: Option<PathBuf>,
 
     /// Rolling window size for replay mode (default 10)
-    #[arg(long, default_value_t = 10)]
+    #[arg(
+        long,
+        default_value_t = 10,
+        value_parser = clap::builder::RangedU64ValueParser::<usize>::new().range(1..=MAX_WINDOW_MESSAGES as u64)
+    )]
     window_messages: usize,
 
     /// Summary emission interval in milliseconds for replay mode (default 1000)
@@ -82,7 +90,7 @@ pub struct Cli {
     pub command: Option<Command>,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum Command {
     /// Human-readable summary of BMP file contents and health
     Inspect {
@@ -144,7 +152,11 @@ pub enum Command {
         #[arg(long)]
         asn: Option<String>,
         /// Rolling window size in messages
-        #[arg(long, default_value_t = 100)]
+        #[arg(
+            long,
+            default_value_t = 100,
+            value_parser = clap::builder::RangedU64ValueParser::<usize>::new().range(1..=MAX_WINDOW_MESSAGES as u64)
+        )]
         window_messages: usize,
         /// Use mock data — no real Kafka broker needed (for testing only)
         #[arg(long, hide = true)]
@@ -328,5 +340,40 @@ pub fn run() {
             eprintln!("dump requires --jsonl flag");
             process::exit(1);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_window_messages_rejects_oversized() {
+        // A huge window pre-allocates one slot per message (each ~100+ bytes),
+        // so values above the cap must be rejected at parse time.
+        let err = Cli::try_parse_from(["bmpwatch", "--window-messages", "999999999999"])
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("999999999999"), "got: {err}");
+    }
+
+    #[test]
+    fn test_window_messages_accepts_cap() {
+        let cli = Cli::try_parse_from([
+            "bmpwatch",
+            "--window-messages",
+            &MAX_WINDOW_MESSAGES.to_string(),
+        ])
+        .unwrap();
+        assert_eq!(cli.window_messages, MAX_WINDOW_MESSAGES);
+    }
+
+    #[test]
+    fn test_dashboard_window_messages_rejects_oversized() {
+        let err =
+            Cli::try_parse_from(["bmpwatch", "dashboard", "--window-messages", "999999999999"])
+                .unwrap_err()
+                .to_string();
+        assert!(err.contains("999999999999"), "got: {err}");
     }
 }
