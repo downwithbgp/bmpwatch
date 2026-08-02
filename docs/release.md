@@ -21,9 +21,10 @@ cargo dist plan
 ```
 
 Note: `release.yml` is cargo-dist-generated but manually hardened
-(SHA-pinned actions, checksum-verified installers). Re-running
-`cargo dist generate` overwrites those edits — re-apply them after any
-regeneration (see the header comment in the workflow).
+(SHA-pinned actions, checksum-verified installers). `dist-workspace.toml`
+sets `allow-dirty = ["ci"]` so dist accepts the out-of-date file instead
+of failing the release — keep the hardening edits when touching the
+workflow (see the header comment in the file).
 
 ## Tag and build
 
