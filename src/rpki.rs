@@ -61,6 +61,16 @@ pub struct RPKICache {
 /// every TUI start is unnecessary and impolite to the RTR server.
 const RPKI_CACHE_TTL_SECS: u64 = 72 * 3600;
 
+/// Maximum accepted RTR (RFC 8210) PDU length. Legitimate PDUs are tens of
+/// bytes (IPv6 Prefix PDU is 32); this cap prevents OOM from a malicious
+/// length field in a PDU header.
+const MAX_PDU_LEN: usize = 64 * 1024;
+
+/// Maximum VRPs accepted from one RTR session. The global RPKI table has a
+/// few hundred thousand entries; this cap prevents unbounded memory growth
+/// from a malicious server streaming prefix PDUs.
+const MAX_VRPS: usize = 2_000_000;
+
 impl RPKICache {
     pub fn load_or_download(host: &str, port: u16) -> Result<Self, String> {
         let cache_path = rpki_cache_path();
@@ -99,92 +109,7 @@ impl RPKICache {
         sock.write_all(&reset_query)
             .map_err(|e| format!("RTR write: {e}"))?;
 
-        let mut vrps4: Vec<Vrp4> = Vec::new();
-        let mut vrps6: Vec<Vrp6> = Vec::new();
-
-        loop {
-            let mut header = [0u8; 8];
-            sock.read_exact(&mut header)
-                .map_err(|e| format!("RTR read header: {e}"))?;
-
-            let pdu_type = header[1];
-            let length = u32::from_be_bytes([header[4], header[5], header[6], header[7]]) as usize;
-            if length < 8 {
-                return Err(format!("RTR: bad PDU length {length}"));
-            }
-
-            let body_len = length - 8;
-            let mut body = vec![0u8; body_len];
-            if body_len > 0 {
-                sock.read_exact(&mut body)
-                    .map_err(|e| format!("RTR read body: {e}"))?;
-            }
-
-            match pdu_type {
-                3 => {} // Cache Response
-                4
-                    // IPv4 Prefix PDU
-                    if body_len >= 12 => {
-                        let prefix_len = body[1];
-                        let max_len = body[2].max(prefix_len);
-                        let prefix = u32::from_be_bytes([body[4], body[5], body[6], body[7]]);
-                        let asn = u32::from_be_bytes([body[8], body[9], body[10], body[11]]);
-                        if prefix_len > 0 && prefix_len <= 32 {
-                            let mask = if prefix_len == 0 {
-                                0
-                            } else {
-                                !0u32 << (32 - prefix_len)
-                            };
-                            vrps4.push(Vrp4 {
-                                prefix: prefix & mask,
-                                prefix_len,
-                                max_len,
-                                asn,
-                            });
-                        }
-                    }
-                6
-                    // IPv6 Prefix PDU
-                    if body_len >= 24 => {
-                        let prefix_len = body[1];
-                        let max_len = body[2].max(prefix_len);
-                        let mut prefix_bytes = [0u8; 16];
-                        prefix_bytes.copy_from_slice(&body[4..20]);
-                        let prefix = u128::from_be_bytes(prefix_bytes);
-                        let asn = u32::from_be_bytes([body[20], body[21], body[22], body[23]]);
-                        if prefix_len > 0 && prefix_len <= 128 {
-                            let mask = if prefix_len == 0 {
-                                0
-                            } else {
-                                !0u128 << (128 - prefix_len)
-                            };
-                            vrps6.push(Vrp6 {
-                                prefix: prefix & mask,
-                                prefix_len,
-                                max_len,
-                                asn,
-                            });
-                        }
-                    }
-                7 => break,
-                10 => {
-                    return Err(format!(
-                        "RTR error report: {}",
-                        std::str::from_utf8(&body).unwrap_or("(binary)")
-                    ));
-                }
-                _ => {}
-            }
-        }
-
-        vrps4.sort_by_key(|v| v.prefix);
-        vrps4.dedup_by(|a, b| {
-            a.prefix == b.prefix && a.prefix_len == b.prefix_len && a.asn == b.asn
-        });
-        vrps6.sort_by_key(|v| v.prefix);
-        vrps6.dedup_by(|a, b| {
-            a.prefix == b.prefix && a.prefix_len == b.prefix_len && a.asn == b.asn
-        });
+        let (vrps4, vrps6) = read_rtr_pdus(&mut sock)?;
 
         // Diagnostic only — avoids corrupting the TUI during dashboard
         // startup.  Switch to stderr if running outside TUI mode.
@@ -557,7 +482,22 @@ impl RPKICache {
             buf.push(v.max_len);
             buf.extend_from_slice(&v.asn.to_be_bytes());
         }
-        fs::write(path, &buf).map_err(|e| format!("cache write: {e}"))?;
+        // Write to a temp file in the same directory, then rename over the
+        // final path: atomic (no torn reads of a partial cache) and private
+        // (0600 — cache holds routing/validation data).
+        let tmp_path = path.with_extension("bin.tmp");
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut f = fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .mode(0o600)
+                .open(&tmp_path)
+                .map_err(|e| format!("cache write: {e}"))?;
+            f.write_all(&buf).map_err(|e| format!("cache write: {e}"))?;
+        }
+        fs::rename(&tmp_path, path).map_err(|e| format!("cache rename: {e}"))?;
         Ok(())
     }
 
@@ -568,7 +508,11 @@ impl RPKICache {
         }
 
         let count4 = u32::from_be_bytes([data[0], data[1], data[2], data[3]]) as usize;
-        let mut vrps4 = Vec::with_capacity(count4);
+        // Bound the reservation by what the file can actually hold (10 bytes
+        // per v4 entry): a tampered count must not drive a multi-GiB
+        // Vec::with_capacity reservation.
+        let max_v4 = (data.len() - 4) / 10;
+        let mut vrps4 = Vec::with_capacity(count4.min(max_v4));
         let mut pos = 4;
         while pos + 10 <= data.len() && vrps4.len() < count4 {
             let prefix =
@@ -592,7 +536,9 @@ impl RPKICache {
                 u32::from_be_bytes([data[pos], data[pos + 1], data[pos + 2], data[pos + 3]])
                     as usize;
             pos += 4;
-            vrps6 = Vec::with_capacity(count6);
+            // Same bound for v6 entries (22 bytes each).
+            let max_v6 = (data.len() - pos) / 22;
+            vrps6 = Vec::with_capacity(count6.min(max_v6));
             while pos + 22 <= data.len() && vrps6.len() < count6 {
                 let mut prefix_bytes = [0u8; 16];
                 prefix_bytes.copy_from_slice(&data[pos..pos + 16]);
@@ -625,6 +571,115 @@ impl RPKICache {
             not_found_count: 0,
         })
     }
+}
+
+/// Read RTR (RFC 8210) PDUs from `reader` until End-of-Data, returning the
+/// collected VRPs. Enforces protocol limits on PDU size (MAX_PDU_LEN) and
+/// VRP count (MAX_VRPS) so a malicious or misbehaving server cannot force
+/// huge allocations or unbounded memory growth. `reader` may be a socket or
+/// any byte source (tests feed byte slices directly).
+fn read_rtr_pdus(reader: &mut impl Read) -> Result<(Vec<Vrp4>, Vec<Vrp6>), String> {
+    let mut vrps4: Vec<Vrp4> = Vec::new();
+    let mut vrps6: Vec<Vrp6> = Vec::new();
+
+    loop {
+        let mut header = [0u8; 8];
+        reader
+            .read_exact(&mut header)
+            .map_err(|e| format!("RTR read header: {e}"))?;
+
+        let pdu_type = header[1];
+        let length = u32::from_be_bytes([header[4], header[5], header[6], header[7]]) as usize;
+        if length < 8 {
+            return Err(format!("RTR: bad PDU length {length}"));
+        }
+        if length > MAX_PDU_LEN {
+            return Err(format!(
+                "RTR: PDU length {length} exceeds maximum {MAX_PDU_LEN}"
+            ));
+        }
+
+        let body_len = length - 8;
+        let mut body = vec![0u8; body_len];
+        if body_len > 0 {
+            reader
+                .read_exact(&mut body)
+                .map_err(|e| format!("RTR read body: {e}"))?;
+        }
+
+        match pdu_type {
+            3 => {} // Cache Response
+            4
+                // IPv4 Prefix PDU
+                if body_len >= 12 => {
+                    let prefix_len = body[1];
+                    let max_len = body[2].max(prefix_len);
+                    let prefix = u32::from_be_bytes([body[4], body[5], body[6], body[7]]);
+                    let asn = u32::from_be_bytes([body[8], body[9], body[10], body[11]]);
+                    if prefix_len > 0 && prefix_len <= 32 {
+                        if vrps4.len() + vrps6.len() >= MAX_VRPS {
+                            return Err(format!(
+                                "RTR: VRP count exceeds maximum {MAX_VRPS}"
+                            ));
+                        }
+                        let mask = if prefix_len == 0 {
+                            0
+                        } else {
+                            !0u32 << (32 - prefix_len)
+                        };
+                        vrps4.push(Vrp4 {
+                            prefix: prefix & mask,
+                            prefix_len,
+                            max_len,
+                            asn,
+                        });
+                    }
+                }
+            6
+                // IPv6 Prefix PDU
+                if body_len >= 24 => {
+                    let prefix_len = body[1];
+                    let max_len = body[2].max(prefix_len);
+                    let mut prefix_bytes = [0u8; 16];
+                    prefix_bytes.copy_from_slice(&body[4..20]);
+                    let prefix = u128::from_be_bytes(prefix_bytes);
+                    let asn = u32::from_be_bytes([body[20], body[21], body[22], body[23]]);
+                    if prefix_len > 0 && prefix_len <= 128 {
+                        if vrps4.len() + vrps6.len() >= MAX_VRPS {
+                            return Err(format!(
+                                "RTR: VRP count exceeds maximum {MAX_VRPS}"
+                            ));
+                        }
+                        let mask = if prefix_len == 0 {
+                            0
+                        } else {
+                            !0u128 << (128 - prefix_len)
+                        };
+                        vrps6.push(Vrp6 {
+                            prefix: prefix & mask,
+                            prefix_len,
+                            max_len,
+                            asn,
+                        });
+                    }
+                }
+            7 => break,
+            10 => {
+                return Err(format!(
+                    "RTR error report: {}",
+                    std::str::from_utf8(&body).unwrap_or("(binary)")
+                ));
+            }
+            _ => {}
+        }
+    }
+
+    vrps4.sort_by_key(|v| v.prefix);
+    vrps4.dedup_by(|a, b| a.prefix == b.prefix && a.prefix_len == b.prefix_len && a.asn == b.asn);
+    vrps6.sort_by_key(|v| v.prefix);
+    vrps6.dedup_by(|a, b| a.prefix == b.prefix && a.prefix_len == b.prefix_len && a.asn == b.asn);
+
+    Ok((vrps4, vrps6))
 }
 
 fn rpki_cache_path() -> PathBuf {
@@ -899,6 +954,192 @@ mod tests {
     #[test]
     fn test_cache_ttl_is_72_hours() {
         assert_eq!(RPKI_CACHE_TTL_SECS, 72 * 3600);
+    }
+
+    // ── Cache file hardening ──
+
+    #[test]
+    fn test_from_cache_file_does_not_reserve_beyond_file() {
+        // A tampered count4 = 0xFFFFFFFF with no entries behind it must not
+        // drive a multi-GiB Vec::with_capacity reservation; the allocation
+        // must be bounded by what the file can actually hold.
+        let mut data = Vec::new();
+        data.extend_from_slice(&0xFFFF_FFFFu32.to_be_bytes()); // count4
+        data.extend_from_slice(&0u32.to_be_bytes()); // count6
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+
+        let cache = RPKICache::from_cache_file(&tmp.path().to_path_buf()).unwrap();
+        assert!(cache.vrps4.is_empty());
+        assert!(cache.vrps4.capacity() <= (data.len() - 4) / 10);
+        assert_eq!(cache.vrps6.capacity(), 0);
+    }
+
+    #[test]
+    fn test_from_cache_file_does_not_reserve_beyond_file_v6() {
+        // Same for the v6 count: 4-byte v4 count (0 entries), then a tampered
+        // count6 claiming 0xFFFFFFFF entries with no data behind it.
+        let mut data = Vec::new();
+        data.extend_from_slice(&0u32.to_be_bytes()); // count4
+        data.extend_from_slice(&0xFFFF_FFFFu32.to_be_bytes()); // count6
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&data).unwrap();
+
+        let cache = RPKICache::from_cache_file(&tmp.path().to_path_buf()).unwrap();
+        assert!(cache.vrps6.is_empty());
+        assert_eq!(cache.vrps6.capacity(), 0);
+    }
+
+    #[test]
+    fn test_save_to_file_creates_private_file() {
+        let cache = RPKICache {
+            vrps4: vec![Vrp4 {
+                prefix: 0x0A000000,
+                prefix_len: 8,
+                max_len: 16,
+                asn: 65000,
+            }],
+            vrps6: vec![],
+            valid_count: 0,
+            invalid_count: 0,
+            not_found_count: 0,
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("rpki_cache.bin");
+
+        cache.save_to_file(&path).unwrap();
+
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(
+            mode, 0o600,
+            "cache file must be private (0600), got {mode:o}"
+        );
+        // Temp file must not be left behind after the atomic rename.
+        assert!(!path.with_extension("bin.tmp").exists());
+    }
+
+    #[test]
+    fn test_save_load_roundtrip() {
+        let cache = RPKICache {
+            vrps4: vec![Vrp4 {
+                prefix: 0x0A000000,
+                prefix_len: 8,
+                max_len: 16,
+                asn: 65000,
+            }],
+            vrps6: vec![Vrp6 {
+                prefix: 0x20010DB8000000000000000000000000,
+                prefix_len: 32,
+                max_len: 48,
+                asn: 65001,
+            }],
+            valid_count: 0,
+            invalid_count: 0,
+            not_found_count: 0,
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("rpki_cache.bin");
+
+        cache.save_to_file(&path).unwrap();
+        let loaded = RPKICache::from_cache_file(&path).unwrap();
+
+        assert_eq!(loaded.vrps4.len(), 1);
+        assert_eq!(loaded.vrps4[0].prefix, 0x0A000000);
+        assert_eq!(loaded.vrps4[0].prefix_len, 8);
+        assert_eq!(loaded.vrps4[0].max_len, 16);
+        assert_eq!(loaded.vrps4[0].asn, 65000);
+        assert_eq!(loaded.vrps6.len(), 1);
+        assert_eq!(loaded.vrps6[0].prefix, 0x20010DB8000000000000000000000000);
+        assert_eq!(loaded.vrps6[0].asn, 65001);
+    }
+
+    // ── RTR stream limits ──
+
+    fn rtr_pdu(pdu_type: u8, body: &[u8]) -> Vec<u8> {
+        let mut pdu = vec![0u8, pdu_type, 0, 0];
+        pdu.extend_from_slice(&((8 + body.len()) as u32).to_be_bytes());
+        pdu.extend_from_slice(body);
+        pdu
+    }
+
+    fn rtr_v4_pdu(prefix: [u8; 4], prefix_len: u8, max_len: u8, asn: u32) -> Vec<u8> {
+        let mut body = vec![0u8; 12];
+        body[1] = prefix_len;
+        body[2] = max_len;
+        body[4..8].copy_from_slice(&prefix);
+        body[8..12].copy_from_slice(&asn.to_be_bytes());
+        rtr_pdu(4, &body)
+    }
+
+    #[test]
+    fn test_read_rtr_pdus_rejects_oversized_pdu() {
+        // Declared PDU length just over the cap must be rejected before the
+        // body is read or allocated.
+        let mut stream = vec![0u8, 4, 0, 0];
+        stream.extend_from_slice(&((MAX_PDU_LEN as u32) + 1).to_be_bytes());
+        let err = read_rtr_pdus(&mut &stream[..]).unwrap_err();
+        assert!(
+            err.contains("maximum"),
+            "expected max-length rejection, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_read_rtr_pdus_rejects_huge_length_before_allocating() {
+        // The real attack value: ~1 GiB declared length. Must be rejected by
+        // the cap before any allocation of the declared size.
+        let mut stream = vec![0u8, 4, 0, 0];
+        stream.extend_from_slice(&0x4000_0000u32.to_be_bytes());
+        let err = read_rtr_pdus(&mut &stream[..]).unwrap_err();
+        assert!(err.contains("maximum"), "got: {err}");
+    }
+
+    #[test]
+    fn test_read_rtr_pdus_parses_v4_v6_and_end() {
+        let mut stream = Vec::new();
+        stream.extend_from_slice(&rtr_pdu(3, &[])); // Cache Response
+        stream.extend_from_slice(&rtr_v4_pdu([10, 0, 0, 0], 8, 16, 65000));
+        let mut v6_body = vec![0u8; 24];
+        v6_body[1] = 32;
+        v6_body[2] = 48;
+        v6_body[4..20]
+            .copy_from_slice(&[0x20, 0x01, 0x0D, 0xB8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        v6_body[20..24].copy_from_slice(&65000u32.to_be_bytes());
+        stream.extend_from_slice(&rtr_pdu(6, &v6_body));
+        stream.extend_from_slice(&rtr_pdu(7, &[])); // End of Data
+
+        let (vrps4, vrps6) = read_rtr_pdus(&mut &stream[..]).unwrap();
+        assert_eq!(vrps4.len(), 1);
+        assert_eq!(vrps4[0].prefix, 0x0A000000);
+        assert_eq!(vrps4[0].prefix_len, 8);
+        assert_eq!(vrps4[0].max_len, 16);
+        assert_eq!(vrps4[0].asn, 65000);
+        assert_eq!(vrps6.len(), 1);
+        assert_eq!(vrps6[0].prefix, 0x20010DB8000000000000000000000000);
+        assert_eq!(vrps6[0].prefix_len, 32);
+        assert_eq!(vrps6[0].asn, 65000);
+    }
+
+    #[test]
+    fn test_read_rtr_pdus_enforces_vrp_limit() {
+        // A malicious server streaming prefix PDUs must be cut off at the
+        // VRP cap instead of growing memory without bound.
+        let mut stream = Vec::with_capacity((MAX_VRPS + 1) * 20);
+        stream.extend_from_slice(&rtr_pdu(3, &[]));
+        for i in 0..MAX_VRPS + 1 {
+            stream.extend_from_slice(&rtr_v4_pdu(
+                [10, (i >> 16) as u8, (i >> 8) as u8, i as u8],
+                24,
+                24,
+                65000,
+            ));
+        }
+        let err = read_rtr_pdus(&mut &stream[..]).unwrap_err();
+        assert!(
+            err.contains("maximum"),
+            "expected VRP limit rejection, got: {err}"
+        );
     }
 
     /// Helper: parse "a.b.c.d" into a u32 in network byte order.
