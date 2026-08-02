@@ -513,6 +513,9 @@ impl RPKICache {
                 let _ = fs::remove_file(&tmp_path); // our temp; clean it up
                 return Err(format!("cache write: {e}"));
             }
+            // Durability: flush to disk before the rename so a crash cannot
+            // leave an empty/partial cache at the final path.
+            f.sync_all().map_err(|e| format!("cache write: {e}"))?;
         }
         if let Err(e) = fs::rename(&tmp_path, path) {
             let _ = fs::remove_file(&tmp_path); // our temp; clean it up
@@ -703,14 +706,7 @@ fn read_rtr_pdus(reader: &mut impl Read) -> Result<(Vec<Vrp4>, Vec<Vrp6>), Strin
 }
 
 fn rpki_cache_path() -> PathBuf {
-    let base = if let Ok(dir) = std::env::var("XDG_CACHE_HOME") {
-        PathBuf::from(dir)
-    } else if let Ok(home) = std::env::var("HOME") {
-        PathBuf::from(home).join(".cache")
-    } else {
-        PathBuf::from(".")
-    };
-    base.join("bmpwatch").join("rpki_cache.bin")
+    crate::cache::cache_dir().join("rpki_cache.bin")
 }
 
 fn parse_ipv4_prefix(s: &str) -> Option<(u32, u8)> {

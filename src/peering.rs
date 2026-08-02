@@ -17,7 +17,7 @@ fn peering_diag(msg: &str) {
     let _ = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open("/tmp/bmpwatch-peering.log")
+        .open(crate::cache::debug_log_path("peering"))
         .map(|mut f| {
             let _ = f.write_all(line.as_bytes());
         });

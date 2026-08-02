@@ -1,5 +1,6 @@
 mod asnames;
 pub mod browser;
+pub mod cache;
 pub mod cli;
 pub mod dashboard;
 pub mod doctor;

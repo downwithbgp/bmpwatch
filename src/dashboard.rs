@@ -816,7 +816,7 @@ fn dashboard_diag(msg: &str) {
     let _ = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open("/tmp/bmpwatch-dashboard.log")
+        .open(crate::cache::debug_log_path("dashboard"))
         .map(|mut f| {
             let _ = std::io::Write::write_all(&mut f, line.as_bytes());
         });

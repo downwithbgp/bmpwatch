@@ -215,14 +215,7 @@ fn run_refresh(asns: &[u32]) -> Result<()> {
 }
 
 fn cache_path() -> PathBuf {
-    let base = if let Ok(dir) = std::env::var("XDG_CACHE_HOME") {
-        PathBuf::from(dir)
-    } else if let Ok(home) = std::env::var("HOME") {
-        PathBuf::from(home).join(".cache")
-    } else {
-        PathBuf::from(".")
-    };
-    base.join("bmpwatch").join("asn_names.json")
+    crate::cache::cache_dir().join("asn_names.json")
 }
 
 #[cfg(test)]
