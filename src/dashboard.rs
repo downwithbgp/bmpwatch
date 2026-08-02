@@ -35,6 +35,12 @@ const MAX_TRACKED_PEERS: usize = 100_000;
 const MAX_TRACKED_PREFIXES: usize = 1_000_000;
 const MAX_TRACKED_ASNS: usize = 100_000;
 const MAX_TRACKED_AS_PAIRS: usize = 100_000;
+// Cap on a stored AS path. Real BGP paths are well under this; bounding it
+// stops a crafted message (huge AS_PATH attribute + many NLRI prefixes)
+// from amplifying a single payload into TB-scale clones (each announced
+// prefix stores a copy of the path). The true origin ASN is captured before
+// truncation and kept in the announced-prefix entries.
+const MAX_TRACKED_PATH_ASNS: usize = 64;
 
 /// A single line in the scrolling message ticker at the bottom of the screen.
 struct MessageLine {
@@ -1264,6 +1270,10 @@ fn extract_prefixes(full_data: &[u8]) -> Option<PrefixChange> {
                         communities.dedup();
                         communities.truncate(8);
 
+                        // Bound the stored path (see MAX_TRACKED_PATH_ASNS);
+                        // origin_asn above already holds the true origin.
+                        as_path.truncate(MAX_TRACKED_PATH_ASNS);
+
                         Some(PrefixChange {
                             announced: update
                                 .announced_prefixes
@@ -2061,9 +2071,9 @@ mod tests {
     }
 
     /// Build a BMP Route Monitoring frame announcing 10.0.<n>.0/24 with
-    /// AS_PATH [6447, 13335] (same wire format as the existing
+    /// the given AS_PATH (same wire format as the existing
     /// test_extract_prefixes_with_proper_bgp_update fixture).
-    fn make_update_frame(n: u8) -> Vec<u8> {
+    fn make_update_frame_with_path(n: u8, path: &[u32]) -> Vec<u8> {
         use crate::raw_bmp::fixtures;
 
         let mut bgp = Vec::new();
@@ -2074,10 +2084,20 @@ mod tests {
 
         let mut attrs = Vec::new();
         attrs.extend_from_slice(&[0x40, 0x01, 0x01, 0x00]); // ORIGIN IGP
-        attrs.extend_from_slice(&[
-            0x40, 0x02, 0x0A, 0x02, 0x02, 0x00, 0x00, 0x19, 0x2F, // AS_PATH 6447
-            0x00, 0x00, 0x34, 0x17, // 13335
-        ]);
+                                                            // AS_PATH: AS_SEQUENCE with the given ASNs (1-byte attribute
+                                                            // length, or extended 2-byte length via flag 0x10 when > 255)
+        let seg_len = 2 + 4 * path.len();
+        if seg_len <= u8::MAX as usize {
+            attrs.extend_from_slice(&[0x40, 0x02, seg_len as u8]);
+        } else {
+            attrs.extend_from_slice(&[0x50, 0x02]);
+            attrs.extend_from_slice(&(seg_len as u16).to_be_bytes());
+        }
+        attrs.push(0x02); // AS_SEQUENCE
+        attrs.push(path.len() as u8);
+        for asn in path {
+            attrs.extend_from_slice(&asn.to_be_bytes());
+        }
         attrs.extend_from_slice(&[0x40, 0x03, 0x04, 10, 0, 0, 1]); // NEXT_HOP
         bgp.extend_from_slice(&(attrs.len() as u16).to_be_bytes());
         bgp.extend_from_slice(&attrs);
@@ -2090,6 +2110,12 @@ mod tests {
         let total_payload: Vec<u8> = pph.into_iter().chain(bgp).collect();
         let bmp_header = fixtures::make_common_header(0, total_payload.len() as u32);
         bmp_header.into_iter().chain(total_payload).collect()
+    }
+
+    /// Build a BMP Route Monitoring frame announcing 10.0.<n>.0/24 with
+    /// AS_PATH [6447, 13335].
+    fn make_update_frame(n: u8) -> Vec<u8> {
+        make_update_frame_with_path(n, &[6447, 13335])
     }
 
     #[test]
@@ -2106,5 +2132,19 @@ mod tests {
         assert_eq!(dash.as_adjacency[&(6447, 13335)], 3);
         // Last announced path is retained for the detail view.
         assert_eq!(dash.prefix_last_path["10.0.2.0/24"], vec![6447, 13335]);
+    }
+
+    #[test]
+    fn test_extract_prefixes_bounds_as_path() {
+        // A crafted UPDATE with a 100-ASN path must not be stored in full:
+        // the stored path is capped at MAX_TRACKED_PATH_ASNS while the true
+        // origin ASN (last element of the full path) is preserved for the
+        // announced prefixes.
+        let path: Vec<u32> = (1..=100).collect();
+        let frame = make_update_frame_with_path(1, &path);
+        let pc = extract_prefixes(&frame).unwrap();
+        assert_eq!(pc.as_path.len(), MAX_TRACKED_PATH_ASNS);
+        assert_eq!(*pc.as_path.last().unwrap(), MAX_TRACKED_PATH_ASNS as u32);
+        assert_eq!(pc.announced[0].1, 100, "true origin ASN must be preserved");
     }
 }
