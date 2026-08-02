@@ -67,6 +67,13 @@ Plus the companion binary `record_openbmp_kafka` for offline capture.
   ROA authorizes the observed origin ASN and prefix length ≤ maxLength
 - "should be ASxxxxx" hint only when the authorized origin is unambiguous
 
+> **Note on RTR transport:** RFC 8210 defines no TLS or authentication for
+> the RTR session. The VRP data that drives the displayed VALID/INVALID
+> status is fetched over plaintext TCP from a hardcoded public server, so
+> an on-path attacker could alter validation results. bmpwatch only
+> *displays* this telemetry — it never makes routing decisions — but treat
+> RPKI status as advisory on untrusted networks.
+
 **AS name enrichment**
 - Multi-tier resolution: bundled Cymru seed → user cache → bundled Cymru
   fallback → RouteViews peer metadata → raw ASN fallback

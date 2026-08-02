@@ -12,12 +12,18 @@ git status
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
+cargo deny check   # license + advisory policy (deny.toml)
 
 # Verify crate packaging and release plan
 cargo package --list -p bmpwatch
 cargo publish --dry-run -p bmpwatch
 cargo dist plan
 ```
+
+Note: `release.yml` is cargo-dist-generated but manually hardened
+(SHA-pinned actions, checksum-verified installers). Re-running
+`cargo dist generate` overwrites those edits — re-apply them after any
+regeneration (see the header comment in the workflow).
 
 ## Tag and build
 
