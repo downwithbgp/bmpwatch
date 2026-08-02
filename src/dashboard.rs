@@ -778,9 +778,9 @@ fn header_identity(identity: &str, router: Option<&str>, collector_key: &str) ->
     let router = router.map(sanitize_control_chars).unwrap_or_default();
     let duplicate = !collector_key.is_empty() && router.eq_ignore_ascii_case(collector_key);
     if router.is_empty() || duplicate {
-        format!("{identity}  |  ")
+        identity.to_string()
     } else {
-        format!("{identity} / {router}  |  ")
+        format!("{identity} / {router}")
     }
 }
 
@@ -1039,27 +1039,30 @@ fn render_status_bar(frame: &mut Frame, area: Rect, dash: &Dashboard) {
 fn render_header(frame: &mut Frame, area: Rect, dash: &Dashboard, connected: bool) {
     // Stream identity from the topic (collector key + resolved AS name +
     // ASN) is the base in every state; OpenBMP metadata adds the router
-    // (actual BMP speaker identity) once messages arrive.
+    // (actual BMP speaker identity) once messages arrive. The raw topic
+    // name is not shown: it is `routeviews.{collector}.{asn}.bmp_raw`, so
+    // the identity already carries all of its information (and for topics
+    // that fail to parse, topic_identity falls back to the topic itself).
     let identity = sanitize_control_chars(&topic_identity(&dash.topic));
     let collector_key = crate::browser::parse_topic(&dash.topic)
         .map(|pt| pt.collector)
         .unwrap_or_default();
-    let meta_str = if let Some(ref m) = dash.metadata {
+    let identity_part = if let Some(ref m) = dash.metadata {
         header_identity(&identity, m.router.as_deref(), &collector_key)
     } else {
-        format!("{identity}  |  ")
+        identity
     };
 
     let title = if !connected {
         if dash.session_start.elapsed() >= Duration::from_secs(10) {
-            format!(" BMPWatch — {meta_str}No messages yet — stream may be quiet ")
+            format!(" BMPWatch — {identity_part}  |  No messages yet — stream may be quiet ")
         } else {
-            format!(" BMPWatch — {meta_str}Connecting... ")
+            format!(" BMPWatch — {identity_part}  |  Connecting... ")
         }
     } else if dash.paused {
-        format!(" BMPWatch — {meta_str}⏸ PAUSED — press p to resume ")
+        format!(" BMPWatch — {identity_part}  |  ⏸ PAUSED — press p to resume ")
     } else {
-        format!(" BMPWatch — {meta_str}{} ", dash.topic)
+        format!(" BMPWatch — {identity_part} ")
     };
 
     let style = if dash.paused || !connected {
@@ -2121,12 +2124,12 @@ mod tests {
                 Some("route-views2"),
                 "route-views2"
             ),
-            "route-views2 — RouteViews 2 (AS2152)  |  "
+            "route-views2 — RouteViews 2 (AS2152)"
         );
         // Case-insensitive duplicate is also skipped.
         assert_eq!(
             header_identity("id", Some("Route-Views2"), "route-views2"),
-            "id  |  "
+            "id"
         );
     }
 
@@ -2134,10 +2137,10 @@ mod tests {
     fn test_header_identity_shows_distinct_router() {
         assert_eq!(
             header_identity("route-views2 (AS2152)", Some("edge1.amsix"), "route-views2"),
-            "route-views2 (AS2152) / edge1.amsix  |  "
+            "route-views2 (AS2152) / edge1.amsix"
         );
         // No router metadata at all.
-        assert_eq!(header_identity("id", None, "route-views2"), "id  |  ");
+        assert_eq!(header_identity("id", None, "route-views2"), "id");
     }
 
     // -----------------------------------------------------------------------
