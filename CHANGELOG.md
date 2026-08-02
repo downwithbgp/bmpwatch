@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.1.2 (unreleased)
+## v0.1.2
 
 Security hardening, dependency slimming, and robustness fixes.
 
