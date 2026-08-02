@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+# Least-privilege token: CI never writes to the repo.
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -14,13 +18,17 @@ jobs:
     name: Rust stable
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # SHA-pinned (not tag-pinned) for supply-chain safety. Pin refs:
+      #   actions/checkout@refs/tags/v4
+      #   dtolnay/rust-toolchain@refs/heads/stable
+      #   Swatinem/rust-cache@refs/tags/v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
         with:
           toolchain: stable
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
 
       - name: Format
         run: cargo fmt --check
