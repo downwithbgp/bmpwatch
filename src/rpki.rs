@@ -501,7 +501,10 @@ impl RPKICache {
                 return Err(format!("cache write: {e}"));
             }
         }
-        fs::rename(&tmp_path, path).map_err(|e| format!("cache rename: {e}"))?;
+        if let Err(e) = fs::rename(&tmp_path, path) {
+            let _ = fs::remove_file(&tmp_path); // our temp; clean it up
+            return Err(format!("cache rename: {e}"));
+        }
         Ok(())
     }
 
