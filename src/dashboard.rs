@@ -121,9 +121,16 @@ impl Dashboard {
                 }
 
                 if let Some(ref pk) = peer_key {
-                    bump_count(&mut self.peer_msg_counts, pk.clone(), MAX_TRACKED_PEERS);
+                    bump_count(&mut self.peer_msg_counts, pk.clone(), 1, MAX_TRACKED_PEERS);
                     if !findings.is_empty() {
-                        bump_count(&mut self.peer_warnings, pk.clone(), MAX_TRACKED_PEERS);
+                        // Preserve pre-bounding semantics: count every
+                        // finding, not just the message.
+                        bump_count(
+                            &mut self.peer_warnings,
+                            pk.clone(),
+                            findings.len() as u64,
+                            MAX_TRACKED_PEERS,
+                        );
                     }
                 }
 
@@ -180,7 +187,7 @@ impl Dashboard {
                     // keys are attacker-controlled, see MAX_TRACKED_*)
                     if let Some(ref pc) = prefixes {
                         for (p, origin) in &pc.announced {
-                            bump_count(&mut self.churn_counts, p.clone(), MAX_TRACKED_PREFIXES);
+                            bump_count(&mut self.churn_counts, p.clone(), 1, MAX_TRACKED_PREFIXES);
                             if *origin > 0 {
                                 insert_bounded(
                                     &mut self.prefix_origins,
@@ -197,7 +204,7 @@ impl Dashboard {
                             );
                         }
                         for (p, origin) in &pc.withdrawn {
-                            bump_count(&mut self.churn_counts, p.clone(), MAX_TRACKED_PREFIXES);
+                            bump_count(&mut self.churn_counts, p.clone(), 1, MAX_TRACKED_PREFIXES);
                             if *origin > 0 {
                                 insert_bounded(
                                     &mut self.prefix_origins,
@@ -208,12 +215,13 @@ impl Dashboard {
                             }
                         }
                         for asn in &pc.as_path {
-                            bump_count(&mut self.as_frequency, *asn, MAX_TRACKED_ASNS);
+                            bump_count(&mut self.as_frequency, *asn, 1, MAX_TRACKED_ASNS);
                         }
                         for pair in pc.as_path.windows(2) {
                             bump_count(
                                 &mut self.as_adjacency,
                                 (pair[0], pair[1]),
+                                1,
                                 MAX_TRACKED_AS_PAIRS,
                             );
                         }
@@ -659,15 +667,15 @@ fn global_name_cache() -> &'static Mutex<HashMap<u32, String>> {
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-/// Increment `map[key]` by one, inserting only while the map is under
+/// Add `amount` to `map[key]`, inserting only while the map is under
 /// `cap` — bounds memory growth from attacker-controlled keys (peer IPs,
 /// prefixes, ASNs) without dropping counters for keys already tracked.
-fn bump_count<K: Eq + std::hash::Hash>(map: &mut HashMap<K, u64>, key: K, cap: usize) {
+fn bump_count<K: Eq + std::hash::Hash>(map: &mut HashMap<K, u64>, key: K, amount: u64, cap: usize) {
     match map.get_mut(&key) {
-        Some(v) => *v += 1,
+        Some(v) => *v += amount,
         None => {
             if map.len() < cap {
-                map.insert(key, 1);
+                map.insert(key, amount);
             }
         }
     }
@@ -2002,14 +2010,24 @@ mod tests {
     #[test]
     fn test_bump_count_respects_cap() {
         let mut m: HashMap<u32, u64> = HashMap::new();
-        bump_count(&mut m, 1, 3);
-        bump_count(&mut m, 2, 3);
-        bump_count(&mut m, 3, 3);
-        bump_count(&mut m, 1, 3); // existing key: still increments
-        bump_count(&mut m, 4, 3); // new key beyond cap: dropped
+        bump_count(&mut m, 1, 1, 3);
+        bump_count(&mut m, 2, 1, 3);
+        bump_count(&mut m, 3, 1, 3);
+        bump_count(&mut m, 1, 1, 3); // existing key: still increments
+        bump_count(&mut m, 4, 1, 3); // new key beyond cap: dropped
         assert_eq!(m.len(), 3);
         assert_eq!(m[&1], 2);
         assert!(!m.contains_key(&4));
+    }
+
+    #[test]
+    fn test_bump_count_adds_amount() {
+        let mut m: HashMap<u32, u64> = HashMap::new();
+        bump_count(&mut m, 1, 3, 10);
+        bump_count(&mut m, 1, 2, 10); // existing key: accumulates amount
+        bump_count(&mut m, 2, 5, 10);
+        assert_eq!(m[&1], 5);
+        assert_eq!(m[&2], 5);
     }
 
     #[test]
