@@ -248,6 +248,9 @@ mod tests {
 
     #[test]
     fn test_cache_round_trip() {
+        // cache_path() resolves process-wide env vars, so this must not run
+        // concurrently with the cache.rs env-mutation test.
+        let _lock = crate::cache::CACHE_ENV_LOCK.lock().unwrap();
         clean();
         let mut cache = AsNameCache {
             entries: HashMap::new(),

@@ -106,14 +106,7 @@ fn parse_peering_status(text: &str) -> HashSet<(String, u32)> {
 }
 
 fn cache_path() -> PathBuf {
-    let base = if let Ok(dir) = std::env::var("XDG_CACHE_HOME") {
-        PathBuf::from(dir)
-    } else if let Ok(home) = std::env::var("HOME") {
-        PathBuf::from(home).join(".cache")
-    } else {
-        PathBuf::from(".")
-    };
-    base.join("bmpwatch").join("peering_status.txt")
+    crate::cache::cache_dir().join("peering_status.txt")
 }
 
 fn cache_mtime_secs(path: &PathBuf) -> Option<u64> {
