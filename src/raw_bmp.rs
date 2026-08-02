@@ -8,6 +8,12 @@ use crate::error::DoctorError;
 // Layout: Version (1) + Message Length (4) + Message Type (1) = 6 bytes.
 pub const BMP_COMMON_HEADER_SIZE: usize = 6;
 
+// Maximum accepted BMP frame length (64 MiB). Realistic BMP frames are well
+// under 1 MB; this bound prevents OOM from a malicious length field in the
+// common header of untrusted capture files (same rationale as the `.bmpd`
+// MAX_PAYLOAD_LEN cap in obmp_reader.rs).
+pub const MAX_FRAME_LEN: usize = 64 * 1024 * 1024;
+
 // BMP Per-Peer Header as defined in RFC 7854, Section 3.2.
 // Layout: Peer Type (1) + Peer Flags (1) + Peer Distinguisher (8)
 //       + Peer Address (16) + Peer AS (4) + Peer BGP ID (4)
@@ -522,6 +528,12 @@ impl Iterator for RawBmpIterator {
             ))));
         }
 
+        if msg_len as usize > MAX_FRAME_LEN {
+            return Some(Err(DoctorError::Frame(format!(
+                "Declared BMP message length {msg_len} at offset {frame_offset} exceeds maximum supported frame size {MAX_FRAME_LEN}"
+            ))));
+        }
+
         let payload_len = (msg_len as usize).saturating_sub(BMP_COMMON_HEADER_SIZE);
         let mut payload = vec![0u8; payload_len];
         if let Err(e) = self.reader.read_exact(&mut payload) {
@@ -839,6 +851,31 @@ mod tests {
         let frames: Vec<_> = iter.collect();
         assert_eq!(frames.len(), 1);
         assert!(frames[0].is_err());
+    }
+
+    #[test]
+    fn test_raw_bmp_iterator_oversized_frame_length() {
+        // A crafted header declaring a frame larger than MAX_FRAME_LEN must be
+        // rejected before any allocation. Previously this attempted a ~64 MiB+
+        // vec![0; ...] on a 6-byte file (and up to ~4 GiB for max u32 lengths),
+        // an OOM bomb reachable from any untrusted capture file.
+        let mut header = [0u8; BMP_COMMON_HEADER_SIZE];
+        header[0] = BMP_EXPECTED_VERSION;
+        header[1..5].copy_from_slice(&((MAX_FRAME_LEN as u32) + 1).to_be_bytes());
+        header[5] = BmpMessageType::RouteMonitoring as u8;
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&header).unwrap();
+        let path = tmp.into_temp_path();
+
+        let iter = RawBmpIterator::open(&path).unwrap();
+        let frames: Vec<_> = iter.collect();
+        assert_eq!(frames.len(), 1);
+        let err = frames[0].as_ref().unwrap_err();
+        assert!(
+            err.to_string().contains("maximum"),
+            "expected max-length rejection, got: {err}"
+        );
     }
 
     #[test]
