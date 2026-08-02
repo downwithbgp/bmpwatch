@@ -326,10 +326,15 @@ pub(crate) fn run_dashboard(
     // Phase 1: Resolve the topic (may need TUI for the browser)
     let mut terminal: DefaultTerminal = ratatui::init();
 
+    // Topic list cache for instant back-navigation: refetching on every
+    // 'b' blocks up to 10 s when the broker is unreachable.
+    let mut all_topics: Vec<String> = Vec::new();
+
     let mut chosen = if let Some(exact) = topic {
         exact.to_string()
     } else {
         let all = kafka::fetch_topics(broker, "^routeviews.*\\.bmp_raw$")?;
+        all_topics = all.clone();
         let mut filtered = kafka::apply_filters(all, collector, asn);
         filtered.sort_by(|a, b| {
             let a_undef = a.contains("UNDEFINED_ROUTER_GROUP");
@@ -448,7 +453,13 @@ pub(crate) fn run_dashboard(
         }
 
         // User pressed 'q' or 'b' — back to browser without leaving alternate screen.
-        let all = kafka::fetch_topics(broker, "^routeviews.*\\.bmp_raw$")?;
+        // Reuse the cached topic list (fetched on first entry) instead of
+        // refetching: a metadata fetch blocks up to 10 s offline.
+        let all = if all_topics.is_empty() {
+            kafka::fetch_topics(broker, "^routeviews.*\\.bmp_raw$")?
+        } else {
+            all_topics.clone()
+        };
         let mut filtered = kafka::apply_filters(all, None, None);
         filtered.sort_by(|a, b| {
             let a_undef = a.contains("UNDEFINED_ROUTER_GROUP");
@@ -735,6 +746,27 @@ fn truncate_name(name: &str, max_chars: usize) -> String {
     format!("{}…", &name[..end])
 }
 
+/// Human-readable stream identity derived from the topic name. Shown in the
+/// header before OpenBMP metadata arrives (i.e. while connecting) and as a
+/// permanent fallback for raw-BMP topics that never carry metadata.
+/// Example: "routeviews.route-views2.2152.bmp_raw" ->
+/// "route-views2 — RouteViews 2 (AS2152)" (name resolved when known).
+fn topic_identity(topic: &str) -> String {
+    let Some(pt) = crate::browser::parse_topic(topic) else {
+        return topic.to_string();
+    };
+    let asn = pt.asn_str.parse::<u32>().ok();
+    let name = asn
+        .and_then(|a| routeviews_peer_name(&pt.collector, a).map(str::to_string))
+        .or_else(|| asn.map(as_name_resolve))
+        .filter(|n| !n.is_empty() && !n.starts_with("AS"));
+    match (name, asn) {
+        (Some(n), Some(a)) => format!("{} — {n} (AS{a})", pt.collector),
+        (None, Some(a)) => format!("{} (AS{a})", pt.collector),
+        _ => pt.collector,
+    }
+}
+
 /// Resolve an ASN to a name. Checks global cache → bundled seed → Team Cymru cache →
 /// bundled Cymru seed → RouteViews peer fallback.
 /// Never blocks. No network I/O. Returns "ASxxxxx" for unknowns.
@@ -839,6 +871,11 @@ fn run_loop(
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
                     handle_key(key, dash);
+                    if dash.exit {
+                        // Leave immediately: the consumer.poll below can
+                        // block for up to 500 ms and makes q/b feel laggy.
+                        break;
+                    }
                 }
             }
         }
@@ -988,7 +1025,10 @@ fn render_header(frame: &mut Frame, area: Rect, dash: &Dashboard, connected: boo
         let router = sanitize_control_chars(m.router.as_deref().unwrap_or("?"));
         format!("{collector} / {router}  |  ")
     } else {
-        String::new()
+        // No metadata yet (connecting, or raw-BMP topic): identify the
+        // stream from its topic name instead.
+        let identity = sanitize_control_chars(&topic_identity(&dash.topic));
+        format!("{identity}  |  ")
     };
 
     let title = if !connected {
@@ -2023,6 +2063,20 @@ mod tests {
         }
         let len = global_name_cache().lock().unwrap().len();
         assert!(len <= MAX_CACHED_AS_NAMES, "cache grew to {len} entries");
+    }
+
+    #[test]
+    fn test_topic_identity_shows_collector_and_asn() {
+        // The stream header must identify the selected stream even before
+        // OpenBMP metadata arrives (i.e. while connecting).
+        let id = topic_identity("routeviews.route-views2.2152.bmp_raw");
+        assert!(id.contains("route-views2"), "got: {id}");
+        assert!(id.contains("2152"), "got: {id}");
+    }
+
+    #[test]
+    fn test_topic_identity_fallback_for_unknown_format() {
+        assert_eq!(topic_identity("my.custom.topic"), "my.custom.topic");
     }
 
     // -----------------------------------------------------------------------

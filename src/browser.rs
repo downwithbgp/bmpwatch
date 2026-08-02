@@ -965,7 +965,9 @@ mod model {
             Some(current) => indices
                 .iter()
                 .rposition(|&i| i < current)
-                .map(|pos| indices[pos]),
+                .map(|pos| indices[pos])
+                // Clamp at the first item instead of unselecting.
+                .or(Some(current)),
             None => indices.last().copied(),
         }
     }
@@ -975,7 +977,9 @@ mod model {
             Some(current) => indices
                 .iter()
                 .position(|&i| i > current)
-                .map(|pos| indices[pos]),
+                .map(|pos| indices[pos])
+                // Clamp at the last item instead of unselecting.
+                .or(Some(current)),
             None => indices.first().copied(),
         }
     }
@@ -2116,6 +2120,24 @@ mod model {
                     "row {row} contains stray peering diagnostic text"
                 );
             }
+        }
+        // ── list navigation clamping ──
+
+        #[test]
+        fn test_list_navigation_clamps_at_boundaries() {
+            // Single visible stream: Up/Down at the only item must keep it
+            // selected, not unselect it.
+            let one = [0usize];
+            assert_eq!(inc_opt_in_list(Some(0), &one), Some(0));
+            assert_eq!(dec_opt_in_list(Some(0), &one), Some(0));
+
+            let many = [0usize, 2, 5];
+            assert_eq!(inc_opt_in_list(None, &many), Some(0));
+            assert_eq!(inc_opt_in_list(Some(0), &many), Some(2));
+            assert_eq!(inc_opt_in_list(Some(5), &many), Some(5)); // clamp at end
+            assert_eq!(dec_opt_in_list(None, &many), Some(5));
+            assert_eq!(dec_opt_in_list(Some(5), &many), Some(2));
+            assert_eq!(dec_opt_in_list(Some(0), &many), Some(0)); // clamp at start
         }
     }
 } // mod model
