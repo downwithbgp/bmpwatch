@@ -38,3 +38,10 @@ jobs:
 
       - name: Test
         run: cargo test --workspace
+
+      - name: Dependency policy (licenses, advisories)
+        # Built from crates.io source (no third-party binary/action);
+        # --locked for reproducibility.
+        run: |
+          cargo install cargo-deny --locked
+          cargo deny check
