@@ -34,14 +34,22 @@ fn fetch_peering_status() -> Result<String, String> {
         .call()
         .map_err(|e| format!("fetch peering status: {e}"))?;
     // Bound the response read; a compromised/misbehaving endpoint must not
-    // stream unbounded data into memory.
+    // stream unbounded data into memory. Read cap+1 bytes so truncation is
+    // detectable and treated as a fetch failure (the caller falls back to
+    // bundled data instead of caching a partial peering-status).
     const MAX_PEERING_STATUS_BYTES: u64 = 1 << 20;
-    let mut body = String::new();
+    let mut body = Vec::new();
     let reader = resp.into_body().into_reader();
     reader
-        .take(MAX_PEERING_STATUS_BYTES)
-        .read_to_string(&mut body)
+        .take(MAX_PEERING_STATUS_BYTES + 1)
+        .read_to_end(&mut body)
         .map_err(|e| format!("read peering status: {e}"))?;
+    if body.len() as u64 > MAX_PEERING_STATUS_BYTES {
+        return Err(format!(
+            "peering status response exceeds {MAX_PEERING_STATUS_BYTES} bytes; refusing to cache partial data"
+        ));
+    }
+    let body = String::from_utf8(body).map_err(|e| format!("peering status not UTF-8: {e}"))?;
     Ok(body)
 }
 

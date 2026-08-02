@@ -28,10 +28,13 @@ pub(crate) fn debug_log_path(name: &str) -> PathBuf {
 mod tests {
     use super::*;
 
+    // Single test so the XDG_CACHE_HOME/HOME mutations cannot race with
+    // other tests in parallel threads; env is restored at the end.
     #[test]
-    fn test_cache_dir_uses_xdg() {
+    fn test_cache_dir_resolution() {
         let old_xdg = std::env::var("XDG_CACHE_HOME").ok();
         let old_home = std::env::var("HOME").ok();
+
         std::env::set_var("XDG_CACHE_HOME", "/tmp/bmpwatch-test-cache");
         std::env::set_var("HOME", "/tmp/bmpwatch-test-home");
         assert_eq!(
@@ -42,27 +45,14 @@ mod tests {
             debug_log_path("peering"),
             PathBuf::from("/tmp/bmpwatch-test-cache/bmpwatch/peering.log")
         );
-        // Restore
-        match old_xdg {
-            Some(v) => std::env::set_var("XDG_CACHE_HOME", v),
-            None => std::env::remove_var("XDG_CACHE_HOME"),
-        }
-        match old_home {
-            Some(v) => std::env::set_var("HOME", v),
-            None => std::env::remove_var("HOME"),
-        }
-    }
 
-    #[test]
-    fn test_cache_dir_falls_back_to_home() {
-        let old_xdg = std::env::var("XDG_CACHE_HOME").ok();
-        let old_home = std::env::var("HOME").ok();
         std::env::remove_var("XDG_CACHE_HOME");
         std::env::set_var("HOME", "/tmp/bmpwatch-test-home");
         assert_eq!(
             cache_dir(),
             PathBuf::from("/tmp/bmpwatch-test-home/.cache/bmpwatch")
         );
+
         match old_xdg {
             Some(v) => std::env::set_var("XDG_CACHE_HOME", v),
             None => std::env::remove_var("XDG_CACHE_HOME"),
