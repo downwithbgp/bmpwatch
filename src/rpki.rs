@@ -484,18 +484,31 @@ impl RPKICache {
         }
         // Write to a private temp file in the same directory, then rename
         // over the final path: atomic (no torn reads of a partial cache) and
-        // 0600. create_new (O_EXCL) refuses to follow or reuse a
-        // pre-existing file at the deterministic temp path, and the PID
-        // suffix prevents collisions between processes.
+        // 0600. create_new (O_EXCL) refuses to write through a pre-existing
+        // entry; if one exists (stale temp from a crashed run, or a planted
+        // file) it is unlinked — which never follows symlinks — and the
+        // create is retried once.
         let tmp_path = path.with_extension(format!("bin.tmp.{}", std::process::id()));
         {
             use std::os::unix::fs::OpenOptionsExt;
-            let mut f = fs::OpenOptions::new()
+            let mut f = match fs::OpenOptions::new()
                 .write(true)
                 .create_new(true)
                 .mode(0o600)
                 .open(&tmp_path)
-                .map_err(|e| format!("cache write: {e}"))?;
+            {
+                Ok(f) => f,
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                    fs::remove_file(&tmp_path).map_err(|e| format!("cache write: {e}"))?;
+                    fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .mode(0o600)
+                        .open(&tmp_path)
+                        .map_err(|e| format!("cache write: {e}"))?
+                }
+                Err(e) => return Err(format!("cache write: {e}")),
+            };
             if let Err(e) = f.write_all(&buf) {
                 let _ = fs::remove_file(&tmp_path); // our temp; clean it up
                 return Err(format!("cache write: {e}"));
@@ -1028,11 +1041,35 @@ mod tests {
     }
 
     #[test]
-    fn test_save_to_file_refuses_preexisting_temp() {
-        // A file planted at the deterministic temp path (e.g. a symlink
-        // attack or stale artifact) must not be followed or overwritten:
-        // save errors out, the artifact is untouched, and the final path is
-        // not created.
+    fn test_save_to_file_cleans_temp_on_rename_failure() {
+        let cache = RPKICache {
+            vrps4: vec![Vrp4 {
+                prefix: 0x0A000000,
+                prefix_len: 8,
+                max_len: 16,
+                asn: 65000,
+            }],
+            vrps6: vec![],
+            valid_count: 0,
+            invalid_count: 0,
+            not_found_count: 0,
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("rpki_cache.bin");
+        std::fs::create_dir(&path).unwrap(); // rename over a directory fails
+
+        assert!(cache.save_to_file(&path).is_err());
+        let tmp_path = path.with_extension(format!("bin.tmp.{}", std::process::id()));
+        assert!(
+            !tmp_path.exists(),
+            "temp must be cleaned up on rename failure"
+        );
+    }
+
+    #[test]
+    fn test_save_to_file_self_heals_stale_temp() {
+        // A leftover temp from a crashed run must not block persistence:
+        // it is unlinked and the save proceeds.
         let cache = RPKICache {
             vrps4: vec![Vrp4 {
                 prefix: 0x0A000000,
@@ -1048,15 +1085,44 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("rpki_cache.bin");
         let tmp_path = path.with_extension(format!("bin.tmp.{}", std::process::id()));
-        std::fs::write(&tmp_path, b"attacker artifact").unwrap();
+        std::fs::write(&tmp_path, b"stale garbage").unwrap();
 
-        assert!(cache.save_to_file(&path).is_err());
+        cache.save_to_file(&path).unwrap();
+        assert!(path.exists());
+        assert!(!tmp_path.exists(), "stale temp must be consumed");
+    }
+
+    #[test]
+    fn test_save_to_file_does_not_follow_symlink_temp() {
+        // A planted symlink at the temp path must never be written through:
+        // the unlink removes the link itself, the target stays untouched.
+        let cache = RPKICache {
+            vrps4: vec![Vrp4 {
+                prefix: 0x0A000000,
+                prefix_len: 8,
+                max_len: 16,
+                asn: 65000,
+            }],
+            vrps6: vec![],
+            valid_count: 0,
+            invalid_count: 0,
+            not_found_count: 0,
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("rpki_cache.bin");
+        let tmp_path = path.with_extension(format!("bin.tmp.{}", std::process::id()));
+        let target = dir.path().join("victim.txt");
+        std::fs::write(&target, b"victim data").unwrap();
+        std::os::unix::fs::symlink(&target, &tmp_path).unwrap();
+
+        cache.save_to_file(&path).unwrap();
         assert_eq!(
-            std::fs::read(&tmp_path).unwrap(),
-            b"attacker artifact",
-            "pre-existing temp must not be modified"
+            std::fs::read(&target).unwrap(),
+            b"victim data",
+            "symlink target must not be written through"
         );
-        assert!(!path.exists(), "final path must not be created");
+        assert!(path.exists());
+        assert!(!tmp_path.exists());
     }
 
     #[test]
