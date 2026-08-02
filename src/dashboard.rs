@@ -19,6 +19,7 @@ use crate::kafka;
 use crate::lint;
 use crate::obmp_reader::parse_record_payload;
 use crate::raw_bmp::BMP_EXPECTED_VERSION;
+use crate::report::sanitize_control_chars;
 use crate::rolling::RollingSummary;
 use crate::rpki::RPKICache;
 use crate::state::{Finding, PeerKey};
@@ -691,6 +692,9 @@ fn insert_bounded<K: Eq + std::hash::Hash, V>(
 /// UTF-8 names (e.g. from the network-refreshed WHOIS cache) cannot panic —
 /// unlike the previous raw byte slice `&name[..21]`.
 fn truncate_name(name: &str, max_chars: usize) -> String {
+    if max_chars == 0 {
+        return String::new();
+    }
     if name.chars().count() <= max_chars {
         return name.to_string();
     }
@@ -966,8 +970,8 @@ fn render_status_bar(frame: &mut Frame, area: Rect, dash: &Dashboard) {
 
 fn render_header(frame: &mut Frame, area: Rect, dash: &Dashboard, connected: bool) {
     let meta_str = if let Some(ref m) = dash.metadata {
-        let collector = m.collector.as_deref().unwrap_or("?");
-        let router = m.router.as_deref().unwrap_or("?");
+        let collector = sanitize_control_chars(m.collector.as_deref().unwrap_or("?"));
+        let router = sanitize_control_chars(m.router.as_deref().unwrap_or("?"));
         format!("{collector} / {router}  |  ")
     } else {
         String::new()
@@ -1983,6 +1987,12 @@ mod tests {
         assert_eq!(s, format!("{}…", "Ä".repeat(4)));
         assert!(s.is_char_boundary(s.len()));
         assert_eq!(s.chars().count(), 5);
+    }
+
+    #[test]
+    fn test_truncate_name_zero_max_chars() {
+        assert_eq!(truncate_name("abc", 0), "");
+        assert_eq!(truncate_name("", 0), "");
     }
 
     // -----------------------------------------------------------------------

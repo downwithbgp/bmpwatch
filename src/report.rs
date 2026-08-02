@@ -19,9 +19,9 @@ fn format_size(bytes: u64) -> String {
 
 /// Replace control characters (which can inject ANSI/OSC terminal escape
 /// sequences into output) with visible escapes. Applied at the print
-/// boundary to strings derived from untrusted BMP TLVs, so a crafted
-/// capture cannot spoof terminal output or trigger clipboard writes.
-fn sanitize_control_chars(s: &str) -> String {
+/// boundary to strings derived from untrusted BMP/OpenBMP content, so a
+/// crafted capture cannot spoof terminal output or trigger clipboard writes.
+pub(crate) fn sanitize_control_chars(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
         match c {
@@ -240,13 +240,13 @@ pub fn render_inspect(state: &DoctorState, truncated: bool, max_peers: usize) {
             println!();
             println!("OpenBMP metadata:");
             if let Some(ref c) = meta.collector {
-                println!("  Collector:  {c}");
+                println!("  Collector:  {}", sanitize_control_chars(c));
             }
             if let Some(ref r) = meta.router {
-                println!("  Router:     {r}");
+                println!("  Router:     {}", sanitize_control_chars(r));
             }
             if let Some(ref ip) = meta.router_ip {
-                println!("  Router IP:  {ip}");
+                println!("  Router IP:  {}", sanitize_control_chars(ip));
             }
         }
     }

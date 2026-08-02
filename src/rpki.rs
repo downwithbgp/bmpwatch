@@ -482,20 +482,24 @@ impl RPKICache {
             buf.push(v.max_len);
             buf.extend_from_slice(&v.asn.to_be_bytes());
         }
-        // Write to a temp file in the same directory, then rename over the
-        // final path: atomic (no torn reads of a partial cache) and private
-        // (0600 — cache holds routing/validation data).
-        let tmp_path = path.with_extension("bin.tmp");
+        // Write to a private temp file in the same directory, then rename
+        // over the final path: atomic (no torn reads of a partial cache) and
+        // 0600. create_new (O_EXCL) refuses to follow or reuse a
+        // pre-existing file at the deterministic temp path, and the PID
+        // suffix prevents collisions between processes.
+        let tmp_path = path.with_extension(format!("bin.tmp.{}", std::process::id()));
         {
             use std::os::unix::fs::OpenOptionsExt;
             let mut f = fs::OpenOptions::new()
                 .write(true)
-                .create(true)
-                .truncate(true)
+                .create_new(true)
                 .mode(0o600)
                 .open(&tmp_path)
                 .map_err(|e| format!("cache write: {e}"))?;
-            f.write_all(&buf).map_err(|e| format!("cache write: {e}"))?;
+            if let Err(e) = f.write_all(&buf) {
+                let _ = fs::remove_file(&tmp_path); // our temp; clean it up
+                return Err(format!("cache write: {e}"));
+            }
         }
         fs::rename(&tmp_path, path).map_err(|e| format!("cache rename: {e}"))?;
         Ok(())
@@ -1016,7 +1020,40 @@ mod tests {
             "cache file must be private (0600), got {mode:o}"
         );
         // Temp file must not be left behind after the atomic rename.
-        assert!(!path.with_extension("bin.tmp").exists());
+        let tmp_path = path.with_extension(format!("bin.tmp.{}", std::process::id()));
+        assert!(!tmp_path.exists());
+    }
+
+    #[test]
+    fn test_save_to_file_refuses_preexisting_temp() {
+        // A file planted at the deterministic temp path (e.g. a symlink
+        // attack or stale artifact) must not be followed or overwritten:
+        // save errors out, the artifact is untouched, and the final path is
+        // not created.
+        let cache = RPKICache {
+            vrps4: vec![Vrp4 {
+                prefix: 0x0A000000,
+                prefix_len: 8,
+                max_len: 16,
+                asn: 65000,
+            }],
+            vrps6: vec![],
+            valid_count: 0,
+            invalid_count: 0,
+            not_found_count: 0,
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("rpki_cache.bin");
+        let tmp_path = path.with_extension(format!("bin.tmp.{}", std::process::id()));
+        std::fs::write(&tmp_path, b"attacker artifact").unwrap();
+
+        assert!(cache.save_to_file(&path).is_err());
+        assert_eq!(
+            std::fs::read(&tmp_path).unwrap(),
+            b"attacker artifact",
+            "pre-existing temp must not be modified"
+        );
+        assert!(!path.exists(), "final path must not be created");
     }
 
     #[test]
