@@ -1,13 +1,26 @@
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use rdkafka::config::ClientConfig;
+use rdkafka::config::{ClientConfig, RDKafkaLogLevel};
 use rdkafka::consumer::BaseConsumer;
 use rdkafka::consumer::Consumer;
 
+/// librdkafka logs to stderr by default, which corrupts the TUI's
+/// alternate screen (raw `%3|...|rdkafka#consumer-2|...` lines interleaved
+/// with the dashboard). Both consumers below are used from the TUI (and the
+/// recorder), so pin the log level to Emerg — nothing below emergency ever
+/// reaches the terminal. Connectivity is surfaced by the dashboard's own
+/// status line instead. (rdkafka 0.36 exposes no safe log callback to
+/// redirect these lines to the debug log file.)
+fn quiet_librdkafka(cfg: &mut ClientConfig) {
+    cfg.set_log_level(RDKafkaLogLevel::Emerg);
+}
+
 /// Fetch topic names from a Kafka broker matching a regex pattern.
 pub fn fetch_topics(broker: &str, pattern: &str) -> Result<Vec<String>> {
-    let consumer: BaseConsumer = ClientConfig::new()
+    let mut config = ClientConfig::new();
+    quiet_librdkafka(&mut config);
+    let consumer: BaseConsumer = config
         .set("bootstrap.servers", broker)
         .set("group.id", "bmpwatch-recorder-metadata")
         .create()
@@ -52,7 +65,9 @@ pub fn apply_filters(
 /// Create a Kafka BaseConsumer with standard config for RouteViews.
 pub fn create_consumer(broker: &str, group_id: &str, from_end: bool) -> Result<BaseConsumer> {
     let offset_reset = if from_end { "latest" } else { "earliest" };
-    ClientConfig::new()
+    let mut config = ClientConfig::new();
+    quiet_librdkafka(&mut config);
+    config
         .set("bootstrap.servers", broker)
         .set("group.id", group_id)
         .set("enable.auto.commit", "false")
