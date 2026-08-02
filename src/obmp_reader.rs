@@ -132,6 +132,20 @@ pub(crate) fn parse_record_payload(
         };
     }
 
+    // Cap the payload itself: the dashboard feeds Kafka messages straight
+    // into this function (bypassing ObmpReader's length guard), so a giant
+    // live message must be rejected before any parsing/allocation.
+    if payload.len() > MAX_PAYLOAD_LEN {
+        return RecordResult {
+            frame: Err(DoctorError::Frame(format!(
+                ".bmpd frame {frame_index} at offset {frame_offset}: payload length {} exceeds maximum {MAX_PAYLOAD_LEN}",
+                payload.len()
+            ))),
+            kind: PayloadKind::Unrecognized,
+            metadata: None,
+        };
+    }
+
     let kind = if payload[0] == 0x03 {
         PayloadKind::RawBmp
     } else if payload.len() >= 4 && &payload[..4] == b"OBMP" {
@@ -816,5 +830,18 @@ mod tests {
         assert_eq!(frames.len(), 1);
         let err = frames[0].as_ref().unwrap_err().to_string();
         assert!(err.contains("exceeds maximum"));
+    }
+
+    #[test]
+    fn test_parse_record_payload_rejects_oversized() {
+        // The dashboard feeds Kafka payloads straight into
+        // parse_record_payload, bypassing ObmpReader's length guard; the
+        // cap must hold here too so a giant live message cannot drive
+        // unbounded parsing/allocation.
+        let payload = vec![0u8; MAX_PAYLOAD_LEN + 1];
+        let result = parse_record_payload(&payload, 0, 0);
+        assert!(result.frame.is_err());
+        let msg = result.frame.unwrap_err().to_string();
+        assert!(msg.contains("maximum"), "got: {msg}");
     }
 }

@@ -26,6 +26,15 @@ use bytes::Bytes;
 
 const THROUGHPUT_HISTORY: usize = 60;
 
+// Bounds on live-stream per-key state. Keys are derived from
+// attacker-controlled BMP content (peer IPs, prefixes, AS paths), so without
+// caps a hostile feed grows these maps without bound. Limits sit well above
+// realistic RouteViews traffic (full table is ~1M prefixes).
+const MAX_TRACKED_PEERS: usize = 100_000;
+const MAX_TRACKED_PREFIXES: usize = 1_000_000;
+const MAX_TRACKED_ASNS: usize = 100_000;
+const MAX_TRACKED_AS_PAIRS: usize = 100_000;
+
 /// A single line in the scrolling message ticker at the bottom of the screen.
 struct MessageLine {
     msg_type: u8,
@@ -111,9 +120,9 @@ impl Dashboard {
                 }
 
                 if let Some(ref pk) = peer_key {
-                    *self.peer_msg_counts.entry(pk.clone()).or_insert(0) += 1;
+                    bump_count(&mut self.peer_msg_counts, pk.clone(), MAX_TRACKED_PEERS);
                     if !findings.is_empty() {
-                        *self.peer_warnings.entry(pk.clone()).or_insert(0) += findings.len() as u64;
+                        bump_count(&mut self.peer_warnings, pk.clone(), MAX_TRACKED_PEERS);
                     }
                 }
 
@@ -166,27 +175,46 @@ impl Dashboard {
                         }
                         pc.rpki = worst;
                     }
-                    // Track churn, origins, and AS relationships
+                    // Track churn, origins, and AS relationships (bounded:
+                    // keys are attacker-controlled, see MAX_TRACKED_*)
                     if let Some(ref pc) = prefixes {
                         for (p, origin) in &pc.announced {
-                            *self.churn_counts.entry(p.clone()).or_insert(0) += 1;
+                            bump_count(&mut self.churn_counts, p.clone(), MAX_TRACKED_PREFIXES);
                             if *origin > 0 {
-                                self.prefix_origins.insert(p.clone(), *origin);
+                                insert_bounded(
+                                    &mut self.prefix_origins,
+                                    p.clone(),
+                                    *origin,
+                                    MAX_TRACKED_PREFIXES,
+                                );
                             }
-                            self.prefix_last_path.insert(p.clone(), pc.as_path.clone());
+                            insert_bounded(
+                                &mut self.prefix_last_path,
+                                p.clone(),
+                                pc.as_path.clone(),
+                                MAX_TRACKED_PREFIXES,
+                            );
                         }
                         for (p, origin) in &pc.withdrawn {
-                            *self.churn_counts.entry(p.clone()).or_insert(0) += 1;
+                            bump_count(&mut self.churn_counts, p.clone(), MAX_TRACKED_PREFIXES);
                             if *origin > 0 {
-                                self.prefix_origins.insert(p.clone(), *origin);
+                                insert_bounded(
+                                    &mut self.prefix_origins,
+                                    p.clone(),
+                                    *origin,
+                                    MAX_TRACKED_PREFIXES,
+                                );
                             }
                         }
                         for asn in &pc.as_path {
-                            *self.as_frequency.entry(*asn).or_insert(0) += 1;
+                            bump_count(&mut self.as_frequency, *asn, MAX_TRACKED_ASNS);
                         }
                         for pair in pc.as_path.windows(2) {
-                            let key = (pair[0], pair[1]);
-                            *self.as_adjacency.entry(key).or_insert(0) += 1;
+                            bump_count(
+                                &mut self.as_adjacency,
+                                (pair[0], pair[1]),
+                                MAX_TRACKED_AS_PAIRS,
+                            );
                         }
                     }
                     let ts_sec = frame
@@ -628,6 +656,33 @@ pub(crate) fn format_prefix_count(n: u64) -> String {
 fn global_name_cache() -> &'static Mutex<HashMap<u32, String>> {
     static CACHE: OnceLock<Mutex<HashMap<u32, String>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Increment `map[key]` by one, inserting only while the map is under
+/// `cap` — bounds memory growth from attacker-controlled keys (peer IPs,
+/// prefixes, ASNs) without dropping counters for keys already tracked.
+fn bump_count<K: Eq + std::hash::Hash>(map: &mut HashMap<K, u64>, key: K, cap: usize) {
+    match map.get_mut(&key) {
+        Some(v) => *v += 1,
+        None => {
+            if map.len() < cap {
+                map.insert(key, 1);
+            }
+        }
+    }
+}
+
+/// Insert `key -> value` only when the key is already present or the map is
+/// under `cap` — same bounding rationale as `bump_count`.
+fn insert_bounded<K: Eq + std::hash::Hash, V>(
+    map: &mut HashMap<K, V>,
+    key: K,
+    value: V,
+    cap: usize,
+) {
+    if map.contains_key(&key) || map.len() < cap {
+        map.insert(key, value);
+    }
 }
 
 /// Truncate a name for display: names longer than `max_chars` characters are
@@ -1928,5 +1983,100 @@ mod tests {
         assert_eq!(s, format!("{}…", "Ä".repeat(4)));
         assert!(s.is_char_boundary(s.len()));
         assert_eq!(s.chars().count(), 5);
+    }
+
+    // -----------------------------------------------------------------------
+    // live-stream state bounds
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_bump_count_respects_cap() {
+        let mut m: HashMap<u32, u64> = HashMap::new();
+        bump_count(&mut m, 1, 3);
+        bump_count(&mut m, 2, 3);
+        bump_count(&mut m, 3, 3);
+        bump_count(&mut m, 1, 3); // existing key: still increments
+        bump_count(&mut m, 4, 3); // new key beyond cap: dropped
+        assert_eq!(m.len(), 3);
+        assert_eq!(m[&1], 2);
+        assert!(!m.contains_key(&4));
+    }
+
+    #[test]
+    fn test_insert_bounded_respects_cap() {
+        let mut m: HashMap<u32, u32> = HashMap::new();
+        insert_bounded(&mut m, 1, 10, 2);
+        insert_bounded(&mut m, 2, 20, 2);
+        insert_bounded(&mut m, 1, 11, 2); // present key: updates
+        insert_bounded(&mut m, 3, 30, 2); // new key beyond cap: dropped
+        assert_eq!(m.len(), 2);
+        assert_eq!(m[&1], 11);
+        assert!(!m.contains_key(&3));
+    }
+
+    #[test]
+    fn test_peer_state_bounded() {
+        use crate::raw_bmp::fixtures;
+        let mut dash = Dashboard::new("test", 10);
+        // Distinct peer IPs beyond the cap: only MAX_TRACKED_PEERS tracked.
+        for i in 0..MAX_TRACKED_PEERS + 5 {
+            let frame = fixtures::make_route_monitoring_frame(
+                65000,
+                [10, (i >> 16) as u8, (i >> 8) as u8, i as u8],
+                100,
+                0,
+            );
+            dash.process_message(&frame);
+        }
+        assert_eq!(dash.peer_msg_counts.len(), MAX_TRACKED_PEERS);
+        assert_eq!(dash.peer_warnings.len(), 0);
+    }
+
+    /// Build a BMP Route Monitoring frame announcing 10.0.<n>.0/24 with
+    /// AS_PATH [6447, 13335] (same wire format as the existing
+    /// test_extract_prefixes_with_proper_bgp_update fixture).
+    fn make_update_frame(n: u8) -> Vec<u8> {
+        use crate::raw_bmp::fixtures;
+
+        let mut bgp = Vec::new();
+        bgp.extend_from_slice(&[0xFF; 16]);
+        bgp.extend_from_slice(&[0x00, 0x00]);
+        bgp.push(0x02);
+        bgp.extend_from_slice(&[0x00, 0x00]); // withdrawn length
+
+        let mut attrs = Vec::new();
+        attrs.extend_from_slice(&[0x40, 0x01, 0x01, 0x00]); // ORIGIN IGP
+        attrs.extend_from_slice(&[
+            0x40, 0x02, 0x0A, 0x02, 0x02, 0x00, 0x00, 0x19, 0x2F, // AS_PATH 6447
+            0x00, 0x00, 0x34, 0x17, // 13335
+        ]);
+        attrs.extend_from_slice(&[0x40, 0x03, 0x04, 10, 0, 0, 1]); // NEXT_HOP
+        bgp.extend_from_slice(&(attrs.len() as u16).to_be_bytes());
+        bgp.extend_from_slice(&attrs);
+        bgp.extend_from_slice(&[24, 10, 0, n]); // NLRI 10.0.<n>.0/24
+
+        let bgp_total = bgp.len() as u16;
+        bgp[16..18].copy_from_slice(&bgp_total.to_be_bytes());
+
+        let pph = fixtures::make_per_peer_header(13335, [10, 0, 0, 1], 1000, 0);
+        let total_payload: Vec<u8> = pph.into_iter().chain(bgp).collect();
+        let bmp_header = fixtures::make_common_header(0, total_payload.len() as u32);
+        bmp_header.into_iter().chain(total_payload).collect()
+    }
+
+    #[test]
+    fn test_prefix_state_tracking() {
+        let mut dash = Dashboard::new("test", 10);
+        for n in 0..3 {
+            dash.process_message(&make_update_frame(n));
+        }
+        assert_eq!(dash.churn_counts.len(), 3);
+        assert_eq!(dash.churn_counts["10.0.1.0/24"], 1);
+        assert_eq!(dash.prefix_origins["10.0.0.0/24"], 13335);
+        assert_eq!(dash.as_frequency[&6447], 3);
+        assert_eq!(dash.as_frequency[&13335], 3);
+        assert_eq!(dash.as_adjacency[&(6447, 13335)], 3);
+        // Last announced path is retained for the detail view.
+        assert_eq!(dash.prefix_last_path["10.0.2.0/24"], vec![6447, 13335]);
     }
 }
