@@ -14,6 +14,11 @@ pub const BMP_COMMON_HEADER_SIZE: usize = 6;
 // MAX_PAYLOAD_LEN cap in obmp_reader.rs).
 pub const MAX_FRAME_LEN: usize = 64 * 1024 * 1024;
 
+// Cap on Stats Report entries per frame. Real reports have a handful of
+// entries; the cap bounds the ~15-24x heap amplification of a crafted
+// 64 MiB stats frame (each entry needs >= 4 bytes of payload) to ~4 MB.
+const MAX_STATS_ENTRIES: usize = 100_000;
+
 // BMP Per-Peer Header as defined in RFC 7854, Section 3.2.
 // Layout: Peer Type (1) + Peer Flags (1) + Peer Distinguisher (8)
 //       + Peer Address (16) + Peer AS (4) + Peer BGP ID (4)
@@ -234,10 +239,13 @@ fn parse_stats(payload: &[u8]) -> Option<StatsInfo> {
         return None;
     }
     let stats_count = u32::from_be_bytes([payload[0], payload[1], payload[2], payload[3]]) as usize;
-    let mut entries = Vec::new();
+    // Bound the reservation and the parse loop by what the payload can
+    // actually hold (min 4 bytes per entry) and by MAX_STATS_ENTRIES.
+    let max_entries = ((payload.len() - 4) / 4).min(MAX_STATS_ENTRIES);
+    let mut entries = Vec::with_capacity(stats_count.min(max_entries));
     let mut pos = 4;
 
-    for _ in 0..stats_count {
+    for _ in 0..stats_count.min(max_entries) {
         if pos + 4 > payload.len() {
             break;
         }
@@ -1082,5 +1090,42 @@ mod tests {
         assert_eq!(frames.len(), 1);
         assert_eq!(frames[0].msg_type, Some(BmpMessageType::StatisticsReport));
         assert!(frames[0].stats_info.is_none());
+    }
+
+    #[test]
+    fn test_parse_stats_caps_entries_per_frame() {
+        // A stats frame declaring MAX_STATS_ENTRIES + 1 entries must stop at
+        // the cap: before the bound, one crafted 64 MiB frame could build
+        // ~16M heap entries (~700 MB) from 4-byte-per-entry input.
+        let pph = fixtures::make_per_peer_header(65000, [10, 0, 0, 1], 100, 0);
+        let mut payload = Vec::new();
+        payload.extend_from_slice(&((MAX_STATS_ENTRIES as u32) + 1).to_be_bytes());
+        for _ in 0..MAX_STATS_ENTRIES + 1 {
+            payload.extend_from_slice(&make_stats_entry(7, &42u32.to_be_bytes()));
+        }
+        let total = [pph.as_slice(), payload.as_slice()].concat();
+        let frame = make_bmp_message(1, &total);
+        let stats = parse_frame_from_bytes(&frame, 0)
+            .unwrap()
+            .stats_info
+            .unwrap();
+        assert_eq!(stats.entries.len(), MAX_STATS_ENTRIES);
+    }
+
+    #[test]
+    fn test_parse_stats_huge_declared_count_small_payload() {
+        // Declared count near u32::MAX with a small payload must not panic
+        // or over-allocate; parsing is bounded by the actual payload.
+        let pph = fixtures::make_per_peer_header(65000, [10, 0, 0, 1], 100, 0);
+        let mut payload = vec![0u8; 4];
+        payload[0..4].copy_from_slice(&0xFFFF_FFF0u32.to_be_bytes());
+        payload.extend_from_slice(&make_stats_entry(7, &42u32.to_be_bytes()));
+        let total = [pph.as_slice(), payload.as_slice()].concat();
+        let frame = make_bmp_message(1, &total);
+        let stats = parse_frame_from_bytes(&frame, 0)
+            .unwrap()
+            .stats_info
+            .unwrap();
+        assert_eq!(stats.entries.len(), 1);
     }
 }
