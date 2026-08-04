@@ -37,14 +37,19 @@ announced prefixes against RPKI VRPs loaded from an RTR server.
 
 ## What it does
 
-bmpwatch provides four modes of operation:
+bmpwatch provides five modes of operation:
 
 | Mode | Command | Description |
 |------|---------|-------------|
 | **dashboard** | `bmpwatch` (default) | Live TUI with stream browser, message log, and RPKI validation |
+| **replay** | `bmpwatch <file>` | Rolling-window summary of a recorded capture (`--window-messages`, `--interval-ms`, `--format`) |
 | **inspect** | `bmpwatch inspect <file>` | Human-readable file summary with peer inventory and findings |
 | **lint** | `bmpwatch lint <file>` | Machine-oriented finding output with exit codes |
 | **dump** | `bmpwatch dump <file> --jsonl` | One JSON object per BMP message for scripting |
+
+The dashboard can also be started explicitly with the `bmpwatch dashboard`
+subcommand (same `--broker`/`--topic`/`--collector`/`--asn` flags as the
+default mode).
 
 Plus the companion binary `record_openbmp_kafka` for offline capture.
 
@@ -75,8 +80,9 @@ Plus the companion binary `record_openbmp_kafka` for offline capture.
 > RPKI status as advisory on untrusted networks.
 
 **AS name enrichment**
-- Multi-tier resolution: bundled Cymru seed → user cache → bundled Cymru
-  fallback → RouteViews peer metadata → raw ASN fallback
+- Multi-tier resolution: session cache → bundled seed → user Cymru
+  cache → bundled Cymru seed → RouteViews peer metadata → raw ASN
+  fallback
 - Offline WHOIS refresh via `bmpwatch refresh-asnames`
 - No network I/O during TUI operation
 
@@ -235,8 +241,9 @@ Before showing a Kafka topic in the browser, bmpwatch checks whether the
 RouteViews' peering-status page, with a bundled TSV fallback). Topics for
 dead, inactive, or reserved peerings are hidden. Normal TUI operation produces
 no peering diagnostics on stderr. Set `BMPWATCH_DEBUG_PEERING=1` to write
-peering diagnostics and hidden-topic listings to
-`/tmp/bmpwatch-peering.log`.
+peering diagnostics and hidden-topic listings to the bmpwatch cache
+directory (`$XDG_CACHE_HOME/bmpwatch/peering.log`, default
+`~/.cache/bmpwatch/peering.log`).
 
 ## RPKI validation
 
@@ -272,9 +279,9 @@ AS names in the browser and dashboard are resolved through a chain of
 fallbacks — no network calls are made during TUI operation:
 
 1. **Session cache** — names seen earlier in this run
-2. **Bundled Cymru seed** — ~800 entries, compiled into the binary
+2. **Bundled seed** — ~380 curated entries, compiled into the binary
 3. **User Cymru cache** — populated offline via `bmpwatch refresh-asnames`
-4. **Bundled Cymru fallback** — secondary seed set
+4. **Bundled Cymru seed** — ~800 Team Cymru entries, compiled into the binary
 5. **RouteViews peer metadata** — names from the bundled peering TSV
 6. **Raw ASN** — `AS12345` when no name is available
 
@@ -302,11 +309,11 @@ cargo clippy --workspace --all-targets -- -D warnings
 
 ### Debug flags
 
-| Variable | Log file | Effect |
+| Variable | Log file (under `$XDG_CACHE_HOME/bmpwatch/`; default `~/.cache/bmpwatch/`, else `./bmpwatch/`) | Effect |
 |----------|----------|--------|
-| `BMPWATCH_BROWSER_DEBUG` | `/tmp/bmpwatch-browser-debug.log` | Browser event-loop diagnostics and mouse-capture warnings |
-| `BMPWATCH_DEBUG_PEERING` | `/tmp/bmpwatch-peering.log` | Peering-filter diagnostics and hidden-topic listings |
-| `BMPWATCH_DASHBOARD_DEBUG` | `/tmp/bmpwatch-dashboard.log` | Kafka poll errors during dashboard operation |
+| `BMPWATCH_BROWSER_DEBUG` | `browser-debug.log` | Browser event-loop diagnostics and mouse-capture warnings |
+| `BMPWATCH_DEBUG_PEERING` | `peering.log` | Peering-filter diagnostics and hidden-topic listings |
+| `BMPWATCH_DASHBOARD_DEBUG` | `dashboard.log` | Kafka poll errors during dashboard operation |
 
 ## Limitations
 

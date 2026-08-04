@@ -28,7 +28,7 @@ Metadata for all topics (from broker -1: stream.routeviews.org:9092/bootstrap):
   topic "routeviews.uaeix.31898.bmp_raw" ...
   topic "routeviews.nwax.13335.bmp_raw" ...
   topic "routeviews.sg.64050.bmp_raw" ...
-  topic "route-views.linx.8714.bmp_raw" ...
+  topic "routeviews.linx.8714.bmp_raw" ...
 ```
 
 ### 3. Observed topic names
@@ -40,7 +40,7 @@ Metadata for all topics (from broker -1: stream.routeviews.org:9092/bootstrap):
 | `routeviews.uaeix.31898.bmp_raw` | `routeviews.` |
 | `routeviews.nwax.13335.bmp_raw` | `routeviews.` |
 | `routeviews.sg.64050.bmp_raw` | `routeviews.` |
-| `route-views.linx.8714.bmp_raw` | `route-views.` |
+| `routeviews.linx.8714.bmp_raw` | `routeviews.` |
 
 ### 4. Topic regex
 
@@ -48,8 +48,11 @@ Metadata for all topics (from broker -1: stream.routeviews.org:9092/bootstrap):
 ^route-?views\..*\.bmp_raw$
 ```
 
-**Warning:** Topic naming is not perfectly uniform. Both `routeviews.` and
-`route-views.` prefixes exist. Any Kafka consumer must handle both variants.
+**Note (re-verified 2026-08-04 over 1954 live topics):** the topic
+prefix is uniformly `routeviews.`. Hyphenated names appear only in the
+collector group segment (e.g. `routeviews.route-views2.saopaulo.199524.bmp_raw`).
+The defensive regex above still works, but no `route-views.`-prefixed
+topics have been observed on the broker.
 
 ## Conclusion
 

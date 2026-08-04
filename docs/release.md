@@ -29,9 +29,9 @@ workflow (see the header comment in the file).
 ## Tag and build
 
 ```sh
-# Tag the release (triggers cargo-dist CI)
-git tag v0.1.0
-git push origin v0.1.0
+# Tag the release (triggers cargo-dist CI); use the new version from Cargo.toml
+git tag v0.1.2
+git push origin v0.1.2
 ```
 
 The cargo-dist release workflow will:

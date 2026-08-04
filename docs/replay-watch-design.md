@@ -1,15 +1,18 @@
 # Replay / Watch Design
 
-Future CLI concept for replaying `.bmpd` or `.rawbmp` captures as a
+Design for replaying `.bmpd` or `.rawbmp` captures as a
 rolling window stream — a stepping stone toward live Observatory
 summaries.
 
-## Command sketch
+**Implemented** (since v0.1.2): `bmpwatch <file>` runs this mode.
+
+## Command (as implemented)
 
 ```sh
-bmpwatch watch samples/capture.bmpd \
+bmpwatch samples/capture.bmpd \
   --window-messages 100 \
-  --interval 1s
+  --interval-ms 1000 \
+  --format auto
 ```
 
 - Reads an existing capture file sequentially.
@@ -80,7 +83,10 @@ Minimal, additive to existing `--summary-json` shape:
 ## Implementation notes
 
 - Rolling model implemented in `src/rolling.rs` (`RollingSummary`).
-- CLI command still future work.
+- CLI command implemented: `bmpwatch <file>` (no `watch` subcommand;
+  the interval flag is `--interval-ms`, integer milliseconds).
+  Emits one JSON summary line per interval (see `src/doctor.rs`
+  `watch()` and `src/rolling.rs` `RollingSummary`).
 - Reuse existing parser and state tracking logic where possible.
 - Do not duplicate rule matching code.
 - Keep memory bounded to `--window-messages` records.

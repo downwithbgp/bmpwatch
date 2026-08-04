@@ -17,11 +17,11 @@ implementation.
 |-----------|-------|-----------|
 | [RFC 8671](https://www.rfc-editor.org/rfc/rfc8671) | Adj-RIB-Out Support in BMP | Defines peer flag bit 1 (L = post-policy flag) for Adj-RIB-Out route monitoring. BMPWatch does not yet interpret Adj-RIB-Out vs Adj-RIB-In. |
 | [RFC 9069](https://www.rfc-editor.org/rfc/rfc9069) | Loc-RIB Support in BMP | Defines Route Monitoring message differentiation for Loc-RIB exports. BMPWatch's `duplicate_peer_up` rule does not yet distinguish Loc-RIB sessions from Adj-RIB sessions. |
-| [RFC 9736](https://www.rfc-editor.org/rfc/rfc9736) | BMP Peer Up TLV Update | Updates Peer Up message TLVs for BGP role and mode negotiation. BMPWatch does not parse Peer Up TLVs beyond the OPEN message in v0.1. |
+| [RFC 9736](https://www.rfc-editor.org/rfc/rfc9736) | BMP Peer Up TLV Update | Updates Peer Up message TLVs for BGP role and mode negotiation. BMPWatch does not parse Peer Up TLVs beyond the OPEN message in v0.1.2. |
 
-## Implementation scope (v0.1)
+## Implementation scope (v0.1.2)
 
-BMPWatch v0.1 implements and validates **only the RFC 7854 base framing and
+BMPWatch implements and validates **only the RFC 7854 base framing and
 message classification**:
 
 - 6-byte common header (version, length, type) — RFC 7854 §3.1
@@ -29,16 +29,17 @@ message classification**:
 - Message type identification 0–6 — RFC 7854 §3.3–3.8, §8
 - Peer Up / Peer Down lifecycle tracking
 - Timestamp ordering checks
+- Stats Report counter interpretation — RFC 7854 §3.4
+- Initiation/Termination TLV parsing — RFC 7854 §3.7, §3.8
+- IANA-registered reason code labels for Peer Down (incl. the
+  `truncated_peer_down_reason` lint rule)
 
 **Not yet implemented:**
 
 - Adj-RIB-Out vs Loc-RIB differentiation (RFC 8671, RFC 9069)
 - Peer Up TLV parsing beyond the OPEN message (RFC 9736)
 - Post-policy flag interpretation (RFC 8671 L flag)
-- Stats Report counter interpretation (RFC 7854 §3.4)
-- Initiation/Termination TLV parsing (RFC 7854 §3.7, §3.8)
 - Route Mirroring TLV parsing (RFC 7854 §8)
-- IANA-registered reason code labels for Peer Down
 - IANA-registered peer type labels
 
 Extension-aware interpretation is planned but deferred to post-MVP releases.

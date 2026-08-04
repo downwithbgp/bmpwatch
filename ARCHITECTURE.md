@@ -67,7 +67,7 @@ File → format detection (input.rs) → Iterator (RawBmpIterator or ObmpReader)
 | `state.rs` | Data types: DoctorState, PeerKey, PeerState, Finding, Severity |
 | `error.rs` | DoctorError enum (Io / Frame string) |
 | `event.rs` | JsonlEvent struct, `emit_jsonl()`, `max_exit_code()` |
-| `lint.rs` | Finding factory functions, rule name constants (8 rules) |
+| `lint.rs` | Finding factory functions, rule name constants (9 rules) |
 | `report.rs` | Text and JSON output for inspect/lint commands, findings bucketing, session lifecycle |
 | `rolling.rs` | RollingSummary for bounded-window message aggregation (used by `bmpwatch <file>` replay mode) |
 | `input.rs` | Format detection from file content, `file_size_and_format()` |
@@ -79,9 +79,9 @@ File → format detection (input.rs) → Iterator (RawBmpIterator or ObmpReader)
 | `asnames.rs` | Team Cymru bulk WHOIS client for offline AS name cache refresh (`bmpwatch refresh-asnames`) |
 | `record_openbmp_kafka/src/main.rs` | Recorder crate: Kafka consumer for public BMP feeds, writes `.bmpd` via ObmpWriter |
 
-### Lint rules (8)
+### Lint rules (9)
 
-`invalid_bmp_version` (ERR), `truncated_frame` (ERR), `unknown_bmp_type` (WARN), `parse_error` (ERR), `route_monitoring_before_peer_up` (WARN), `duplicate_peer_up` (WARN), `peer_down_without_peer_up` (WARN), `timestamp_regression` (WARN). Rule names are stable snake_case identifiers used in machine output.
+`invalid_bmp_version` (ERR), `truncated_frame` (ERR), `unknown_bmp_type` (WARN), `parse_error` (ERR), `route_monitoring_before_peer_up` (WARN), `duplicate_peer_up` (WARN), `peer_down_without_peer_up` (WARN), `timestamp_regression` (WARN), `truncated_peer_down_reason` (ERR). Rule names are stable snake_case identifiers used in machine output.
 
 ### Findings bucketing
 

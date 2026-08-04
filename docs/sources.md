@@ -10,7 +10,7 @@ Sources ordered by implementation status and verification level.
 
 | Tier | Source                             | Extension    | Status                  |
 |------|------------------------------------|--------------|-------------------------|
-| 1    | Synthetic fixtures                 | (in-memory)  | Implemented, 17 tests   |
+| 1    | Synthetic fixtures                 | (in-memory)  | Implemented (~95 tests in raw_bmp.rs, doctor.rs, obmp_reader.rs, report.rs) |
 | 2    | Local FRR/GoBGP raw BMP            | `.rawbmp`    | Planned, not tested     |
 | 3    | RouteViews Kafka                   | `.bmpd`      | Verified, 100 msg capture |
 | 4    | BGPReader routeviews-stream        | N/A          | Comparison only         |
@@ -37,10 +37,14 @@ collectors via topics matching `^route-?views\..*\.bmp_raw$`.
 
 Each topic corresponds to a BMP peer session. Observed topics include
 `routeviews.sg.64050.bmp_raw`, `routeviews.flix.395880.bmp_raw`,
-`route-views.linx.8714.bmp_raw`, and others.
+`routeviews.linx.8714.bmp_raw`, and others.
 
-**Warning:** Topic naming is not perfectly uniform. Both `routeviews.`
-and `route-views.` prefixes exist. Consumers must handle both variants.
+**Note (verified 2026-08-04 over 1954 live topics):** the topic prefix is
+uniformly `routeviews.`; hyphenated names appear only in the collector
+group segment (e.g. `routeviews.route-views2.saopaulo.199524.bmp_raw`,
+`routeviews.route-views.3333.bmp_raw`). The defensive regex
+`^route-?views\..*\.bmp_raw$` is harmless, but no `route-views.`-prefixed
+topics have been observed on the broker.
 
 This is now the preferred external real-data source for BMPWatch.
 See [RouteViews Kafka verification](routeviews-kafka-verification.md)

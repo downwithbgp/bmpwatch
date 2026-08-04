@@ -10,11 +10,14 @@ BMPWatch integration. See
 [RouteViews Kafka verification](routeviews-kafka-verification.md)
 for the full test log.
 
-**Topic regex:** `^route-?views\..*\.bmp_raw$`
+**Topic regex:** `^routeviews.*\.bmp_raw$` — the recorder's default;
+it matches every topic observed on the broker.
 
-**Warning:** Topic naming is not perfectly uniform. Both `routeviews.`
-and `route-views.` prefixes have been observed. Consumers must handle
-both variants.
+**Note (verified 2026-08-04 over 1954 live topics):** the topic prefix
+is uniformly `routeviews.`; hyphenated names appear only in the
+collector group segment (e.g. `routeviews.route-views2.saopaulo.199524.bmp_raw`).
+The defensive `^route-?views\..*\.bmp_raw$` also works, but no
+`route-views.`-prefixed topics have been observed.
 
 ## Historical: CAIDA BGPStream broker
 
