@@ -11,6 +11,8 @@ publish = false
 bmpwatch = { path = ".." }
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
-rdkafka = "0.36"
+# Sync BaseConsumer + poll() API only; the default "tokio" feature pulls the
+# async runtime for the StreamConsumer API this tool never uses.
+rdkafka = { version = "0.36", default-features = false, features = ["libz"] }
 serde_json = "1"
 ctrlc = "3"
